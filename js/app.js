@@ -881,7 +881,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       const inX = uni.flatMap(s => [s.x1, s.x2]), inY = uni.flatMap(s => [s.y1, s.y2]);
       const rbox = [Math.min(...inX), Math.min(...inY), Math.max(...inX), Math.max(...inY)];
       blocks[k] = { bbox, rbox, byPa, bg, text };
-      plate.items.push({ key: k, bbox });
+      plate.items.push({ key: k, bbox, rbox });   // rbox = full object footprint (frame + number tab)
     }
     return { byKey: blocks, plate };
   }
@@ -1116,7 +1116,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       if (fullBed && round) { const c = svgEl("circle"); c.setAttribute("cx", (ox + bx / 2).toFixed(1)); c.setAttribute("cy", (pad + by / 2).toFixed(1)); c.setAttribute("r", (bx / 2).toFixed(1)); c.setAttribute("fill", "none"); c.setAttribute("stroke", stroke); c.setAttribute("stroke-width", sw); thumb.append(c); }
       else { const bg = svgEl("rect"); bg.setAttribute("x", ox.toFixed(1)); bg.setAttribute("y", pad); bg.setAttribute("width", d.w.toFixed(1)); bg.setAttribute("height", d.h.toFixed(1)); bg.setAttribute("fill", "none"); bg.setAttribute("stroke", stroke); bg.setAttribute("stroke-width", sw); thumb.append(bg); }
       pl.items.forEach(it => {
-        const [x0, y0, x1, y1] = it.bbox, r = svgEl("rect");
+        const [x0, y0, x1, y1] = it.rbox || it.bbox, r = svgEl("rect");   // full object footprint
         const rx = fullBed ? (ox + x0 + oxOff) : (ox + x0 - d.mnx);
         const ry = fullBed ? (pad + by - (y1 + oyOff)) : (pad + d.mxy - y1);
         r.setAttribute("x", rx.toFixed(1)); r.setAttribute("y", ry.toFixed(1));
