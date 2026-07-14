@@ -724,7 +724,21 @@ Paste into Orca's Pressure Advance (PA Pattern) test:
 
 Speeds are your ${flowsMm3.map(f => Math.round(f)).join(", ")} mm³/s test flows at ${num($("layerH").value) || 0.2}×${num($("lineW").value) || 0.44} mm geometry.
 Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length * accels.length} points.`;
-    currentSettings = { source: "recommended", mode: "advanced", unit: $("unitMode").value, layerH: num($("layerH").value), lineW: num($("lineW").value), maxFlow, paStart: +start.toFixed(3), paEnd: +end.toFixed(3), paStep: +step.toFixed(3), speeds, points: flowPts, accels };
+    // Plate-fit: how many test plates does this matrix take on the selected printer's bed?
+    const printer = getPrinter(data.lastPrinterId), bed = printer && printer.bed;
+    let plan = null;
+    if (bed && window.PAPattern) {
+      const combos = [];
+      flowPts.forEach(f => accels.forEach(a => combos.push({ accel: a, flow: f })));
+      plan = window.PAPattern.planPlates({ bed, combos, paStart: +start.toFixed(3), paEnd: +end.toFixed(3), paStep: +step.toFixed(3), lineWidth: num($("lineW").value), layerHeight: num($("layerH").value), wallLoops: 3 });
+      const bedLabel = bed.shape === "round" ? `${bed.diameter} mm round` : `${bed.x}×${bed.y} mm`;
+      const pl = el("div", "planline");
+      pl.textContent = !plan.fits
+        ? `⚠ A single test object (~${Math.round(plan.objW)}×${Math.round(plan.objH)} mm) doesn't fit your ${bedLabel} bed — narrow the PA range or use fewer accels.`
+        : `Plate plan: ${plan.count} objects → ${plan.plates} plate${plan.plates > 1 ? "s" : ""} (${plan.perPlate} per plate, ${plan.cols}×${plan.rows}) on your ${bedLabel} bed.`;
+      $("recommendOut").appendChild(pl);
+    }
+    currentSettings = { source: "recommended", mode: "advanced", unit: $("unitMode").value, layerH: num($("layerH").value), lineW: num($("lineW").value), maxFlow, paStart: +start.toFixed(3), paEnd: +end.toFixed(3), paStep: +step.toFixed(3), speeds, points: flowPts, accels, plan };
     $("loadPointsBtn").hidden = false; $("loadPointsBtn")._points = buildGridRows(flowPts, accels);
   }
 

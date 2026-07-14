@@ -197,6 +197,44 @@
     return { x: b.rbox[2] - b.rbox[0], y: b.rbox[3] - b.rbox[1] };
   }
 
-  root.PAPattern = { synthBlock: synthBlock, objectSize: objectSize, derive: derive, paValues: paValues, drawDigit: drawDigit, CONST: CONST };
+  // ---- plate-fit / layout engine ----
+  // Pack the N pattern objects (one per accel x speed combo) onto plates for the given bed.
+  // opts: { bed:{shape,x,y,diameter}, combos:[{accel,flow}], paStart,paEnd,paStep, nozzle,
+  //         lineWidth, layerHeight, wallLoops, gap, edge }
+  // Returns { count, plates, perPlate, cols, rows, objW, objH, fits, items:[{combo,plate,col,row,x,y}] }.
+  function planPlates(opts) {
+    opts = opts || {};
+    var gap = opts.gap != null ? opts.gap : 4;      // spacing between objects (mm)
+    var edge = opts.edge != null ? opts.edge : 5;   // bed edge margin (skirt/exclusion) (mm)
+    var combos = opts.combos || [];
+    var n = combos.length;
+    // per-object footprint: take the MAX across combos (accel/flow label widths differ), so all fit
+    var maxW = 0, maxH = 0;
+    combos.forEach(function (c) {
+      var s = objectSize({ paStart: opts.paStart, paEnd: opts.paEnd, paStep: opts.paStep, nozzle: opts.nozzle,
+        lineWidth: opts.lineWidth, layerHeight: opts.layerHeight, wallLoops: opts.wallLoops, accel: c.accel, flow: c.flow });
+      if (s.x > maxW) maxW = s.x; if (s.y > maxH) maxH = s.y;
+    });
+    // usable bed area (round bed → inscribed square)
+    var ux, uy;
+    if (opts.bed && opts.bed.shape === "round") { var d = opts.bed.diameter || 0; ux = uy = Math.max(0, d / Math.SQRT2 - 2 * edge); }
+    else { ux = Math.max(0, ((opts.bed && opts.bed.x) || 0) - 2 * edge); uy = Math.max(0, ((opts.bed && opts.bed.y) || 0) - 2 * edge); }
+    // grid packing, no rotation
+    var cols = maxW > 0 ? Math.floor((ux + gap) / (maxW + gap)) : 0;
+    var rows = maxH > 0 ? Math.floor((uy + gap) / (maxH + gap)) : 0;
+    var fits = cols >= 1 && rows >= 1;
+    var perPlate = fits ? cols * rows : 0;
+    var plates = (fits && n > 0) ? Math.ceil(n / perPlate) : (n > 0 ? Infinity : 0);
+    var items = [];
+    if (fits) {
+      for (var i = 0; i < n; i++) {
+        var plate = Math.floor(i / perPlate), idx = i % perPlate, col = idx % cols, row = Math.floor(idx / cols);
+        items.push({ combo: combos[i], plate: plate, col: col, row: row, x: edge + col * (maxW + gap), y: edge + row * (maxH + gap) });
+      }
+    }
+    return { count: n, plates: plates, perPlate: perPlate, cols: cols, rows: rows, objW: maxW, objH: maxH, fits: fits, items: items };
+  }
+
+  root.PAPattern = { synthBlock: synthBlock, objectSize: objectSize, planPlates: planPlates, derive: derive, paValues: paValues, drawDigit: drawDigit, CONST: CONST };
   if (typeof module !== "undefined" && module.exports) module.exports = root.PAPattern;
 })();

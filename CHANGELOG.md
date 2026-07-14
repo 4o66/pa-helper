@@ -21,6 +21,8 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   (hotlinked live from the maker's site, never stored).
 - New printers auto-seed one **Generic 0.4 mm Brass** nozzle and then prompt you to keep it or delete
   it and add your own.
+- **Plate-fit**: the recommend output now tells you how many test plates the job needs on your bed
+  (e.g. "25 objects → 3 plates, 12 per plate on your 280×280 mm bed").
 
 ### Changed
 - `beds.js` rebuilt as a clean, documented single-purpose data file: real per-maker models (Voron =
