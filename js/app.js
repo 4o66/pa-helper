@@ -1025,11 +1025,45 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       const on = it.key === curKey; r.setAttribute("fill", on ? "var(--accent)" : "#8b97a7"); r.setAttribute("opacity", on ? "1" : "0.3"); thumb.append(r);
     });
   }
+  // Plate thumbnail for a GENERATED test (no imported plate): from the plate-fit plan, draw the
+  // objects on the current row's plate, current one highlighted, and label "plate N of M".
+  function renderPlanThumb(tr) {
+    const thumb = $("patternThumb"); if (!thumb) return;
+    while (thumb.firstChild) thumb.removeChild(thumb.firstChild);
+    const plan = currentSettings && currentSettings.plan;
+    const printer = getPrinter(data.lastPrinterId), bed = printer && printer.bed;
+    if (!plan || !plan.fits || !bed) { thumb.style.display = "none"; return; }
+    thumb.style.display = "";
+    const flow = num(tr.querySelector('input[data-key="flow"]').value);
+    const accel = num(tr.querySelector('input[data-key="accel"]').value);
+    const cur = plan.items.find(it => it.combo.accel === accel && (flow == null || Math.abs(it.combo.flow - flow) < 0.6));
+    const curPlate = cur ? cur.plate : 0;
+    const bx = bed.shape === "round" ? (bed.diameter || 0) : (bed.x || 0);
+    const by = bed.shape === "round" ? (bed.diameter || 0) : (bed.y || 0);
+    const pad = 4;
+    thumb.setAttribute("viewBox", `0 0 ${(bx + 2 * pad).toFixed(1)} ${(by + 2 * pad).toFixed(1)}`);
+    if (bed.shape === "round") {
+      const c = svgEl("circle"); c.setAttribute("cx", (bx / 2 + pad).toFixed(1)); c.setAttribute("cy", (by / 2 + pad).toFixed(1)); c.setAttribute("r", (bx / 2).toFixed(1));
+      c.setAttribute("fill", "none"); c.setAttribute("stroke", "#8b97a7"); c.setAttribute("stroke-width", 1.5); thumb.append(c);
+    } else {
+      const b = svgEl("rect"); b.setAttribute("x", pad); b.setAttribute("y", pad); b.setAttribute("width", bx); b.setAttribute("height", by);
+      b.setAttribute("fill", "none"); b.setAttribute("stroke", "#8b97a7"); b.setAttribute("stroke-width", 1.5); thumb.append(b);
+    }
+    plan.items.filter(it => it.plate === curPlate).forEach(it => {
+      const r = svgEl("rect");
+      r.setAttribute("x", (it.x + pad).toFixed(1)); r.setAttribute("y", (it.y + pad).toFixed(1));
+      r.setAttribute("width", plan.objW.toFixed(1)); r.setAttribute("height", plan.objH.toFixed(1));
+      const on = cur && it === cur;
+      r.setAttribute("fill", on ? "var(--accent)" : "#8b97a7"); r.setAttribute("opacity", on ? "1" : "0.35"); thumb.append(r);
+    });
+    if (plan.plates > 0) $("patternTitle").textContent += `  ·  plate ${curPlate + 1} of ${plan.plates}`;
+  }
   function renderRealPattern(tr, block, accel, speed) {
     const flow = tr.querySelector('input[data-key="flow"]').value;
     const cur = num(tr.querySelector('input[data-key="bestPA"]').value);
     $("patternTitle").textContent = `Pick the best line — flow ${flow || "?"} mm³/s @ ${accel} mm/s² (${speed} mm/s)`;
-    renderThumb(accel + "|" + speed);
+    if (gcodeBlocks && gcodeBlocks.plate) renderThumb(accel + "|" + speed);   // imported plate
+    else renderPlanThumb(tr);                                                  // generated test → plate-fit plan
     const svg = $("patternSvg"); while (svg.firstChild) svg.removeChild(svg.firstChild);
     const [minx, miny, maxx, maxy] = block.rbox, pad = 2, UW = maxx - minx, VH = maxy - miny;
     svg.setAttribute("viewBox", `0 0 ${(VH + 2 * pad).toFixed(1)} ${(UW + 2 * pad).toFixed(1)}`);
