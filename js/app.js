@@ -14,7 +14,7 @@
   const PALETTE = ["#4aa8ff", "#37c98b", "#ffb84a", "#c98bff", "#5de0e6", "#ff8f5d", "#8bff9e"];
 
   // ---- session state ----
-  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null;
+  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, pendingTab = null;
   const PA_FACTORS = ["toolhead", "extruder", "drive", "hotend"];
   const FILAMENT_PA_FACTORS = ["material", "formulation", "fiber", "fiberName", "fiberPct", "hardness", "diameter"];
 
@@ -26,7 +26,7 @@
   // ---- generic field builder ----
   function makeFieldNode(spec) {
     if (spec.customKey && !data.customOptions[spec.customKey]) data.customOptions[spec.customKey] = [];
-    const wrap = el("div", "field"); wrap.dataset.key = spec.key;
+    const wrap = el("div", "field" + (spec.newRow ? " newrow" : "")); wrap.dataset.key = spec.key;
     const lab = el("label"); lab.textContent = spec.label;
     if (spec.help) {
       const h = el("span", "help"); h.textContent = "?"; h.title = spec.help;
@@ -57,7 +57,19 @@
         set: (v) => { v = v == null ? "" : String(v);
           if ([...sel.options].some(o => o.value === v)) { sel.value = v; if (custom) custom.hidden = true; }
           else if (v && custom) { sel.value = "__custom__"; custom.hidden = false; custom.value = v; }
-          else sel.selectedIndex = 0; }
+          else sel.selectedIndex = 0; },
+        // Rebuild the option list at runtime (used for the maker-dependent model dropdown).
+        setOptions: (list) => {
+          const keep = api.get();
+          while (sel.firstChild) sel.removeChild(sel.firstChild);
+          if (spec.optional) { const b = el("option"); b.value = ""; b.textContent = "— none —"; sel.append(b); }
+          (list || []).forEach(o => addOpt(sel, o));
+          if (spec.customKey) {
+            (data.customOptions[spec.customKey] || []).filter(o => !(list || []).map(String).includes(String(o))).forEach(o => addOpt(sel, o));
+            const cu = el("option"); cu.value = "__custom__"; cu.textContent = "Custom…"; sel.append(cu);
+          }
+          api.set(keep);
+        }
       };
     } else {
       const inp = el("input"); inp.type = (spec.kind === "number") ? "number" : "text";
@@ -88,13 +100,22 @@
   }
 
   const PRINTER_FIELDS = [
-    { key: "maker", label: "Printer maker", kind: "select", options: P.printerMakers, customKey: "printerMaker" },
-    { key: "model", label: "Printer model", kind: "text", customKey: "printerModel" },
-    { key: "toolhead", label: "Toolhead", kind: "select", options: P.toolheads, customKey: "toolhead" },
+    // Row 1: maker + model
+    { key: "maker", label: "Printer maker", kind: "select", options: P.printerMakers, customKey: "printerMaker", newRow: true },
+    { key: "model", label: "Printer model", kind: "select", options: [], customKey: "printerModel", help: "Pick your model to auto-fill the bed size, or choose Custom… to type one. Models come from the built-in list for the selected maker, newest first." },
+    // Row 2: toolhead, extruder, hotend  (Row 3 wraps: drive)
+    { key: "toolhead", label: "Toolhead", kind: "select", options: P.toolheads, customKey: "toolhead", newRow: true },
     { key: "extruder", label: "Extruder", kind: "select", options: P.extruders, customKey: "extruder" },
-    { key: "drive", label: "Drive", kind: "select", options: P.extruderDrives },
     { key: "hotend", label: "Hotend", kind: "select", options: P.hotends, customKey: "hotend" },
-    { key: "maxAccel", label: "Max acceleration (mm/s²)", kind: "number", step: "500", default: 12000, help: "The highest acceleration this printer can reliably run — a function of its frame, motors, toolhead mass and input shaping. Used as the ceiling for the PA test's acceleration sweep." }
+    { key: "drive", label: "Drive", kind: "select", options: P.extruderDrives },
+    // Row 4: bed shape, X, Y (diameter for round)  (origin wraps below)
+    { key: "bedShape", label: "Bed shape", kind: "select", options: ["Rectangular", "Round"], default: "Rectangular", newRow: true, help: "Rectangular for bed-slingers and CoreXY; Round for deltas." },
+    { key: "bedX", label: "Bed size X (mm)", kind: "number", step: "1", help: "Usable bed width. Auto-filled from the model; edit if your machine differs. Used to work out how many test plates a big job needs." },
+    { key: "bedY", label: "Bed size Y (mm)", kind: "number", step: "1", help: "Usable bed depth." },
+    { key: "bedDiameter", label: "Bed diameter (mm)", kind: "number", step: "1", help: "Usable bed diameter (round/delta beds)." },
+    { key: "origin", label: "Origin", kind: "select", options: ["Front-left (0,0)", "Center"], default: "Front-left (0,0)", help: "Where (0,0) sits — front-left for most bed-slingers/CoreXY, center for many deltas." },
+    // Last row: max acceleration
+    { key: "maxAccel", label: "Max acceleration (mm/s²)", kind: "number", step: "500", default: 12000, newRow: true, help: "The highest acceleration this printer can reliably run — a function of its frame, motors, toolhead mass and input shaping. Used as the ceiling for the PA test's acceleration sweep." }
   ];
   const NOZZLE_FIELDS = [
     { key: "maker", label: "Nozzle maker", kind: "select", options: P.nozzleMakers, customKey: "nozzleMaker" },
@@ -131,6 +152,37 @@
     printerForm.extruder.set(cfg.extruder);
     printerForm.drive.set(cfg.drive);
     printerForm.hotend.set(cfg.hotend);
+  }
+
+  // ---- bed data (js/beds.js) ----
+  const BEDS = window.PA_BEDS || {};
+  const bedEntry = (maker) => BEDS[maker] || null;
+  const bedModelRows = (maker) => { const b = bedEntry(maker); return b ? (b.models || b.sizes || []) : []; };
+  function applyModelOptions() {
+    if (!printerForm || !printerForm.model.setOptions) return;
+    printerForm.model.setOptions(bedModelRows(printerForm.maker.get()).map(r => r[0]));
+  }
+  // Auto-fill the bed fields from beds.js for the current maker+model (leaves them alone if unknown).
+  function autofillBed() {
+    if (!printerForm || !printerForm.bedShape) return;
+    const b = bedEntry(printerForm.maker.get());
+    if (b && b.origin) printerForm.origin.set(b.origin === "center" ? "Center" : "Front-left (0,0)");
+    const row = bedModelRows(printerForm.maker.get()).find(r => r[0] === printerForm.model.get());
+    if (row) { printerForm.bedShape.set("Rectangular"); printerForm.bedX.set(row[1]); printerForm.bedY.set(row[2]); }
+    updatePrinterConditionals();
+  }
+  function updatePrinterConditionals() {
+    if (!printerForm || !printerForm.bedShape) return;
+    const round = printerForm.bedShape.get() === "Round";
+    const show = (key, on) => { const w = document.querySelector('#printerForm .field[data-key="' + key + '"]'); if (w) w.style.display = on ? "" : "none"; };
+    show("bedX", !round); show("bedY", !round); show("bedDiameter", round);
+  }
+  // full setup after (re)building the printer form
+  function initPrinterDefaults() { applyModelOptions(); applyPrinterDefaults(); autofillBed(); updatePrinterConditionals(); }
+  // does a printer have a usable bed defined? (gate uses this)
+  function hasBed(p) {
+    const b = p && p.bed; if (!b) return false;
+    return b.shape === "round" ? (b.diameter > 0) : (b.x > 0 && b.y > 0);
   }
 
   // ---- lookups ----
@@ -173,9 +225,26 @@
   function applyTheme(t) { document.documentElement.dataset.theme = t || "system"; }
 
   // ---- tabs ----
-  function switchTab(name) {
+  const markJobDirty = () => { jobDirty = true; };
+  const clearJobDirty = () => { jobDirty = false; };
+  function applyTab(name) {
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
     document.querySelectorAll(".tab").forEach(s => s.classList.toggle("active", s.id === "tab-" + name));
+  }
+  function switchTab(name) {
+    // Gate: the selected printer must have a bed size before leaving the Printers tab (it's
+    // needed to work out how many test plates a job takes). Bounce back and open its editor.
+    if (name !== "printers") {
+      const p = getPrinter(data.lastPrinterId);
+      if (p && !hasBed(p)) {
+        alert("Set the bed size for “" + printerLabel(p) + "” first — it's needed to plan test-plate layout.");
+        name = "printers";
+        editPrinter(p.id);
+      }
+    }
+    // Guard: an unsaved PA test in progress — prompt to save-in-progress or abandon before leaving.
+    if (jobDirty && name !== "test") { pendingTab = name; $("jobGuardModal").hidden = false; return; }
+    applyTab(name);
   }
   function switchSubtab(name) {
     document.querySelectorAll(".subtab-btn").forEach(b => b.classList.toggle("active", b.dataset.subtab === name));
@@ -239,19 +308,32 @@
   function readPrinterForm() {
     const v = readForm(printerForm);
     const multi = $("printerMulti").checked;
-    return { maker: v.maker, model: v.model, toolhead: v.toolhead, extruder: v.extruder, drive: v.drive, hotend: v.hotend, maxAccel: num(v.maxAccel) || 12000, multi, instances: multi ? parseInstances($("instancesInput").value) : [] };
+    const shape = v.bedShape === "Round" ? "round" : "rect";
+    const origin = v.origin === "Center" ? "center" : "corner";
+    const bed = shape === "round"
+      ? { shape, diameter: num(v.bedDiameter) || 0, origin }
+      : { shape, x: num(v.bedX) || 0, y: num(v.bedY) || 0, origin };
+    return { maker: v.maker, model: v.model, toolhead: v.toolhead, extruder: v.extruder, drive: v.drive, hotend: v.hotend, maxAccel: num(v.maxAccel) || 12000, bed, multi, instances: multi ? parseInstances($("instancesInput").value) : [] };
   }
   function resetPrinterForm() {
     editingPrinterId = null;
     $("printerAdd").open = false; $("instancesInput").value = ""; $("printerMulti").checked = false; $("instancesWrap").hidden = true;
     $("savePrinterBtn").textContent = "Save printer";
     $("printerAdd").querySelector("summary").textContent = "+ Add a printer";
-    printerForm = buildForm($("printerForm"), PRINTER_FIELDS); applyPrinterDefaults();
+    printerForm = buildForm($("printerForm"), PRINTER_FIELDS); initPrinterDefaults();
   }
   function editPrinter(id) {
     const p = getPrinter(id); if (!p) return;
     editingPrinterId = id;
     fillForm(printerForm, p);
+    applyModelOptions();                        // model options depend on maker (set above)
+    printerForm.model.set(p.model);
+    if (p.bed) {                                // restore bed fields from the nested bed object
+      printerForm.bedShape.set(p.bed.shape === "round" ? "Round" : "Rectangular");
+      printerForm.bedX.set(p.bed.x); printerForm.bedY.set(p.bed.y); printerForm.bedDiameter.set(p.bed.diameter);
+      printerForm.origin.set(p.bed.origin === "center" ? "Center" : "Front-left (0,0)");
+    }
+    updatePrinterConditionals();
     $("printerMulti").checked = !!p.multi; $("instancesWrap").hidden = !p.multi;
     $("instancesInput").value = (p.instances || []).map(i => i.label).join(", ");
     $("savePrinterBtn").textContent = "Update printer";
@@ -368,7 +450,7 @@
   function abandonRun(id) {
     const r = data.runs.find(x => x.id === id); if (!r) return;
     if (!confirm("Abandon this run? The filament stays; only this unfinished run is set aside.")) return;
-    r.status = "abandoned"; if (currentRunId === id) currentRunId = null;
+    r.status = "abandoned"; if (currentRunId === id) { currentRunId = null; clearJobDirty(); }
     if (data.gcodeCache) delete data.gcodeCache[id];
     persist(); renderInProgress();
   }
@@ -792,7 +874,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       const flow = (r.flow && r.flow[a + "|" + s] != null) ? r.flow[a + "|" + s] : s * cf;   // true flow from the g-code
       rows.push({ flow: Math.round(flow * 100) / 100, accel: a, speed: s });
     }));
-    if (rows.length) { loadGrid(rows); sortResults(); }
+    if (rows.length) { loadGrid(rows); sortResults(); markJobDirty(); }
     currentSettings = { source: "gcode", mode: "advanced", unit: "speed", layerH: num($("layerH").value), lineW: num($("lineW").value), paStart: r.paStart, paEnd: r.paEnd, paStep: r.paStep, speeds: r.speeds, accels: r.accels, flow: r.flow };
     $("gcodeHint").textContent = `Imported ${file.name}: built a ${r.speeds.length}×${r.accels.length} = ${rows.length}-point table using the actual flow from the g-code${r.paStart != null ? " (PA " + r.paStart + "–" + r.paEnd + ")" : ""}. Fill in the best PA per row.`;
   }
@@ -802,7 +884,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     if (isBasic()) {
       currentSettings = { source: "provided", mode: "basic", basicMethod: $("basicMethod").value, paStart, paEnd, paStep };
       $("recommendOut").textContent = `Recorded your basic ${$("basicMethod").value} settings. Enter the best PA below.`;
-      return;
+      markJobDirty(); return;
     }
     const pts = parseList($("pvFlows").value), accels = parseList($("pvAccels").value);
     if (!pts.length) { alert("Enter the " + (unitIsSpeed() ? "speed" : "flow") + " points you tested, comma-separated."); return; }
@@ -810,7 +892,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const cf = convFactor();
     const flows = unitIsSpeed() ? pts.map(p => Math.round(p * cf * 100) / 100) : pts;   // results table is flow
     currentSettings = { source: "provided", mode: "advanced", unit: $("unitMode").value, layerH: num($("layerH").value), lineW: num($("lineW").value), maxFlow: num($("maxFlow").value), paStart, paEnd, paStep, points: flows, accels };
-    loadGrid(buildGridRows(flows, accels)); sortResults();
+    loadGrid(buildGridRows(flows, accels)); sortResults(); markJobDirty();
   }
 
   // results table
@@ -1118,14 +1200,14 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   function upsertRun(run) { const i = data.runs.findIndex(r => r.id === run.id); if (i >= 0) data.runs[i] = run; else data.runs.unshift(run); }
   function savePlanned() {
     if (!data.lastPrinterId || !getSelectedNozzle() || !data.lastFilamentId) { alert("Select a printer, nozzle and filament first."); return; }
-    const run = collectRun("planned"); currentRunId = run.id; upsertRun(run); cacheBlocksFor(run.id); persist(); renderInProgress();
+    const run = collectRun("planned"); currentRunId = run.id; upsertRun(run); cacheBlocksFor(run.id); persist(); renderInProgress(); clearJobDirty();
     alert("Saved as a planned run. Print it, then reopen PA-Helper → Filament tab → Resume to enter results.");
   }
   function saveRun() {
     if (!data.lastPrinterId || !getSelectedNozzle() || !data.lastFilamentId) { alert("Select a printer, nozzle and filament first."); return; }
     const run = collectRun("complete"); currentRunId = run.id; upsertRun(run);
     cacheBlocksFor(run.id);   // keep the geometry so a completed test can be reopened in the real picker
-    persist(); renderInProgress(); renderCompletedRuns();
+    persist(); renderInProgress(); renderCompletedRuns(); clearJobDirty();
     alert("Run saved.");
   }
   function resumeRun(id) {
@@ -1154,7 +1236,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       sortResults();
       $("recommendOut").textContent = `Resumed planned run. PA range ${s.paStart}–${s.paEnd} step ${s.paStep}. Fill in the best PA per row.`;
     }
-    persist(); renderPrinters(); renderNozzles(); renderFilaments(); updateTestContext();
+    persist(); renderPrinters(); renderNozzles(); renderFilaments(); updateTestContext(); markJobDirty();
     switchTab("test");
   }
 
@@ -1175,7 +1257,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     printerForm = buildForm($("printerForm"), PRINTER_FIELDS);
     nozzleForm = buildForm($("nozzleForm"), NOZZLE_FIELDS);
     filamentForm = buildForm($("filamentForm"), FILAMENT_FIELDS);
-    applyPrinterDefaults(); updateFilamentConditionals();
+    initPrinterDefaults(); updateFilamentConditionals();
   }
   function doClear(kind) {
     if (kind === "cancel") { $("debugModal").hidden = true; return; }
@@ -1190,7 +1272,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     else if (kind === "history") { data.runs = []; data.gcodeCache = {}; data.customOptions = Store.defaultData().customOptions; }
     else if (kind === "filaments") { data.filaments = []; data.lastFilamentId = null; }
     else if (kind === "printers") { data.printers = []; data.lastPrinterId = null; data.lastInstanceId = null; data.lastNozzleId = null; }
-    editingPrinterId = null; editingFilamentId = null; currentRunId = null; currentSettings = null; lastFit = null;
+    editingPrinterId = null; editingFilamentId = null; currentRunId = null; currentSettings = null; lastFit = null; clearJobDirty();
     persist(); rebuildForms(); reloadAll();
     $("debugModal").hidden = true;
   }
@@ -1202,12 +1284,17 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     printerForm = buildForm($("printerForm"), PRINTER_FIELDS);
     nozzleForm = buildForm($("nozzleForm"), NOZZLE_FIELDS);
     filamentForm = buildForm($("filamentForm"), FILAMENT_FIELDS);
-    applyPrinterDefaults(); updateFilamentConditionals();
+    initPrinterDefaults(); updateFilamentConditionals();
     $("basicMethod").value = P.basicDefault;
     $("flowPoints").value = 5;   // deterministic default (defeat browser form-restore)
     document.querySelectorAll("input, select").forEach(e => e.setAttribute("autocomplete", "off"));
     updateUnitUI(); reloadAll();
-    $("printerForm").addEventListener("change", (e) => { const f = e.target.closest(".field"); if (f && (f.dataset.key === "maker" || f.dataset.key === "model")) applyPrinterDefaults(); });
+    $("printerForm").addEventListener("change", (e) => {
+      const f = e.target.closest(".field"); if (!f) return;
+      if (f.dataset.key === "maker") { applyModelOptions(); applyPrinterDefaults(); autofillBed(); }
+      else if (f.dataset.key === "model") { applyPrinterDefaults(); autofillBed(); }
+      else if (f.dataset.key === "bedShape") { updatePrinterConditionals(); }
+    });
     $("filamentForm").addEventListener("change", () => updateFilamentConditionals());
     $("filamentRestrict").addEventListener("change", () => { const on = $("filamentRestrict").checked; if (on) renderFilamentPrinterPicker(); $("filamentPrinters").hidden = !on; });
     $("filamentViewToggle").addEventListener("click", (e) => { const b = e.target.closest("button[data-view]"); if (!b) return; data.filamentView = b.dataset.view; persist(); renderFilaments(); });
@@ -1240,9 +1327,21 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("importGcodeBtn").addEventListener("click", () => { if (gcodeImported) resetGcode(); else $("gcodeInput").click(); });
     $("gcodeInput").addEventListener("change", (e) => { if (e.target.files[0]) importGcode(e.target.files[0]); });
     window.PA_parseGcode = parsePaGcode;
-    $("loadPointsBtn").addEventListener("click", (e) => { loadGrid(e.target._points || []); sortResults(); });
+    $("loadPointsBtn").addEventListener("click", (e) => { loadGrid(e.target._points || []); sortResults(); markJobDirty(); });
     $("resultSort").addEventListener("change", sortResults);
     $("savePlannedBtn").addEventListener("click", savePlanned);
+    // Unsaved-PA-job guard: mark the job dirty on edits, prompt on navigation / tab close.
+    $("resultsBody").addEventListener("input", markJobDirty);
+    if ($("basicBestPA")) $("basicBestPA").addEventListener("input", markJobDirty);
+    $("jobGuardSave").addEventListener("click", () => { savePlanned(); $("jobGuardModal").hidden = true; const t = pendingTab; pendingTab = null; if (t) applyTab(t); });
+    $("jobGuardAbandon").addEventListener("click", () => {
+      const r = currentRunId ? data.runs.find(x => x.id === currentRunId) : null;
+      if (r) { r.status = "abandoned"; if (data.gcodeCache) delete data.gcodeCache[currentRunId]; }
+      currentRunId = null; loadGrid([]); clearJobDirty(); persist(); renderInProgress();
+      $("jobGuardModal").hidden = true; const t = pendingTab; pendingTab = null; if (t) applyTab(t);
+    });
+    $("jobGuardCancel").addEventListener("click", () => { $("jobGuardModal").hidden = true; pendingTab = null; });
+    window.addEventListener("beforeunload", (e) => { if (jobDirty) { e.preventDefault(); e.returnValue = ""; } });
     $("flowPoints").addEventListener("change", () => { let n = Math.round(num($("flowPoints").value)); if (!(n >= 2)) n = 5; $("flowPoints").value = n; });
     $("addRowBtn").addEventListener("click", () => addRow());
     $("analyzeBtn").addEventListener("click", analyze);
@@ -1258,13 +1357,13 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("debugModal").querySelectorAll("button[data-clear]").forEach(b => b.addEventListener("click", () => doClear(b.dataset.clear)));
     $("exportBtn").addEventListener("click", () => { persist(); Store.exportJSON(data); });
     $("importBtn").addEventListener("click", () => $("importInput").click());
-    $("importInput").addEventListener("change", async (e) => { if (e.target.files[0]) { data = await Store.importJSON(e.target.files[0]); printerForm = buildForm($("printerForm"), PRINTER_FIELDS); nozzleForm = buildForm($("nozzleForm"), NOZZLE_FIELDS); filamentForm = buildForm($("filamentForm"), FILAMENT_FIELDS); applyPrinterDefaults(); updateFilamentConditionals(); reloadAll(); } });
+    $("importInput").addEventListener("change", async (e) => { if (e.target.files[0]) { data = await Store.importJSON(e.target.files[0]); printerForm = buildForm($("printerForm"), PRINTER_FIELDS); nozzleForm = buildForm($("nozzleForm"), NOZZLE_FIELDS); filamentForm = buildForm($("filamentForm"), FILAMENT_FIELDS); initPrinterDefaults(); updateFilamentConditionals(); reloadAll(); } });
     $("connectFileBtn").addEventListener("click", async () => {
       try {
         if (!Store.supportsFS()) { alert("Your browser can't open a file directly (need Chrome/Edge/Brave on https or localhost). Use Import/Export instead."); return; }
         const open = confirm("OK = open an existing pa_data.json.\nCancel = create a new one.");
         const loaded = await Store.connectFile(open);
-        if (loaded) { data = loaded; printerForm = buildForm($("printerForm"), PRINTER_FIELDS); nozzleForm = buildForm($("nozzleForm"), NOZZLE_FIELDS); filamentForm = buildForm($("filamentForm"), FILAMENT_FIELDS); applyPrinterDefaults(); updateFilamentConditionals(); reloadAll(); } else { persist(); }
+        if (loaded) { data = loaded; printerForm = buildForm($("printerForm"), PRINTER_FIELDS); nozzleForm = buildForm($("nozzleForm"), NOZZLE_FIELDS); filamentForm = buildForm($("filamentForm"), FILAMENT_FIELDS); initPrinterDefaults(); updateFilamentConditionals(); reloadAll(); } else { persist(); }
         setStatus();
       } catch (err) { /* cancelled */ }
     });

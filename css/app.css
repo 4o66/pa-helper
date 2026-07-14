@@ -78,6 +78,7 @@ nav.subtabs{display:flex;gap:.3rem;margin:1rem 0 0}
 .hint{color:var(--muted);font-size:.85rem;margin:.2rem 0 .8rem}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:.7rem}
 .field{display:flex;flex-direction:column;gap:.2rem}
+.field.newrow{grid-column-start:1}
 .field label{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .row{display:flex;gap:.8rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:.6rem}
 .grid + .row{margin-top:1rem}

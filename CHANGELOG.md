@@ -10,6 +10,13 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
 ## [Unreleased]
 
 ### Added
+- **Bed size on printers** (`js/beds.js` + printer form): maker-driven **model dropdown** (newest
+  first) that auto-fills bed shape / X / Y / origin, with Custom + manual entry. A printer must have
+  a bed before you can leave the Printers tab (bounce-back gate) — this also migrates existing
+  printers. Printer form reorganized into readable rows (maker+model / toolhead+extruder+hotend+drive
+  / bed shape+X+Y+origin / max accel).
+- **Unsaved-PA-job guard**: once you start a PA test, navigating away — switching tabs or closing the
+  browser tab — prompts you to save it as an in-progress run or abandon it.
 - **Orca-method PA-pattern replica** (`js/pattern.js`) — generates the exact block that OrcaSlicer
   prints for the no-g-code picker: chevrons, the anchoring frame, the filled number tab, the
   seven-segment PA / flow / acceleration glyphs (Orca's own digit method, not a font), and the
