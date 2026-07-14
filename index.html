@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="system">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PA-Helper</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header>
+  <h1>PA-Helper <span class="sub">Pressure Advance calibration companion</span></h1>
+  <div class="toolbar">
+    <select id="themeSel" title="Theme" aria-label="Theme">
+      <option value="system">System</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+    </select>
+    <span id="dataStatus" class="status">local (this browser)</span>
+    <button id="connectFileBtn" title="Read/write a real pa_data.json (Chrome/Edge/Brave)">Connect file…</button>
+    <button id="importBtn">Import</button>
+    <input id="importInput" type="file" accept="application/json" hidden>
+    <button id="exportBtn">Export</button>
+    <button id="debugClearBtn" class="danger" title="Danger: permanently delete local data">DEBUG: Clear data</button>
+  </div>
+</header>
+
+<div id="patternModal" class="modal" hidden>
+  <div class="modal-box plain wide">
+    <div class="pmhead">
+      <div>
+        <h3 id="patternTitle">Pick the best line</h3>
+        <p class="hint">Click the line that printed cleanest (sharpest corners, no bulge/gap) — its PA value fills the row. Hover to highlight. Enlarge the window or rotate your screen if the pattern is hard to read.</p>
+      </div>
+      <svg id="patternThumb" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" aria-label="build plate — current block highlighted"></svg>
+    </div>
+    <div id="patternSvgWrap"><svg id="patternSvg" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"></svg></div>
+    <p id="patternSel" class="muted"></p>
+    <div class="row" style="margin-top:.4rem"><button id="patternOk">OK</button><button id="patternCancel" class="secondary">Cancel</button></div>
+  </div>
+</div>
+
+<div id="debugModal" class="modal" hidden>
+  <div class="modal-box">
+    <h3>⚠ Clear data — here there be dragons</h3>
+    <p>This permanently deletes local data. <b>There is no undo, no way back.</b> Choose what to obliterate:</p>
+    <div class="modal-actions">
+      <button class="danger" data-clear="printers">Printers</button>
+      <button class="danger" data-clear="filaments">Filaments</button>
+      <button class="danger" data-clear="history">PA history + remembered inputs</button>
+      <button class="danger" data-clear="all">Clear ALL</button>
+      <button class="secondary" data-clear="cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<nav class="tabs">
+  <button class="tab-btn" data-tab="printers"><span class="tt">Printer</span><span class="ts" id="tabSelPrinter">Not selected</span></button>
+  <button class="tab-btn" data-tab="filaments"><span class="tt">Filament</span><span class="ts" id="tabSelFilament">Not selected</span></button>
+  <button class="tab-btn" data-tab="test"><span class="tt">PA Test</span><span class="ts">&nbsp;</span></button>
+</nav>
+
+<main>
+  <!-- ============ TAB 1: PRINTERS ============ -->
+  <section class="tab" id="tab-printers">
+    <h2>Printer</h2>
+    <p class="hint">A printer is defined by its maker/model, toolhead, extruder (+ drive) and hotend — the things that dominate pressure advance. Swapping any of those is a new printer. Nozzle and filament are chosen per test, not here.</p>
+    <div id="printerList" class="cards"></div>
+
+    <details id="printerAdd">
+      <summary>+ Add a printer</summary>
+      <div id="printerForm" class="grid"></div>
+      <label class="checkline"><input id="printerMulti" type="checkbox"> I run multiple copies of this exact machine (track them individually)</label>
+      <div id="instancesWrap" hidden>
+        <label class="blocklabel">Units (serial / asset ID — one per line or comma-separated)</label>
+        <textarea id="instancesInput" rows="3" placeholder="e.g. VT-350-001, VT-350-002, VT-350-003"></textarea>
+      </div>
+      <div class="row"><button id="savePrinterBtn">Save printer</button><button id="cancelPrinterBtn" class="secondary">Cancel</button></div>
+    </details>
+
+    <div id="nozzleSection" class="subsec" hidden>
+      <h3>Nozzles for <span id="nozzleForPrinter"></span></h3>
+      <p class="hint">Pick the nozzle you're printing with. Nozzles swap often and change PA, so they live with the printer. Add as many as you use.</p>
+      <div id="nozzleList" class="cards"></div>
+      <details id="nozzleAdd">
+        <summary>+ Add a nozzle</summary>
+        <div id="nozzleForm" class="grid"></div>
+        <div class="row"><button id="saveNozzleBtn">Save nozzle</button></div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ============ TAB 2: FILAMENTS ============ -->
+  <section class="tab" id="tab-filaments">
+    <h2>Filament</h2>
+
+    <div id="inProgressWrap" hidden>
+      <h3 class="pinhead">In progress — printed, waiting for data entry</h3>
+      <div id="inProgressList" class="cards"></div>
+    </div>
+
+    <details id="completedWrap" hidden>
+      <summary>Completed runs — reopen to view</summary>
+      <div id="completedList" class="cards"></div>
+    </details>
+
+    <p class="hint">Pick the filament you're calibrating, or add a new one. Filaments work on any printer unless you restrict them. Runs you've started but not finished appear pinned above.</p>
+    <div class="filbar">
+      <div id="filamentFilters" class="filters"></div>
+      <div class="viewtoggle" id="filamentViewToggle">
+        <button data-view="cards" class="secondary">Cards</button>
+        <button data-view="list" class="secondary">List</button>
+      </div>
+    </div>
+    <div id="filamentList" class="cards"></div>
+    <p id="filamentPinNotice" class="hint pinnotice" hidden></p>
+
+    <details id="filamentAdd">
+      <summary>+ Add a filament</summary>
+      <div id="filamentForm" class="grid"></div>
+      <label class="checkline"><input id="filamentRestrict" type="checkbox"> Restrict this filament to specific printer(s)</label>
+      <div id="filamentPrinters" hidden></div>
+      <div class="row"><button id="saveFilamentBtn">Save filament</button><button id="cancelFilamentBtn" class="secondary">Cancel</button></div>
+    </details>
+  </section>
+
+  <!-- ============ TAB 3: PA TEST ============ -->
+  <section class="tab" id="tab-test">
+    <h2>PA Test</h2>
+    <div id="testContext" class="context"></div>
+
+    <div id="testBody" hidden>
+      <!-- shared: max volumetric speed (from a prior flow calibration) -->
+      <div class="subsec">
+        <div class="row">
+          <label>Max volumetric speed (mm³/s) <input id="maxFlow" type="number" step="0.5" placeholder="from flow calibration"></label>
+        </div>
+        <p class="hint" id="flowHint"></p>
+      </div>
+
+      <!-- shared: what kind of test -->
+      <div class="subsec">
+        <h3>Test type</h3>
+        <div class="row">
+          <label>Mode <select id="testMode"><option value="advanced">Advanced — adaptive PA (flow × accel)</option><option value="basic">Basic — single PA value</option></select></label>
+          <label>Method <select id="basicMethod"><option value="tower">Tower (recommended)</option><option value="line">Line</option><option value="pattern">Pattern</option></select></label>
+        </div>
+        <p class="hint" id="modeHint"></p>
+      </div>
+
+      <nav class="subtabs">
+        <button class="subtab-btn" data-subtab="recommend">Recommend settings</button>
+        <button class="subtab-btn" data-subtab="printed">Settings I already printed</button>
+      </nav>
+
+      <div class="subtab" id="subtab-recommend">
+        <div id="advancedControls" class="advanced-only">
+          <div class="row">
+            <label>Test points in <select id="unitMode"><option value="flow">Volumetric flow (mm³/s)</option><option value="speed">Speed (mm/s)</option></select></label>
+            <label>Layer height (mm) <input id="layerH" type="number" step="0.02" value="0.2"></label>
+            <label>Line width (mm) <input id="lineW" type="number" step="0.02" value="0.44"></label>
+          </div>
+          <p class="hint" id="geomHint"></p>
+          <p class="hint">Speed is what you type into Orca; flow (speed × layer-height × line-width) is what actually prints and is comparable across printers. LH + line width only convert between them.</p>
+          <div class="row">
+            <label>Flow points <input id="flowPoints" type="number" step="1" min="2" value="5"></label>
+            <label>Printer max accel (mm/s²) <input id="accelLimit" type="number" step="500" value="12000" disabled title="Set on the Printer tab — this is what the selected printer can do"></label>
+            <label style="flex:1;min-width:15rem">Accel values to test (mm/s², comma-separated) <input id="accelList" type="text" placeholder="blank = auto 1000 → printer max, 5 steps"></label>
+          </div>
+          <p class="hint">Adaptive PA depends on both flow and acceleration. Leave accel values blank to auto-scale 5 steps from 1000 to your max (Orca suggests 1000, 2000, 4000, 8000, 12000, 16000). The test grid is every flow × every accel.</p>
+        </div>
+        <div class="row"><button id="recommendBtn">Recommend settings</button></div>
+        <pre id="recommendOut" class="out"></pre>
+        <div class="row"><button id="loadPointsBtn" hidden>Load test points into the table ↓</button></div>
+      </div>
+
+      <div class="subtab" id="subtab-printed">
+        <p class="hint">Enter the settings you already printed in Orca — the PA range, plus the accelerations and the flow or speed points — then load them into the table. Or import the printed <code>.gcode</code> to auto-fill them.</p>
+        <div class="row">
+          <input id="gcodeInput" type="file" accept=".gcode,.g,.gco" hidden>
+          <button id="importGcodeBtn" class="secondary">Import .gcode</button>
+          <span class="hint" id="gcodeHint" style="align-self:center"></span>
+        </div>
+        <div class="row">
+          <label>PA start <input id="pvStart" type="number" step="0.001"></label>
+          <label>PA end <input id="pvEnd" type="number" step="0.001"></label>
+          <label>PA step <input id="pvStep" type="number" step="0.001"></label>
+        </div>
+        <div class="row advanced-only" id="pvUnitRow">
+          <span class="radlabel">Points entered as:</span>
+          <label class="radio"><input type="radio" name="pvUnit" value="flow" checked> Flow (mm³/s)</label>
+          <label class="radio"><input type="radio" name="pvUnit" value="speed"> Speed (mm/s)</label>
+        </div>
+        <div class="row advanced-only">
+          <label style="flex:1;min-width:15rem"><span id="pvFlowsLabel">Flow points tested (mm³/s, comma-separated)</span> <input id="pvFlows" type="text" placeholder="e.g. 5, 10, 15, 20"></label>
+        </div>
+        <div class="row advanced-only">
+          <label style="flex:1;min-width:15rem">Accel values tested (mm/s², comma-separated) <input id="pvAccels" type="text" placeholder="e.g. 1000, 2000, 4000, 8000, 12000"></label>
+        </div>
+        <div class="row"><button id="pvLoadBtn">Load ↓</button></div>
+      </div>
+
+      <!-- ADVANCED results grid -->
+      <div class="subsec advanced-only" id="resultsSec">
+        <h3>Results</h3>
+        <p class="hint">One row per test point. Flow &amp; accel are locked to the test grid — import the printed <code>.gcode</code> (under “Settings I already printed”) for the exact points, or tick <b>Override</b> on a row to edit that pair. Fill in the best PA you saw at each.</p>
+        <div class="row"><label>Group / sort by <select id="resultSort"><option value="accel">Acceleration</option><option value="flow">Flow rate</option></select></label></div>
+        <table id="resultsTable">
+          <thead><tr><th title="Tick to manually edit this point's flow / accel">Override</th><th id="colUnit">Flow (mm³/s)</th><th>Accel (mm/s²)</th><th>Best PA</th><th>Notes</th><th></th></tr></thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+        <button id="addRowBtn">+ Add row</button>
+      </div>
+
+      <!-- BASIC result -->
+      <div class="subsec basic-only" id="basicResultSec" hidden>
+        <h3>Result</h3>
+        <div class="row">
+          <label>Best PA value <input id="basicBestPA" type="number" step="0.001"></label>
+          <label style="flex:1;min-width:14rem">Notes <input id="basicNotes" type="text" placeholder="e.g. sharpest corners at line 7"></label>
+        </div>
+      </div>
+
+      <div class="subsec advanced-only" id="analyzeSec">
+        <h3>Analyze</h3>
+        <button id="analyzeBtn">Plot &amp; check</button>
+        <svg id="plot" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid meet" aria-label="PA vs flow plot"></svg>
+        <div id="analysisOut" class="out"></div>
+      </div>
+
+      <div class="subsec">
+        <h3>Export for Orca</h3>
+        <button id="exportBtnModel">Generate</button>
+        <div id="singlePaOut" class="out"></div>
+        <div class="advanced-only">
+          <label class="blocklabel">Adaptive PA model (paste into Orca — verify field format):</label>
+          <textarea id="modelOut" rows="7" spellcheck="false"></textarea>
+          <button id="copyModelBtn">Copy</button>
+        </div>
+      </div>
+
+      <div class="subsec">
+        <h3>Save this run</h3>
+        <div class="row"><button id="savePlannedBtn" class="secondary">Save as planned run (enter results later)</button><button id="saveRunBtn">Save completed run</button></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <span>PA-Helper · GNU AGPLv3</span>
+  <a id="sourceLink" href="https://github.com/4o66/pa-helper" target="_blank" rel="noopener">Source</a>
+  <span class="muted">Runs locally · no account · no data leaves your machine</span>
+  <span id="buildStamp" class="muted"></span>
+</footer>
+
+<script src="js/version.js"></script>
+<script src="js/presets.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

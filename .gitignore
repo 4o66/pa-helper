@@ -1,0 +1,16 @@
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Node (only the stamp tool uses node; no deps are committed)
+node_modules/
+npm-debug.log*
+
+# Local scratch / test output
+*.log
+/tmp/
