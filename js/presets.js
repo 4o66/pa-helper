@@ -47,7 +47,7 @@ window.PA_PRESETS = {
   filamentFormulations: [
     { group: "Common", items: ["Basic", "Matte", "Silk", "High Speed"] },
     { group: "Functional", items: ["Odorless", "Tough", "Pro", "Rapid", "Translucent"] },
-    { group: "Aesthetic", items: ["Metal", "Marble", "Wood", "Glow", "Fluorescent", "Dual Color"] }
+    { group: "Aesthetic", items: ["Metal", "Marble", "Wood", "Glow", "Fluorescent", "Multi-Color"] }
   ],
 
   // TPU only — Shore hardness, most common first. Dropdown + Custom.

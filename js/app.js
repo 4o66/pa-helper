@@ -3,6 +3,11 @@
   "use strict";
   const P = window.PA_PRESETS, Store = window.PAStore;
   let data = Store.load();
+  // migration: "Dual Color" formulation was renamed to "Multi-Color"
+  (data.filaments || []).forEach(f => {
+    if (Array.isArray(f.formulation)) f.formulation = f.formulation.map(v => v === "Dual Color" ? "Multi-Color" : v);
+    else if (f.formulation === "Dual Color") f.formulation = "Multi-Color";
+  });
 
   const $ = (id) => document.getElementById(id);
   const el = (t, cls) => { const e = document.createElement(t); if (cls) e.className = cls; return e; };
@@ -204,6 +209,34 @@
   const COLORS = P.colorDict || {};
   const COLOR_KEYS = Object.keys(COLORS).sort((a, b) => b.length - a.length);
   function colorHex(name) { if (!name) return null; const s = String(name).toLowerCase(); for (const k of COLOR_KEYS) if (s.includes(k)) return COLORS[k]; return null; }
+  // All colours named in a string, in the ORDER they appear (for a multi-colour gradient).
+  // Longest keys claim their span first so "space grey" wins over "grey"; consecutive
+  // duplicate hexes are collapsed so the gradient has meaningful stops.
+  function colorList(name) {
+    if (!name) return [];
+    const s = String(name).toLowerCase();
+    const taken = new Array(s.length).fill(false), hits = [];
+    for (const k of COLOR_KEYS) {                 // COLOR_KEYS is longest-first
+      let from = 0, idx;
+      while ((idx = s.indexOf(k, from)) !== -1) {
+        let overlap = false;
+        for (let i = idx; i < idx + k.length; i++) if (taken[i]) { overlap = true; break; }
+        if (!overlap) { hits.push({ pos: idx, hex: COLORS[k] }); for (let i = idx; i < idx + k.length; i++) taken[i] = true; }
+        from = idx + k.length;
+      }
+    }
+    hits.sort((a, b) => a.pos - b.pos);
+    const out = [];
+    for (const h of hits) if (out[out.length - 1] !== h.hex) out.push(h.hex);
+    return out;
+  }
+  const isMultiColor = (f) => formList(f).some(v => v === "Multi-Color" || v === "Dual Color");
+  // CSS background for a filament swatch: a left→right gradient for a multi-colour spool
+  // with 2+ detected colours, otherwise the single dominant colour (or null = no colour).
+  function colorFill(f) {
+    if (isMultiColor(f)) { const cs = colorList(f.color); if (cs.length >= 2) return `linear-gradient(90deg, ${cs.join(", ")})`; if (cs.length) return cs[0]; return null; }
+    return colorHex(f.color);
+  }
   function fiberTag(f) {
     if (!f || !f.fiber || f.fiber === "No") return "";
     const map = { "Carbon Fiber": "CF", "Glass Filled": "GF" };
@@ -485,14 +518,14 @@
 
   function filamentCard(f) {
     const card = el("div", "card fcard" + (f.id === data.lastFilamentId ? " selected" : ""));
-    const band = el("div", "colorband"); const hex = colorHex(f.color); if (hex) band.style.background = hex; else band.classList.add("nocolor"); card.append(band);
+    const band = el("div", "colorband"); const fill = colorFill(f); if (fill) band.style.background = fill; else band.classList.add("nocolor"); card.append(band);
     const title = el("div", "title"); title.textContent = filamentLabel(f); if (isRestricted(f)) title.prepend(pinIcon()); card.append(title);
     const meta = el("div", "meta"); meta.textContent = filMeta(f); card.append(meta);
     card.append(filActions(f)); return card;
   }
   function filamentRow(f) {
     const row = el("div", "frow" + (f.id === data.lastFilamentId ? " selected" : ""));
-    const sq = el("span", "colorsq"); const hex = colorHex(f.color); if (hex) sq.style.background = hex; else sq.classList.add("nocolor"); row.append(sq);
+    const sq = el("span", "colorsq"); const fill = colorFill(f); if (fill) sq.style.background = fill; else sq.classList.add("nocolor"); row.append(sq);
     const name = el("span", "fname"); name.textContent = filamentLabel(f); if (isRestricted(f)) name.prepend(pinIcon()); row.append(name);
     row.append(filActions(f)); return row;
   }
@@ -1522,7 +1555,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("coverageImport").addEventListener("click", () => { $("coverageModal").hidden = true; $("gcodeInputAdd").click(); });
     $("coverageContinue").addEventListener("click", () => { $("coverageModal").hidden = true; });
     window.PA_parseGcode = parsePaGcode;
-    window.PA_test = { importGcode, addPlate, resetGcode, buildPaBlocks };   // test hooks (jsdom smoke)
+    window.PA_test = { importGcode, addPlate, resetGcode, buildPaBlocks, colorList, colorFill };   // test hooks (jsdom smoke)
     $("loadPointsBtn").addEventListener("click", (e) => { loadGrid(e.target._points || []); sortResults(); markJobDirty(); });
     $("resultSort").addEventListener("change", sortResults);
     $("savePlannedBtn").addEventListener("click", savePlanned);

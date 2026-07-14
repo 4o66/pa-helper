@@ -10,6 +10,11 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
 ## [Unreleased]
 
 ### Added
+- **Multi-colour filament swatches**: the "Dual Color" formulation is renamed **Multi-Color**, and a
+  Multi-Color spool's swatch is now a left→right **gradient** built from every colour named in the
+  colour field, in the order you typed them (e.g. "Rainbow Purple/Pink/White" → purple → pink → white).
+  Multi-word colours ("Space Grey", "Army Green") are matched correctly. Single-colour filaments are
+  unchanged. Existing "Dual Color" filaments migrate automatically.
 - **Symmetric point-count controls**: the recommend form now has an **Accel points** count next to the
   flow/speed **points** count. Each auto-spaces its own axis (flow/speed across the flow range; accel
   log-spaced 1000 → your printer's max) and the two are **independent**, so you can run e.g. 5 speeds ×
