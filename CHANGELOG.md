@@ -36,8 +36,9 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
 - The Add-printer form now starts blank and fills in as you make selections (maker → parts + models,
   model → bed size).
 - The picker's plate thumbnails now show the **full bed** with each object at its real position
-  (instead of cropping to the pattern), and plates are ordered **low → high acceleration** (as Orca
-  lays them out) regardless of the order you import them.
+  (instead of cropping to the pattern), drawn as its **actual first-layer pattern** (frame,
+  chevrons, numbers), and plates are ordered **low → high acceleration** (as Orca lays them out)
+  regardless of the order you import them.
 
 ### Fixed
 - A remembered custom printer model no longer appears under every maker (the model dropdown no longer

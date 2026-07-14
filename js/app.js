@@ -1115,13 +1115,16 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       const d = dims[i], ox = px[i], on = i === curPlate, stroke = on ? "var(--accent2)" : "#8b97a7", sw = on ? 2 : 1.2;
       if (fullBed && round) { const c = svgEl("circle"); c.setAttribute("cx", (ox + bx / 2).toFixed(1)); c.setAttribute("cy", (pad + by / 2).toFixed(1)); c.setAttribute("r", (bx / 2).toFixed(1)); c.setAttribute("fill", "none"); c.setAttribute("stroke", stroke); c.setAttribute("stroke-width", sw); thumb.append(c); }
       else { const bg = svgEl("rect"); bg.setAttribute("x", ox.toFixed(1)); bg.setAttribute("y", pad); bg.setAttribute("width", d.w.toFixed(1)); bg.setAttribute("height", d.h.toFixed(1)); bg.setAttribute("fill", "none"); bg.setAttribute("stroke", stroke); bg.setAttribute("stroke-width", sw); thumb.append(bg); }
+      // draw each object's actual first-layer toolpath (frame + tab, chevrons, digits)
+      const tx = (x) => (fullBed ? (ox + x + oxOff) : (ox + x - d.mnx)).toFixed(1);
+      const ty = (y) => (fullBed ? (pad + by - (y + oyOff)) : (pad + d.mxy - y)).toFixed(1);
       pl.items.forEach(it => {
-        const [x0, y0, x1, y1] = it.rbox || it.bbox, r = svgEl("rect");   // full object footprint
-        const rx = fullBed ? (ox + x0 + oxOff) : (ox + x0 - d.mnx);
-        const ry = fullBed ? (pad + by - (y1 + oyOff)) : (pad + d.mxy - y1);
-        r.setAttribute("x", rx.toFixed(1)); r.setAttribute("y", ry.toFixed(1));
-        r.setAttribute("width", (x1 - x0).toFixed(1)); r.setAttribute("height", (y1 - y0).toFixed(1));
-        const cur = it.key === curKey; r.setAttribute("fill", cur ? "var(--accent)" : "#8b97a7"); r.setAttribute("opacity", cur ? "1" : "0.3"); thumb.append(r);
+        const blk = gcodeBlocks.byKey[it.key]; if (!blk) return;
+        const cur = it.key === curKey;
+        const draw = (seg, col, w) => { const l = svgEl("line"); l.setAttribute("x1", tx(seg.x1)); l.setAttribute("y1", ty(seg.y1)); l.setAttribute("x2", tx(seg.x2)); l.setAttribute("y2", ty(seg.y2)); l.setAttribute("stroke", col); l.setAttribute("stroke-width", w); l.setAttribute("stroke-linecap", "round"); thumb.append(l); };
+        (blk.bg || []).forEach(s => draw(s, cur ? "var(--accent)" : "#4a5766", cur ? 1.1 : 0.7));
+        for (const pa in blk.byPa) blk.byPa[pa].forEach(s => draw(s, cur ? "var(--accent)" : "#9aa0a6", cur ? 0.9 : 0.55));
+        (blk.text || []).forEach(s => draw(s, cur ? "var(--ink)" : "#7a8695", 0.5));
       });
     });
     if (curPlate >= 0 && plates.length > 1) $("patternTitle").textContent += `  ·  plate ${curPlate + 1} of ${plates.length}`;
