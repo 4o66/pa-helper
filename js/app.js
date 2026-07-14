@@ -367,12 +367,10 @@
   // ---- nozzles (per printer) ----
   const nozzleLabel = (n) => n ? [n.maker, n.model, (n.diameter != null && n.diameter !== "" ? n.diameter + "mm" : ""), n.material].filter(Boolean).join(" ") || "(nozzle)" : "?";
   const getSelectedNozzle = () => { const p = getPrinter(data.lastPrinterId); if (!p || !p.nozzles) return null; return p.nozzles.find(n => n.id === data.lastNozzleId) || p.nozzles[0] || null; };
-  function seedNozzle(printer) {
-    const cfg = P.makerStock[printer.maker];
-    const stock = /\(stock\)/i.test(printer.hotend || "") && cfg && cfg.nozzleMaker;
-    const n = stock ? { maker: cfg.nozzleMaker, model: cfg.nozzleModel, diameter: cfg.nozzleDiameter, material: cfg.nozzleMaterial }
-                    : { maker: "Generic", model: "", diameter: 0.4, material: "Brass" };
-    return Object.assign({ id: Store.uid() }, n);
+  // Every new printer auto-seeds ONE default nozzle so there's something to select — a universal
+  // Generic 0.4 mm Brass. After save the user is prompted to keep it or replace it (savePrinter).
+  function seedNozzle() {
+    return { id: Store.uid(), maker: "Generic", model: "", diameter: 0.4, material: "Brass" };
   }
   function renderNozzles() {
     const sec = $("nozzleSection"), list = $("nozzleList");
@@ -434,11 +432,14 @@
     }
     const pubId = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : Store.uid();
     const printer = Object.assign({ id: Store.uid(), pubId }, v, { nozzles: [], created: new Date().toISOString() });
-    printer.nozzles = [seedNozzle(printer)];
+    printer.nozzles = [seedNozzle()];
     data.printers.unshift(printer);
     rememberCustoms(printerForm); persist();
     resetPrinterForm(); renderFilamentPrinterPicker();
     selectPrinter(printer.id);
+    // Tell the user about the auto-seeded default nozzle; let them keep it or add their own.
+    $("nozzleSeedMsg").textContent = "Added a default nozzle — Generic 0.4 mm Brass — to “" + printerLabel(printer) + "”. Keep it, or delete it and add your own.";
+    $("nozzleSeedModal").hidden = false;
   }
 
   /* =================== FILAMENTS TAB =================== */
@@ -1353,6 +1354,14 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     });
     $("jobGuardCancel").addEventListener("click", () => { $("jobGuardModal").hidden = true; pendingTab = null; });
     window.addEventListener("beforeunload", (e) => { if (jobDirty) { e.preventDefault(); e.returnValue = ""; } });
+    // Auto-seeded default nozzle prompt (after saving a new printer)
+    $("nozzleSeedOk").addEventListener("click", () => { $("nozzleSeedModal").hidden = true; });
+    $("nozzleSeedReplace").addEventListener("click", () => {
+      const p = getPrinter(data.lastPrinterId);
+      if (p) { p.nozzles = []; data.lastNozzleId = null; persist(); renderNozzles(); deriveGeometryFromNozzle(); updateTestContext(); }
+      $("nozzleSeedModal").hidden = true; $("nozzleAdd").open = true;
+      if ($("nozzleAdd").scrollIntoView) $("nozzleAdd").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
     $("flowPoints").addEventListener("change", () => { let n = Math.round(num($("flowPoints").value)); if (!(n >= 2)) n = 5; $("flowPoints").value = n; });
     $("addRowBtn").addEventListener("click", () => addRow());
     $("analyzeBtn").addEventListener("click", analyze);

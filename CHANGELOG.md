@@ -19,6 +19,8 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   browser tab — prompts you to save it as an in-progress run or abandon it.
 - Editable **printer name** (shown as the card title) and the maker's **favicon** on each printer card
   (hotlinked live from the maker's site, never stored).
+- New printers auto-seed one **Generic 0.4 mm Brass** nozzle and then prompt you to keep it or delete
+  it and add your own.
 
 ### Changed
 - `beds.js` rebuilt as a clean, documented single-purpose data file: real per-maker models (Voron =
