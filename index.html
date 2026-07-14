@@ -158,7 +158,7 @@
           <div class="row">
             <label>Test points in <select id="unitMode"><option value="flow">Volumetric flow (mm³/s)</option><option value="speed">Speed (mm/s)</option></select></label>
             <label>Layer height (mm) <input id="layerH" type="number" step="0.02" value="0.2"></label>
-            <label>Line width (mm) <input id="lineW" type="number" step="0.02" value="0.45" readonly title="Orca derives this automatically (auto_extrusion_width = 1.125× nozzle) — it isn't a PA-test input, so PA-Helper computes it the same way."></label>
+            <input id="lineW" type="hidden" value="0.45">
           </div>
           <p class="hint" id="geomHint"></p>
           <p class="hint">Speed is what you type into Orca; flow (speed × layer-height × line-width) is what actually prints and is comparable across printers. LH + line width only convert between them.</p>

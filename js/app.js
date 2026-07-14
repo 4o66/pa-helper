@@ -412,7 +412,7 @@
     const lw = Math.round(dia * P.lineWidthFactor * 100) / 100, lh = Math.round(dia * P.layerHeightFactor * 100) / 100;
     if ($("lineW")) $("lineW").value = lw;
     if ($("layerH")) $("layerH").value = lh;
-    const gh = $("geomHint"); if (gh) gh.textContent = `Line width ${lw} mm is fixed by Orca's method (auto_extrusion_width = ${P.lineWidthFactor}× your ${dia} mm nozzle) — it isn't a PA-test setting, so it isn't editable here. Layer height defaults to ${lh} mm; set it to the layer height you're calibrating at.`;
+    const gh = $("geomHint"); if (gh) gh.textContent = `Line width is set by Orca's method (${lw} mm = ${P.lineWidthFactor}× your ${dia} mm nozzle) and used automatically. Layer height defaults to ${lh} mm (${P.layerHeightFactor}× your nozzle) — Orca takes it from your print profile, so change it only if you calibrate at a different layer height.`;
   }
   function parseInstances(text) {
     return (text || "").split(/[\n,]+/).map(s => s.trim()).filter(Boolean).map(label => ({ id: label, label }));
