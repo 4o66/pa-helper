@@ -179,6 +179,8 @@
         <div class="row">
           <input id="gcodeInput" type="file" accept=".gcode,.g,.gco" hidden>
           <button id="importGcodeBtn" class="secondary">Import .gcode</button>
+          <input id="gcodeInputAdd" type="file" accept=".gcode,.g,.gco" hidden>
+          <button id="importAddBtn" class="secondary" hidden>+ Import additional plate</button>
           <span class="hint" id="gcodeHint" style="align-self:center"></span>
         </div>
         <div class="row">
@@ -246,6 +248,18 @@
     </div>
   </section>
 </main>
+
+<div id="coverageModal" class="modal" hidden>
+  <div class="modal-box plain">
+    <h2 id="coverageTitle">Multi-plate test</h2>
+    <p class="hint" id="coverageMsg"></p>
+    <div class="actions">
+      <button id="coverageComplete">Complete the matrix</button>
+      <button id="coverageImport" class="secondary">Import additional plate</button>
+      <button id="coverageContinue" class="secondary">Continue with these</button>
+    </div>
+  </div>
+</div>
 
 <div id="nozzleSeedModal" class="modal" hidden>
   <div class="modal-box plain">

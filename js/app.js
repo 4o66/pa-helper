@@ -14,7 +14,7 @@
   const PALETTE = ["#4aa8ff", "#37c98b", "#ffb84a", "#c98bff", "#5de0e6", "#ff8f5d", "#8bff9e"];
 
   // ---- session state ----
-  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, pendingTab = null;
+  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, pendingTab = null, importPlates = [], coverageMissing = [];
   const PA_FACTORS = ["toolhead", "extruder", "drive", "hotend"];
   const FILAMENT_PA_FACTORS = ["material", "formulation", "fiber", "fiberName", "fiberPct", "hardness", "diameter"];
 
@@ -876,33 +876,86 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     [...document.getElementsByName("pvUnit")].forEach(r => { r.disabled = dis; });
   }
   function resetGcode() {
-    gcodeImported = false; gcodeBlocks = null;
+    gcodeImported = false; gcodeBlocks = null; importPlates = []; coverageMissing = [];
     PROVIDE_INPUTS.forEach(id => { $(id).value = ""; }); setProvideDisabled(false);
     $("gcodeHint").textContent = ""; $("importGcodeBtn").textContent = "Import .gcode"; $("gcodeInput").value = "";
+    $("importAddBtn").hidden = true; $("coverageModal").hidden = true;
   }
-  async function importGcode(file) {
+  async function parsePlate(file) {
     const text = await file.text();
     const r = parsePaGcode(text);
-    if (r.paStart == null && !r.accels.length && !r.speeds.length) { alert("Couldn't read PA-test settings from this file. Enter them manually."); $("gcodeInput").value = ""; return; }
-    if (r.paStart != null) $("pvStart").value = r.paStart;
-    if (r.paEnd != null) $("pvEnd").value = r.paEnd;
-    if (r.paStep != null) $("pvStep").value = r.paStep;
-    if (r.accels.length) $("pvAccels").value = r.accels.join(", ");
-    if (r.speeds.length) { $("unitMode").value = "speed"; updateUnitUI(); $("pvFlows").value = r.speeds.join(", "); }
-    setProvideDisabled(true); gcodeImported = true; $("importGcodeBtn").textContent = "Reset";
-    // Build the results table straight from the known points, using the EFFECTIVE flow
-    // per (accel, speed) cell computed from the g-code (what actually printed).
+    if (r.paStart == null && !r.accels.length && !r.speeds.length) return null;
+    return { name: file.name, r, blocks: buildPaBlocks(text) };
+  }
+  // combos (accel|speed) actually present across all imported plates, from the flow keys
+  function presentCombos() { const s = new Set(); importPlates.forEach(p => Object.keys(p.r.flow || {}).forEach(k => s.add(k))); return s; }
+  function unionAxes() {
+    const acc = new Set(), spd = new Set();
+    importPlates.forEach(p => { (p.r.accels || []).forEach(a => acc.add(a)); (p.r.speeds || []).forEach(s => spd.add(s)); });
+    return { accels: [...acc].sort((a, b) => a - b), speeds: [...spd].sort((a, b) => a - b) };
+  }
+  async function importGcode(file) {   // FIRST plate
+    const plate = await parsePlate(file);
+    if (!plate) { alert("Couldn't read PA-test settings from this file. Enter them manually."); $("gcodeInput").value = ""; return; }
+    importPlates = [plate]; coverageMissing = [];
+    applyImport(); classifyCoverage(); $("gcodeInput").value = "";
+  }
+  async function addPlate(file) {      // subsequent plate
+    const plate = await parsePlate(file);
+    if (!plate) { alert("Couldn't read a PA test from that file."); $("gcodeInputAdd").value = ""; return; }
+    const base = importPlates[0].r, m = [];
+    const off = (a, b) => a != null && b != null && Math.abs(a - b) > 1e-6;
+    if (off(base.paStart, plate.r.paStart)) m.push(`PA start ${plate.r.paStart} (job uses ${base.paStart})`);
+    if (off(base.paStep, plate.r.paStep)) m.push(`PA step ${plate.r.paStep} (job uses ${base.paStep})`);
+    if (off(base.paEnd, plate.r.paEnd)) m.push(`PA end ${plate.r.paEnd} (job uses ${base.paEnd})`);
+    if (m.length && !confirm("This file doesn't look like it belongs to the same test:\n  • " + m.join("\n  • ") + "\n\nImport it anyway?")) { $("gcodeInputAdd").value = ""; return; }
+    const have = presentCombos(), dupes = Object.keys(plate.r.flow || {}).filter(k => have.has(k));
+    if (dupes.length && !confirm(`${dupes.length} combo(s) on this plate are already loaded from another plate. Add it anyway? (Duplicates are merged; this plate's geometry wins.)`)) { $("gcodeInputAdd").value = ""; return; }
+    importPlates.push(plate); applyImport(); classifyCoverage(); $("gcodeInputAdd").value = "";
+  }
+  // Merge all imported plates into the results table, the picker blocks, and currentSettings.
+  function applyImport() {
+    const cf = convFactor(), axes = unionAxes(), accels = axes.accels, speeds = axes.speeds;
+    const flow = {}, byKey = {};
+    importPlates.forEach(p => {
+      Object.keys(p.r.flow || {}).forEach(k => { flow[k] = p.r.flow[k]; });                 // later plate wins
+      if (p.blocks && p.blocks.byKey) Object.keys(p.blocks.byKey).forEach(k => { byKey[k] = p.blocks.byKey[k]; });
+    });
+    const present = new Set(Object.keys(flow)), rows = [];
+    accels.forEach(a => speeds.forEach(s => { const k = a + "|" + s; if (present.has(k)) rows.push({ flow: (flow[k] != null ? Math.round(flow[k] * 100) / 100 : Math.round(s * cf * 100) / 100), accel: a, speed: s }); }));
+    gcodeBlocks = { byKey, plates: importPlates.map(p => p.blocks.plate) };
+    const base = importPlates[0].r;
+    if (base.paStart != null) $("pvStart").value = base.paStart;
+    if (base.paEnd != null) $("pvEnd").value = base.paEnd;
+    if (base.paStep != null) $("pvStep").value = base.paStep;
+    $("pvAccels").value = accels.join(", ");
+    $("unitMode").value = "speed"; updateUnitUI(); $("pvFlows").value = speeds.join(", ");
+    setProvideDisabled(true); gcodeImported = true; $("importGcodeBtn").textContent = "Reset"; $("importAddBtn").hidden = false;
     $("testMode").value = "advanced"; applyMode();
-    gcodeBlocks = buildPaBlocks(text);       // real per-block toolpath for the pattern picker
+    currentSettings = { source: "gcode", mode: "advanced", unit: "speed", layerH: num($("layerH").value), lineW: num($("lineW").value), paStart: base.paStart, paEnd: base.paEnd, paStep: base.paStep, speeds, accels, flow, importedPlates: importPlates.length };
+    loadGrid(rows); sortResults(); markJobDirty();
+    $("gcodeHint").textContent = `Imported ${importPlates.length} plate${importPlates.length > 1 ? "s" : ""}: ${rows.length} combo${rows.length !== 1 ? "s" : ""} loaded (PA ${base.paStart}–${base.paEnd}).`;
+  }
+  // 3-state coverage: 1=complete (no popup), 2=gaps (nudge), 3=reconstructable (offer to complete).
+  function classifyCoverage() {
+    const axes = unionAxes(), accels = axes.accels, speeds = axes.speeds, present = presentCombos(), missing = [];
+    accels.forEach(a => speeds.forEach(s => { if (!present.has(a + "|" + s)) missing.push({ accel: a, speed: s }); }));
+    coverageMissing = missing;
+    if (!missing.length) { $("coverageModal").hidden = true; return; }
+    const reconstructable = accels.length >= 2 && speeds.length >= 2;
+    $("coverageTitle").textContent = "This looks like part of a larger test";
+    $("coverageComplete").hidden = !reconstructable;
+    $("coverageMsg").textContent = reconstructable
+      ? `The full matrix looks like ${accels.length} accels × ${speeds.length} speeds = ${accels.length * speeds.length} combos, but ${missing.length} ${missing.length === 1 ? "is" : "are"} missing — probably on other plates. Complete the matrix (fill the gaps with generated patterns), import the other plate(s), or continue with these.`
+      : `This plate's matrix looks incomplete — ${missing.length} combo${missing.length !== 1 ? "s" : ""} missing. Import the other plate(s), or continue with these.`;
+    $("coverageModal").hidden = false;
+  }
+  // "Complete the matrix": add empty placeholder rows for the missing combos (picker uses a
+  // generated pattern for them). Non-blocking — the user can import the real plates later.
+  function completeMatrix() {
     const cf = convFactor();
-    const rows = [];
-    r.accels.forEach(a => r.speeds.forEach(s => {
-      const flow = (r.flow && r.flow[a + "|" + s] != null) ? r.flow[a + "|" + s] : s * cf;   // true flow from the g-code
-      rows.push({ flow: Math.round(flow * 100) / 100, accel: a, speed: s });
-    }));
-    if (rows.length) { loadGrid(rows); sortResults(); markJobDirty(); }
-    currentSettings = { source: "gcode", mode: "advanced", unit: "speed", layerH: num($("layerH").value), lineW: num($("lineW").value), paStart: r.paStart, paEnd: r.paEnd, paStep: r.paStep, speeds: r.speeds, accels: r.accels, flow: r.flow };
-    $("gcodeHint").textContent = `Imported ${file.name}: built a ${r.speeds.length}×${r.accels.length} = ${rows.length}-point table using the actual flow from the g-code${r.paStart != null ? " (PA " + r.paStart + "–" + r.paEnd + ")" : ""}. Fill in the best PA per row.`;
+    coverageMissing.forEach(m => addRow({ flow: Math.round(m.speed * cf * 100) / 100, accel: m.accel, speed: m.speed, bestPA: "", notes: "" }, false));
+    coverageMissing = []; sortResults(); $("coverageModal").hidden = true;
   }
   function provideLoad() {
     currentRunId = null;
@@ -968,7 +1021,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   function compactBlocks(gb) {
     if (!gb || !gb.byKey) return null;
     const c = s => ({ x1: +s.x1.toFixed(1), y1: +s.y1.toFixed(1), x2: +s.x2.toFixed(1), y2: +s.y2.toFixed(1) });
-    const out = { byKey: {}, plate: gb.plate };
+    const out = { byKey: {}, plates: gb.plates };
     for (const k in gb.byKey) {
       const b = gb.byKey[k], byPa = {};
       for (const pa in b.byPa) byPa[pa] = b.byPa[pa].map(c);
@@ -1009,21 +1062,33 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     }
     $("patternModal").hidden = false;
   }
+  // Imported-plate thumbnail: every imported plate side by side, the current block + its plate
+  // highlighted (Y-flipped so it reads like the bed top-down).
   function renderThumb(curKey) {
     const thumb = $("patternThumb"); if (!thumb) return;
     while (thumb.firstChild) thumb.removeChild(thumb.firstChild);
-    const plate = gcodeBlocks && gcodeBlocks.plate;
-    thumb.style.display = plate ? "" : "none";   // no plate (generated test) → hide the empty box
-    if (!plate) return;
-    const [minx, miny, maxx, maxy] = plate.box, pad = 2;
-    thumb.setAttribute("viewBox", `0 0 ${(maxx - minx + 2 * pad).toFixed(1)} ${(maxy - miny + 2 * pad).toFixed(1)}`);
-    const bg = svgEl("rect"); bg.setAttribute("x", 0.5); bg.setAttribute("y", 0.5); bg.setAttribute("width", (maxx - minx + 2 * pad - 1).toFixed(1)); bg.setAttribute("height", (maxy - miny + 2 * pad - 1).toFixed(1)); bg.setAttribute("fill", "none"); bg.setAttribute("stroke", "#8b97a7"); bg.setAttribute("stroke-width", 1.5); thumb.append(bg);
-    plate.items.forEach(it => {
-      const [x0, y0, x1, y1] = it.bbox; const r = svgEl("rect");
-      r.setAttribute("x", (x0 - minx + pad).toFixed(1)); r.setAttribute("y", (maxy - y1 + pad).toFixed(1));
-      r.setAttribute("width", (x1 - x0).toFixed(1)); r.setAttribute("height", (y1 - y0).toFixed(1));
-      const on = it.key === curKey; r.setAttribute("fill", on ? "var(--accent)" : "#8b97a7"); r.setAttribute("opacity", on ? "1" : "0.3"); thumb.append(r);
+    const plates = gcodeBlocks && gcodeBlocks.plates;
+    thumb.style.display = (plates && plates.length) ? "" : "none";
+    if (!plates || !plates.length) return;
+    let curPlate = -1;
+    plates.forEach((pl, i) => { if (pl.items.some(it => it.key === curKey)) curPlate = i; });
+    const pad = 3, gapP = 8;
+    const dims = plates.map(pl => { const [minx, miny, maxx, maxy] = pl.box; return { minx, miny, maxx, maxy, w: maxx - minx, h: maxy - miny }; });
+    const maxH = Math.max.apply(null, dims.map(d => d.h));
+    let x = pad; const px = dims.map(d => { const at = x; x += d.w + gapP; return at; });
+    thumb.setAttribute("viewBox", `0 0 ${(x - gapP + pad).toFixed(1)} ${(maxH + 2 * pad).toFixed(1)}`);
+    plates.forEach((pl, i) => {
+      const d = dims[i], ox = px[i], on = i === curPlate;
+      const bg = svgEl("rect"); bg.setAttribute("x", ox.toFixed(1)); bg.setAttribute("y", pad); bg.setAttribute("width", d.w.toFixed(1)); bg.setAttribute("height", d.h.toFixed(1));
+      bg.setAttribute("fill", "none"); bg.setAttribute("stroke", on ? "var(--accent2)" : "#8b97a7"); bg.setAttribute("stroke-width", on ? 2 : 1.2); thumb.append(bg);
+      pl.items.forEach(it => {
+        const [x0, y0, x1, y1] = it.bbox, r = svgEl("rect");
+        r.setAttribute("x", (ox + x0 - d.minx).toFixed(1)); r.setAttribute("y", (pad + d.maxy - y1).toFixed(1));
+        r.setAttribute("width", (x1 - x0).toFixed(1)); r.setAttribute("height", (y1 - y0).toFixed(1));
+        const cur = it.key === curKey; r.setAttribute("fill", cur ? "var(--accent)" : "#8b97a7"); r.setAttribute("opacity", cur ? "1" : "0.3"); thumb.append(r);
+      });
     });
+    if (curPlate >= 0 && plates.length > 1) $("patternTitle").textContent += `  ·  plate ${curPlate + 1} of ${plates.length}`;
   }
   // Plate thumbnail for a GENERATED test (no imported plate): from the plate-fit plan, draw the
   // objects on the current row's plate, current one highlighted, and label "plate N of M".
@@ -1067,7 +1132,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const flow = tr.querySelector('input[data-key="flow"]').value;
     const cur = num(tr.querySelector('input[data-key="bestPA"]').value);
     $("patternTitle").textContent = `Pick the best line — flow ${flow || "?"} mm³/s @ ${accel} mm/s² (${speed} mm/s)`;
-    if (gcodeBlocks && gcodeBlocks.plate) renderThumb(accel + "|" + speed);   // imported plate
+    if (gcodeBlocks && gcodeBlocks.plates) renderThumb(accel + "|" + speed);   // imported plate(s)
     else renderPlanThumb(tr);                                                  // generated test → plate-fit plan
     const svg = $("patternSvg"); while (svg.firstChild) svg.removeChild(svg.firstChild);
     const [minx, miny, maxx, maxy] = block.rbox, pad = 2, UW = maxx - minx, VH = maxy - miny;
@@ -1391,7 +1456,14 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("pvLoadBtn").addEventListener("click", provideLoad);
     $("importGcodeBtn").addEventListener("click", () => { if (gcodeImported) resetGcode(); else $("gcodeInput").click(); });
     $("gcodeInput").addEventListener("change", (e) => { if (e.target.files[0]) importGcode(e.target.files[0]); });
+    // multi-plate import + coverage
+    $("importAddBtn").addEventListener("click", () => $("gcodeInputAdd").click());
+    $("gcodeInputAdd").addEventListener("change", (e) => { if (e.target.files[0]) addPlate(e.target.files[0]); });
+    $("coverageComplete").addEventListener("click", completeMatrix);
+    $("coverageImport").addEventListener("click", () => { $("coverageModal").hidden = true; $("gcodeInputAdd").click(); });
+    $("coverageContinue").addEventListener("click", () => { $("coverageModal").hidden = true; });
     window.PA_parseGcode = parsePaGcode;
+    window.PA_test = { importGcode, addPlate, resetGcode };   // test hooks (jsdom smoke)
     $("loadPointsBtn").addEventListener("click", (e) => { loadGrid(e.target._points || []); sortResults(); markJobDirty(); });
     $("resultSort").addEventListener("change", sortResults);
     $("savePlannedBtn").addEventListener("click", savePlanned);

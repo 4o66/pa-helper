@@ -23,6 +23,11 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   it and add your own.
 - **Plate-fit**: the recommend output now tells you how many test plates the job needs on your bed
   (e.g. "25 objects → 3 plates, 12 per plate on your 280×280 mm bed").
+- **Multi-plate import**: import a large adaptive job one printed plate at a time. PA-Helper merges
+  the plates into one results table, and when the matrix has gaps it prompts you to import the other
+  plate(s) or fill the gaps with generated patterns ("Complete the matrix"). Added plates are checked
+  against the job's PA range (with a warning if they don't fit) and overlapping combos are de-duped.
+  The picker thumbnail shows every imported plate with the current object and its plate highlighted.
 
 ### Changed
 - `beds.js` rebuilt as a clean, documented single-purpose data file: real per-maker models (Voron =
