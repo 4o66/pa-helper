@@ -65,6 +65,16 @@ version it, or delete it.
   commands (heuristic; not a stable Orca format — needs tuning against real files).
 - **Visual line picker** — render each PA line's toolpath (labeled with its known PA,
   no OCR needed) and click the best one; two-way bound to the table.
+- **Basic PA Pattern / Line pickers** — the basic (single accel/speed) methods currently only
+  capture one best-PA value; they have no visual picker yet. Before building this, **search first**
+  for documentation of people actually running basic single-value PA pattern/line calibrations (how
+  they do it, whether they use Orca's Line method's `generate_test` at all), so we match real
+  practice rather than guessing. Advanced (adaptive) already has the full pattern picker.
+- **Custom line-width override.** Line width is currently locked to Orca's derived value
+  (`auto_extrusion_width` = 1.125× nozzle) because it isn't a PA-test input. A user whose Orca
+  profile overrides `line_width` off auto prints at a different width, so a later "advanced override"
+  toggle could let them enter their profile's real line width (feeds the speed↔flow conversion and
+  generated geometry; ignored on imported g-code, where true flow is read from the extrusion).
 - **Phase B backend** — PocketBase (self-hosted; MIT, so AGPLv3-compatible) for
   accounts via social OAuth and an opt-in, anonymized community dataset keyed on the
   hardware profile ("others with this extruder+hotend+filament landed near PA X").
