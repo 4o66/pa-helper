@@ -17,6 +17,19 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   / bed shape+X+Y+origin / max accel).
 - **Unsaved-PA-job guard**: once you start a PA test, navigating away — switching tabs or closing the
   browser tab — prompts you to save it as an in-progress run or abandon it.
+- Editable **printer name** (shown as the card title) and the maker's **favicon** on each printer card
+  (hotlinked live from the maker's site, never stored).
+
+### Changed
+- `beds.js` rebuilt as a clean, documented single-purpose data file: real per-maker models (Voron =
+  Trident / V2.4 / V0 / Switchwire / Legacy), kit vendors (LDO/Formbot) dropped as makers, `[x,y]` /
+  `[d]` / `null` bed scheme, newest-first, one maker block each for easy PR review.
+- The Add-printer form now starts blank and fills in as you make selections (maker → parts + models,
+  model → bed size).
+
+### Fixed
+- A remembered custom printer model no longer appears under every maker (the model dropdown no longer
+  pools global custom entries).
 - **Orca-method PA-pattern replica** (`js/pattern.js`) — generates the exact block that OrcaSlicer
   prints for the no-g-code picker: chevrons, the anchoring frame, the filled number tab, the
   seven-segment PA / flow / acceleration glyphs (Orca's own digit method, not a font), and the

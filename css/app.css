@@ -176,6 +176,7 @@ footer a{color:var(--accent)}
 .bgfill{stroke:var(--accent);stroke-width:0.62;stroke-linecap:square}
 .labtext{stroke:var(--ink);stroke-width:.7;vector-effect:non-scaling-stroke;stroke-linecap:round}
 .betabar{background:#b45309;color:#fff;text-align:center;padding:.45rem .8rem;font-weight:700;font-size:.82rem;letter-spacing:.01em}
+.favicon{width:15px;height:15px;border-radius:3px;vertical-align:-2px;margin-right:.4rem;object-fit:contain}
 .tabfill{fill:var(--accent);opacity:.9}
 .sframe{fill:none;stroke:var(--accent);stroke-width:2;vector-effect:non-scaling-stroke}
 .sbar{fill:var(--accent)}

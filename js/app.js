@@ -38,6 +38,7 @@
     let api;
     if (spec.kind === "select") {
       const sel = el("select");
+      if (spec.placeholder) { const b = el("option"); b.value = ""; b.textContent = typeof spec.placeholder === "string" ? spec.placeholder : "Select…"; sel.append(b); }
       if (spec.optional) { const b = el("option"); b.value = ""; b.textContent = "— none —"; sel.append(b); }
       const flat = spec.options ? spec.options.map(String) : (spec.groups ? spec.groups.reduce((a, g) => a.concat(g.items.map(String)), []) : []);
       const addOpt = (parent, o) => { const op = el("option"); op.value = String(o); op.textContent = String(o); parent.append(op); };
@@ -62,12 +63,12 @@
         setOptions: (list) => {
           const keep = api.get();
           while (sel.firstChild) sel.removeChild(sel.firstChild);
+          if (spec.placeholder) { const b = el("option"); b.value = ""; b.textContent = typeof spec.placeholder === "string" ? spec.placeholder : "Select…"; sel.append(b); }
           if (spec.optional) { const b = el("option"); b.value = ""; b.textContent = "— none —"; sel.append(b); }
           (list || []).forEach(o => addOpt(sel, o));
-          if (spec.customKey) {
-            (data.customOptions[spec.customKey] || []).filter(o => !(list || []).map(String).includes(String(o))).forEach(o => addOpt(sel, o));
-            const cu = el("option"); cu.value = "__custom__"; cu.textContent = "Custom…"; sel.append(cu);
-          }
+          // NOTE: dynamic dropdowns (the model list) do NOT pool global remembered customs — those
+          // are maker-specific, so pooling them showed e.g. a QIDI model under Voron. Custom… only.
+          if (spec.customKey) { const cu = el("option"); cu.value = "__custom__"; cu.textContent = "Custom…"; sel.append(cu); }
           api.set(keep);
         }
       };
@@ -92,6 +93,7 @@
   function rememberCustoms(map) {
     Object.keys(map).forEach(k => {
       const api = map[k], s = api.spec; if (!s.customKey) return;
+      if (s.customKey === "printerModel") return;   // models are maker-specific — don't pool globally
       const v = api.get(); if (!v) return;
       const builtin = (s.options ? s.options : (s.groups ? s.groups.reduce((a, g) => a.concat(g.items), []) : [])).map(String);
       const arr = data.customOptions[s.customKey] || (data.customOptions[s.customKey] = []);
@@ -100,14 +102,15 @@
   }
 
   const PRINTER_FIELDS = [
-    // Row 1: maker + model
-    { key: "maker", label: "Printer maker", kind: "select", options: P.printerMakers, customKey: "printerMaker", newRow: true },
-    { key: "model", label: "Printer model", kind: "select", options: [], customKey: "printerModel", help: "Pick your model to auto-fill the bed size, or choose Custom… to type one. Models come from the built-in list for the selected maker, newest first." },
-    // Row 2: toolhead, extruder, hotend  (Row 3 wraps: drive)
-    { key: "toolhead", label: "Toolhead", kind: "select", options: P.toolheads, customKey: "toolhead", newRow: true },
-    { key: "extruder", label: "Extruder", kind: "select", options: P.extruders, customKey: "extruder" },
-    { key: "hotend", label: "Hotend", kind: "select", options: P.hotends, customKey: "hotend" },
-    { key: "drive", label: "Drive", kind: "select", options: P.extruderDrives },
+    // Row 1: name (card title) + maker + model
+    { key: "name", label: "Printer name (optional)", kind: "text", newRow: true, help: "A nickname shown as the card title. Leave blank to use maker + model." },
+    { key: "maker", label: "Printer maker", kind: "select", options: P.printerMakers, customKey: "printerMaker", placeholder: "Select maker…" },
+    { key: "model", label: "Printer model", kind: "select", options: [], customKey: "printerModel", placeholder: "Select model…", help: "Pick your model to auto-fill the bed size, or Custom… to type one. Newest models first." },
+    // Row 2: toolhead, extruder, hotend  (drive wraps below)
+    { key: "toolhead", label: "Toolhead", kind: "select", options: P.toolheads, customKey: "toolhead", newRow: true, placeholder: "Select…" },
+    { key: "extruder", label: "Extruder", kind: "select", options: P.extruders, customKey: "extruder", placeholder: "Select…" },
+    { key: "hotend", label: "Hotend", kind: "select", options: P.hotends, customKey: "hotend", placeholder: "Select…" },
+    { key: "drive", label: "Drive", kind: "select", options: P.extruderDrives, placeholder: "Select…" },
     // Row 4: bed shape, X, Y (diameter for round)  (origin wraps below)
     { key: "bedShape", label: "Bed shape", kind: "select", options: ["Rectangular", "Round"], default: "Rectangular", newRow: true, help: "Rectangular for bed-slingers and CoreXY; Round for deltas." },
     { key: "bedX", label: "Bed size X (mm)", kind: "number", step: "1", help: "Usable bed width. Auto-filled from the model; edit if your machine differs. Used to work out how many test plates a big job needs." },
@@ -157,18 +160,21 @@
   // ---- bed data (js/beds.js) ----
   const BEDS = window.PA_BEDS || {};
   const bedEntry = (maker) => BEDS[maker] || null;
-  const bedModelRows = (maker) => { const b = bedEntry(maker); return b ? (b.models || b.sizes || []) : []; };
+  const bedModels = (maker) => { const b = bedEntry(maker); return (b && b.models) ? b.models : []; };
   function applyModelOptions() {
     if (!printerForm || !printerForm.model.setOptions) return;
-    printerForm.model.setOptions(bedModelRows(printerForm.maker.get()).map(r => r[0]));
+    printerForm.model.setOptions(bedModels(printerForm.maker.get()).map(m => m.name));
   }
   // Auto-fill the bed fields from beds.js for the current maker+model (leaves them alone if unknown).
   function autofillBed() {
     if (!printerForm || !printerForm.bedShape) return;
     const b = bedEntry(printerForm.maker.get());
     if (b && b.origin) printerForm.origin.set(b.origin === "center" ? "Center" : "Front-left (0,0)");
-    const row = bedModelRows(printerForm.maker.get()).find(r => r[0] === printerForm.model.get());
-    if (row) { printerForm.bedShape.set("Rectangular"); printerForm.bedX.set(row[1]); printerForm.bedY.set(row[2]); }
+    const m = bedModels(printerForm.maker.get()).find(x => x.name === printerForm.model.get());
+    if (m && Array.isArray(m.bed)) {
+      if (m.bed.length === 1) { printerForm.bedShape.set("Round"); printerForm.bedDiameter.set(m.bed[0]); }
+      else { printerForm.bedShape.set("Rectangular"); printerForm.bedX.set(m.bed[0]); printerForm.bedY.set(m.bed[1]); }
+    }
     updatePrinterConditionals();
   }
   function updatePrinterConditionals() {
@@ -178,7 +184,8 @@
     show("bedX", !round); show("bedY", !round); show("bedDiameter", round);
   }
   // full setup after (re)building the printer form
-  function initPrinterDefaults() { applyModelOptions(); applyPrinterDefaults(); autofillBed(); updatePrinterConditionals(); }
+  // Fresh Add form starts BLANK — model options only; stock defaults fill in on maker change.
+  function initPrinterDefaults() { applyModelOptions(); updatePrinterConditionals(); }
   // does a printer have a usable bed defined? (gate uses this)
   function hasBed(p) {
     const b = p && p.bed; if (!b) return false;
@@ -193,7 +200,7 @@
     const r = data.runs.find(x => x.printerId === pid && x.nozzleId === nid && x.filamentId === fid && x.maxFlow != null);
     return r ? r.maxFlow : null;
   }
-  const printerLabel = (p) => p ? [p.maker, p.model].filter(Boolean).join(" ") || "(unnamed printer)" : "?";
+  const printerLabel = (p) => p ? (p.name || [p.maker, p.model].filter(Boolean).join(" ")) || "(unnamed printer)" : "?";
   const COLORS = P.colorDict || {};
   const COLOR_KEYS = Object.keys(COLORS).sort((a, b) => b.length - a.length);
   function colorHex(name) { if (!name) return null; const s = String(name).toLowerCase(); for (const k of COLOR_KEYS) if (s.includes(k)) return COLORS[k]; return null; }
@@ -264,7 +271,11 @@
     if (!data.printers.length) { wrap.innerHTML = '<p class="hint">No printers yet — add one below.</p>'; return; }
     data.printers.forEach(p => {
       const card = el("div", "card" + (p.id === data.lastPrinterId ? " selected" : ""));
-      const title = el("div", "title"); title.textContent = printerLabel(p); card.append(title);
+      const title = el("div", "title");
+      const dom = (bedEntry(p.maker) || {}).domain;   // maker favicon, hotlinked live (never stored)
+      if (dom) { const fav = el("img", "favicon"); fav.src = "https://" + dom + "/favicon.ico"; fav.alt = ""; fav.setAttribute("loading", "lazy"); fav.addEventListener("error", () => fav.remove()); title.append(fav); }
+      title.append(document.createTextNode(printerLabel(p)));
+      card.append(title);
       const meta = el("div", "meta");
       meta.innerHTML = `${p.toolhead || "—"} · ${p.extruder || "—"} (${p.drive || "?"}) · ${p.hotend || "—"}`;
       card.append(meta);
@@ -313,7 +324,7 @@
     const bed = shape === "round"
       ? { shape, diameter: num(v.bedDiameter) || 0, origin }
       : { shape, x: num(v.bedX) || 0, y: num(v.bedY) || 0, origin };
-    return { maker: v.maker, model: v.model, toolhead: v.toolhead, extruder: v.extruder, drive: v.drive, hotend: v.hotend, maxAccel: num(v.maxAccel) || 12000, bed, multi, instances: multi ? parseInstances($("instancesInput").value) : [] };
+    return { name: v.name, maker: v.maker, model: v.model, toolhead: v.toolhead, extruder: v.extruder, drive: v.drive, hotend: v.hotend, maxAccel: num(v.maxAccel) || 12000, bed, multi, instances: multi ? parseInstances($("instancesInput").value) : [] };
   }
   function resetPrinterForm() {
     editingPrinterId = null;

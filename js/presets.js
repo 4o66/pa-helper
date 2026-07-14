@@ -6,9 +6,10 @@
 window.PA_PRESETS = {
 
   // ---- Hardware option lists (each dropdown also offers "Custom…") ----
+  // Machine DESIGNERS/brands — not kit re-sellers. A Voron kit from LDO/Formbot/Fysetc is a "Voron".
   printerMakers: [
     "Voron", "Bambu Lab", "Prusa Research", "Creality", "QIDI", "RatRig",
-    "Sovol", "Anycubic", "Elegoo", "LDO", "Formbot"
+    "Sovol", "Anycubic", "Elegoo"
   ],
   toolheads: [
     "StealthBurner", "Voron Tap", "Dragon Burner", "Xol Toolhead", "A4T",
