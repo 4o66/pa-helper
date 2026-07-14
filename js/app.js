@@ -1038,24 +1038,29 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const accel = num(tr.querySelector('input[data-key="accel"]').value);
     const cur = plan.items.find(it => it.combo.accel === accel && (flow == null || Math.abs(it.combo.flow - flow) < 0.6));
     const curPlate = cur ? cur.plate : 0;
-    const bx = bed.shape === "round" ? (bed.diameter || 0) : (bed.x || 0);
-    const by = bed.shape === "round" ? (bed.diameter || 0) : (bed.y || 0);
-    const pad = 4;
-    thumb.setAttribute("viewBox", `0 0 ${(bx + 2 * pad).toFixed(1)} ${(by + 2 * pad).toFixed(1)}`);
-    if (bed.shape === "round") {
-      const c = svgEl("circle"); c.setAttribute("cx", (bx / 2 + pad).toFixed(1)); c.setAttribute("cy", (by / 2 + pad).toFixed(1)); c.setAttribute("r", (bx / 2).toFixed(1));
-      c.setAttribute("fill", "none"); c.setAttribute("stroke", "#8b97a7"); c.setAttribute("stroke-width", 1.5); thumb.append(c);
-    } else {
-      const b = svgEl("rect"); b.setAttribute("x", pad); b.setAttribute("y", pad); b.setAttribute("width", bx); b.setAttribute("height", by);
-      b.setAttribute("fill", "none"); b.setAttribute("stroke", "#8b97a7"); b.setAttribute("stroke-width", 1.5); thumb.append(b);
+    const round = bed.shape === "round";
+    const bx = round ? (bed.diameter || 0) : (bed.x || 0);
+    const by = round ? (bed.diameter || 0) : (bed.y || 0);
+    const nP = Math.max(1, plan.plates), pad = 4, gapP = Math.max(6, bx * 0.1);
+    const totalW = nP * bx + (nP - 1) * gapP;
+    thumb.setAttribute("viewBox", `0 0 ${(totalW + 2 * pad).toFixed(1)} ${(by + 2 * pad).toFixed(1)}`);
+    for (let p = 0; p < nP; p++) {
+      const ox = pad + p * (bx + gapP), stroke = p === curPlate ? "var(--accent2)" : "#8b97a7";
+      if (round) {
+        const c = svgEl("circle"); c.setAttribute("cx", (ox + bx / 2).toFixed(1)); c.setAttribute("cy", (pad + by / 2).toFixed(1)); c.setAttribute("r", (bx / 2).toFixed(1));
+        c.setAttribute("fill", "none"); c.setAttribute("stroke", stroke); c.setAttribute("stroke-width", p === curPlate ? 2.5 : 1.5); thumb.append(c);
+      } else {
+        const b = svgEl("rect"); b.setAttribute("x", ox.toFixed(1)); b.setAttribute("y", pad); b.setAttribute("width", bx); b.setAttribute("height", by);
+        b.setAttribute("fill", "none"); b.setAttribute("stroke", stroke); b.setAttribute("stroke-width", p === curPlate ? 2.5 : 1.5); thumb.append(b);
+      }
+      plan.items.filter(it => it.plate === p).forEach(it => {
+        const r = svgEl("rect");
+        r.setAttribute("x", (ox + it.x).toFixed(1)); r.setAttribute("y", (pad + it.y).toFixed(1));
+        r.setAttribute("width", plan.objW.toFixed(1)); r.setAttribute("height", plan.objH.toFixed(1));
+        const on = cur && it === cur;
+        r.setAttribute("fill", on ? "var(--accent)" : "#8b97a7"); r.setAttribute("opacity", on ? "1" : "0.3"); thumb.append(r);
+      });
     }
-    plan.items.filter(it => it.plate === curPlate).forEach(it => {
-      const r = svgEl("rect");
-      r.setAttribute("x", (it.x + pad).toFixed(1)); r.setAttribute("y", (it.y + pad).toFixed(1));
-      r.setAttribute("width", plan.objW.toFixed(1)); r.setAttribute("height", plan.objH.toFixed(1));
-      const on = cur && it === cur;
-      r.setAttribute("fill", on ? "var(--accent)" : "#8b97a7"); r.setAttribute("opacity", on ? "1" : "0.35"); thumb.append(r);
-    });
     if (plan.plates > 0) $("patternTitle").textContent += `  ·  plate ${curPlate + 1} of ${plan.plates}`;
   }
   function renderRealPattern(tr, block, accel, speed) {
