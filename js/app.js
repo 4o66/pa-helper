@@ -1093,23 +1093,33 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   function renderThumb(curKey) {
     const thumb = $("patternThumb"); if (!thumb) return;
     while (thumb.firstChild) thumb.removeChild(thumb.firstChild);
-    const plates = gcodeBlocks && gcodeBlocks.plates;
-    thumb.style.display = (plates && plates.length) ? "" : "none";
-    if (!plates || !plates.length) return;
-    let curPlate = -1;
-    plates.forEach((pl, i) => { if (pl.items.some(it => it.key === curKey)) curPlate = i; });
-    const pad = 3, gapP = 8;
-    const dims = plates.map(pl => { const [minx, miny, maxx, maxy] = pl.box; return { minx, miny, maxx, maxy, w: maxx - minx, h: maxy - miny }; });
-    const maxH = Math.max.apply(null, dims.map(d => d.h));
+    const raw = gcodeBlocks && gcodeBlocks.plates;
+    thumb.style.display = (raw && raw.length) ? "" : "none";
+    if (!raw || !raw.length) return;
+    // Order plates low → high accel (as Orca lays them out), regardless of import order.
+    const minAcc = (pl) => Math.min.apply(null, pl.items.map(it => +it.key.split("|")[0]));
+    const plates = raw.slice().sort((a, b) => minAcc(a) - minAcc(b));
+    let curPlate = -1; plates.forEach((pl, i) => { if (pl.items.some(it => it.key === curKey)) curPlate = i; });
+    // Draw the FULL bed (with objects at their real bed positions) when the bed is known; else fall
+    // back to the printed extents.
+    const printer = getPrinter(data.lastPrinterId), bed = printer && printer.bed;
+    const round = bed && bed.shape === "round";
+    const bx = bed ? (round ? bed.diameter : bed.x) : 0, by = bed ? (round ? bed.diameter : bed.y) : 0;
+    const fullBed = !!(bed && bx > 0 && by > 0);
+    const oxOff = (bed && bed.origin === "center") ? bx / 2 : 0, oyOff = (bed && bed.origin === "center") ? by / 2 : 0;
+    const dims = plates.map(pl => { if (fullBed) return { w: bx, h: by }; const [mnx, mny, mxx, mxy] = pl.box; return { w: mxx - mnx, h: mxy - mny, mnx, mny, mxy }; });
+    const maxH = Math.max.apply(null, dims.map(d => d.h)), pad = 3, gapP = Math.max(6, (fullBed ? bx : dims[0].w) * 0.08);
     let x = pad; const px = dims.map(d => { const at = x; x += d.w + gapP; return at; });
     thumb.setAttribute("viewBox", `0 0 ${(x - gapP + pad).toFixed(1)} ${(maxH + 2 * pad).toFixed(1)}`);
     plates.forEach((pl, i) => {
-      const d = dims[i], ox = px[i], on = i === curPlate;
-      const bg = svgEl("rect"); bg.setAttribute("x", ox.toFixed(1)); bg.setAttribute("y", pad); bg.setAttribute("width", d.w.toFixed(1)); bg.setAttribute("height", d.h.toFixed(1));
-      bg.setAttribute("fill", "none"); bg.setAttribute("stroke", on ? "var(--accent2)" : "#8b97a7"); bg.setAttribute("stroke-width", on ? 2 : 1.2); thumb.append(bg);
+      const d = dims[i], ox = px[i], on = i === curPlate, stroke = on ? "var(--accent2)" : "#8b97a7", sw = on ? 2 : 1.2;
+      if (fullBed && round) { const c = svgEl("circle"); c.setAttribute("cx", (ox + bx / 2).toFixed(1)); c.setAttribute("cy", (pad + by / 2).toFixed(1)); c.setAttribute("r", (bx / 2).toFixed(1)); c.setAttribute("fill", "none"); c.setAttribute("stroke", stroke); c.setAttribute("stroke-width", sw); thumb.append(c); }
+      else { const bg = svgEl("rect"); bg.setAttribute("x", ox.toFixed(1)); bg.setAttribute("y", pad); bg.setAttribute("width", d.w.toFixed(1)); bg.setAttribute("height", d.h.toFixed(1)); bg.setAttribute("fill", "none"); bg.setAttribute("stroke", stroke); bg.setAttribute("stroke-width", sw); thumb.append(bg); }
       pl.items.forEach(it => {
         const [x0, y0, x1, y1] = it.bbox, r = svgEl("rect");
-        r.setAttribute("x", (ox + x0 - d.minx).toFixed(1)); r.setAttribute("y", (pad + d.maxy - y1).toFixed(1));
+        const rx = fullBed ? (ox + x0 + oxOff) : (ox + x0 - d.mnx);
+        const ry = fullBed ? (pad + by - (y1 + oyOff)) : (pad + d.mxy - y1);
+        r.setAttribute("x", rx.toFixed(1)); r.setAttribute("y", ry.toFixed(1));
         r.setAttribute("width", (x1 - x0).toFixed(1)); r.setAttribute("height", (y1 - y0).toFixed(1));
         const cur = it.key === curKey; r.setAttribute("fill", cur ? "var(--accent)" : "#8b97a7"); r.setAttribute("opacity", cur ? "1" : "0.3"); thumb.append(r);
       });
