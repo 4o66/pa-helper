@@ -13,6 +13,16 @@ Upstream source: `SoftFever/OrcaSlicer` — `src/libslic3r/calib.cpp` and `src/l
 Last reviewed against `main`: **2026-07-14**. Geometry has been stable since the pattern was
 introduced (2023-07-22, commit `777c7c68f9`).
 
+## Derived line width (`src/libslic3r/Flow.cpp`)
+
+Line width is **not** a PA-test input in Orca — Orca derives it — so PA-Helper derives it the same
+way and does not let the user set it. `Flow::auto_extrusion_width(role, nozzle)` returns the auto
+extrusion width; `opt_key_to_flow_role("line_width")` → `frPerimeter`, which falls into the default
+case = **`1.125 × nozzle_diameter`** (0.4 → 0.45). This matches real Orca g-code. (A user profile can
+override `line_width` off auto; we assume the auto/default. `frSupportMaterial` / `frTopSolidInfill`
+use `1.0×`, but those roles don't apply to the PA pattern.) `js/presets.js: lineWidthFactor = 1.125`.
+Monthly tripwire: confirm `auto_extrusion_width` still returns `1.125×` for the perimeter role.
+
 ## Constants we mirror (`calib.hpp`)
 
 | Orca symbol | Value | Used for |

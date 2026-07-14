@@ -114,9 +114,12 @@ window.PA_PRESETS = {
   basicMethods: ["tower", "line", "pattern"],
   basicDefault: "tower",
 
-  // Print-geometry defaults derived from nozzle diameter (editable afterward).
-  lineWidthFactor: 1.1,   // line width ≈ 1.1 × nozzle diameter (0.4 → 0.44)
-  layerHeightFactor: 0.5, // layer height ≈ 0.5 × nozzle diameter (0.4 → 0.20)
+  // Print-geometry defaults derived from nozzle diameter.
+  // Line width is NOT editable: Orca computes it as auto_extrusion_width for the
+  // line_width option (frPerimeter role) = 1.125 × nozzle (0.4 → 0.45). Source:
+  // OrcaSlicer src/libslic3r/Flow.cpp Flow::auto_extrusion_width. See docs/orca-method-provenance.md.
+  lineWidthFactor: 1.125,  // line width = 1.125 × nozzle diameter (0.4 → 0.45), Orca auto
+  layerHeightFactor: 0.5,  // layer-height *default* only (editable): 0.5 × nozzle (0.4 → 0.20)
 
   /* ---- New-printer defaults ----
    * When a maker with a stock config is picked, default toolhead/extruder/drive/hotend

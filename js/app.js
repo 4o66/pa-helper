@@ -412,7 +412,7 @@
     const lw = Math.round(dia * P.lineWidthFactor * 100) / 100, lh = Math.round(dia * P.layerHeightFactor * 100) / 100;
     if ($("lineW")) $("lineW").value = lw;
     if ($("layerH")) $("layerH").value = lh;
-    const gh = $("geomHint"); if (gh) gh.textContent = `Defaults from your ${dia} mm nozzle: line width ≈ ${lw} mm (${P.lineWidthFactor}× nozzle), layer height ≈ ${lh} mm. Edit if your slicer profile differs.`;
+    const gh = $("geomHint"); if (gh) gh.textContent = `Line width ${lw} mm is fixed by Orca's method (auto_extrusion_width = ${P.lineWidthFactor}× your ${dia} mm nozzle) — it isn't a PA-test setting, so it isn't editable here. Layer height defaults to ${lh} mm; set it to the layer height you're calibrating at.`;
   }
   function parseInstances(text) {
     return (text || "").split(/[\n,]+/).map(s => s.trim()).filter(Boolean).map(label => ({ id: label, label }));
@@ -619,7 +619,7 @@
   /* =================== PA TEST TAB =================== */
   const isBasic = () => $("testMode").value === "basic";
   const unitIsSpeed = () => $("unitMode").value === "speed";
-  const convFactor = () => (num($("layerH").value) || 0.2) * (num($("lineW").value) || 0.44);
+  const convFactor = () => (num($("layerH").value) || 0.2) * (num($("lineW").value) || 0.45);
   const xToFlow = (x) => unitIsSpeed() ? x * convFactor() : x;
   const flowToX = (f) => unitIsSpeed() ? f / convFactor() : f;
   const unitName = () => unitIsSpeed() ? "mm/s" : "mm³/s";
@@ -724,7 +724,7 @@ Paste into Orca's Pressure Advance (PA Pattern) test:
   Accelerations:  ${accels.join(", ")}${cp(accels.join(","))}
   Speeds (mm/s):  ${speeds.join(", ")}${cp(speeds.join(","))}
 
-Speeds are your ${flowsMm3.map(f => Math.round(f)).join(", ")} mm³/s test flows at ${num($("layerH").value) || 0.2}×${num($("lineW").value) || 0.44} mm geometry.
+Speeds are your ${flowsMm3.map(f => Math.round(f)).join(", ")} mm³/s test flows at ${num($("layerH").value) || 0.2}×${num($("lineW").value) || 0.45} mm geometry.
 Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length * accels.length} points.`;
     // Plate-fit: how many test plates does this matrix take on the selected printer's bed?
     const printer = getPrinter(data.lastPrinterId), bed = printer && printer.bed;

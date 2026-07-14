@@ -30,6 +30,12 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   The picker thumbnail shows every imported plate with the current object and its plate highlighted.
 
 ### Changed
+- **Line width is no longer a user input** — it's now derived by Orca's own method and shown
+  read-only. Orca doesn't ask for line width in the PA test; it computes it as `auto_extrusion_width`
+  for the perimeter role = **1.125× nozzle** (0.4 → 0.45 mm, matching real Orca g-code). Previously we
+  defaulted to a made-up 1.1× (0.44) and let it be edited. Layer height stays editable (it's your
+  calibration layer height, which Orca has no formula for). Source recorded in
+  `docs/orca-method-provenance.md` (`Flow.cpp`).
 - `beds.js` rebuilt as a clean, documented single-purpose data file: real per-maker models (Voron =
   Trident / V2.4 / V0 / Switchwire / Legacy), kit vendors (LDO/Formbot) dropped as makers, `[x,y]` /
   `[d]` / `null` bed scheme, newest-first, one maker block each for easy PR review.
