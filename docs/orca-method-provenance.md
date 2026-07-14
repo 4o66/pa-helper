@@ -40,6 +40,7 @@ Monthly tripwire: confirm `auto_extrusion_width` still returns `1.125×` for the
 
 - `get_num_patterns() = ceil((end − start) / step + 1)` — chevron count.
 - `line_spacing() = line_width − layer_height · (1 − π/4)`.
+- **Bead cross-section (flow↔speed):** `area = layer_height · line_spacing = layer_height · (line_width − layer_height·(1−π/4))`. Orca/Slic3r model the extruded bead as a rounded rectangle, so volumetric flow = nozzle_speed · area — **not** `layer_height · line_width`. Verified against real Orca g-code: 0.2 mm × 0.45 mm → measured 0.08142 mm² (n=702 walls), matching the formula to 5 digits; the naive product (0.09) overstates flow ≈10%. `js/app.js: beadArea()`.
 - `line_spacing_angle() = line_spacing / sin(corner/2)`.
 - `frame_size_y() = 2 · sin(corner/2) · wall_side_length` (= 42.426 mm at 90°/30).
 - row pitch = `(walls−1)·line_spacing_angle + line_width + pattern_spacing` (from `glyph_start_x`).

@@ -668,7 +668,15 @@
     if ($("axisMax")) $("axisMax").value = (mx == null) ? "" : axisRnd(mx);
     if (speedListAuto && mx != null && $("speedList")) $("speedList").value = linspace(axisMinVal(), mx, speedPtsN()).map(axisRnd).join(", ");
   }
-  const convFactor = () => (num($("layerH").value) || 0.2) * (num($("lineW").value) || 0.45);
+  // Volumetric flow per unit nozzle speed = the deposited bead's cross-sectional area.
+  // Orca/Slic3r model the bead as a rounded rectangle, so the area is
+  //   layer_height × (line_width − layer_height·(1−π/4))   [ = layer_height × line_spacing ]
+  // NOT the naive layer_height × line_width. Verified against real Orca g-code: at 0.2×0.45 the
+  // measured area is 0.08142 mm², not 0.09 (the naive value overstates flow ~10%). This is the
+  // same line_spacing correction js/pattern.js already uses for the chevron geometry.
+  const EXTRUSION_K = 1 - Math.PI / 4;   // ≈ 0.2146
+  const beadArea = () => { const lh = num($("layerH").value) || 0.2, lw = num($("lineW").value) || 0.45; return lh * (lw - lh * EXTRUSION_K); };
+  const convFactor = () => beadArea();
   const xToFlow = (x) => unitIsSpeed() ? x * convFactor() : x;
   const flowToX = (f) => unitIsSpeed() ? f / convFactor() : f;
   const unitName = () => unitIsSpeed() ? "mm/s" : "mm³/s";
@@ -788,7 +796,7 @@ Paste into Orca's Pressure Advance (PA Pattern) test:
   Accelerations:  ${accels.join(", ")}${cp(accels.join(","))}
   Speeds (mm/s):  ${speeds.join(", ")}${cp(speeds.join(","))}
 
-Speeds are your ${flowsMm3.map(f => Math.round(f)).join(", ")} mm³/s test flows at ${num($("layerH").value) || 0.2}×${num($("lineW").value) || 0.45} mm geometry.
+Speeds are your ${flowsMm3.map(f => Math.round(f * 100) / 100).join(", ")} mm³/s test flows ÷ the bead cross-section ${beadArea().toFixed(4)} mm²/mm (${num($("layerH").value) || 0.2} mm layer × ${num($("lineW").value) || 0.45} mm width, rounded-bead area — Orca's model).
 Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length * accels.length} points.`;
     // Plate-fit: how many test plates does this matrix take on the selected printer's bed?
     const printer = getPrinter(data.lastPrinterId), bed = printer && printer.bed;
@@ -1601,7 +1609,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("coverageImport").addEventListener("click", () => { $("coverageModal").hidden = true; $("gcodeInputAdd").click(); });
     $("coverageContinue").addEventListener("click", () => { $("coverageModal").hidden = true; });
     window.PA_parseGcode = parsePaGcode;
-    window.PA_test = { importGcode, addPlate, resetGcode, buildPaBlocks, colorList, colorFill, suggestAccelPts, suggestSpeedPts };   // test hooks (jsdom smoke)
+    window.PA_test = { importGcode, addPlate, resetGcode, buildPaBlocks, colorList, colorFill, suggestAccelPts, suggestSpeedPts, beadArea };   // test hooks (jsdom smoke)
     $("loadPointsBtn").addEventListener("click", (e) => { loadGrid(e.target._points || []); sortResults(); markJobDirty(); });
     $("resultSort").addEventListener("change", sortResults);
     $("savePlannedBtn").addEventListener("click", savePlanned);

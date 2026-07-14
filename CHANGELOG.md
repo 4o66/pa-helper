@@ -74,6 +74,12 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   regardless of the order you import them.
 
 ### Fixed
+- **Flow↔speed conversion was ~10% off** — it used `layer_height × line_width` for the bead
+  cross-section, but Orca models the extruded bead as a rounded rectangle, so the real area is
+  `layer_height × (line_width − layer_height·(1−π/4))`. At 0.2 × 0.45 that's 0.0814 mm², not 0.09
+  (verified against a printed .gcode: measured 0.08142 mm²). The recommended speeds were therefore
+  ~10% too low for the intended volumetric flow; they now match what Orca actually extrudes. This
+  feeds the max-speed box, the speed list, and the speed↔flow display.
 - A remembered custom printer model no longer appears under every maker (the model dropdown no longer
   pools global custom entries).
 - G-code import no longer treats the **anchor/frame** (accel 500 / speed 30) or Orca's ±1 speed pairs
