@@ -74,6 +74,11 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   regardless of the order you import them.
 
 ### Fixed
+- **Pattern number labels now match Orca's rounding.** The picker rendered flow labels with a fixed
+  3-decimal format (e.g. `12.86`), but Orca formats them by *significant figures* via
+  `convert_number_to_string` — with 4-digit accels the flow prints at 3 sig figs, so `12.86` prints as
+  **`12.9`** on the actual plate. We now replicate Orca's exact rule (precision driven by the block's
+  `max_numbering_length`), so the rendered numbers match the physical print you're comparing against.
 - **Flow↔speed conversion was ~10% off** — it used `layer_height × line_width` for the bead
   cross-section, but Orca models the extruded bead as a rounded rectangle, so the real area is
   `layer_height × (line_width − layer_height·(1−π/4))`. At 0.2 × 0.45 that's 0.0814 mm², not 0.09

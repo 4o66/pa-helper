@@ -64,11 +64,15 @@
     return v;
   }
 
-  // Orca convert_number_to_string: short decimal, capped at maxNumberLen glyphs.
-  function numStr(v) {
-    var s;
-    if (Math.abs(v) >= 1000 || Number.isInteger(v)) s = String(Math.round(v));
-    else s = String(+(+v).toFixed(3));
+  // Orca CalibPressureAdvance::convert_number_to_string — SIGNIFICANT-figure formatting
+  // (C++ std::defaultfloat). With precision p it uses setprecision(num >= 1000 ? p : p-1),
+  // so a sub-1000 value spends one digit on the decimal separator. precision 0/undefined →
+  // ostringstream's default of 6 sig figs (used only to MEASURE label lengths). Capped at
+  // maxNumberLen glyphs. e.g. p=4 → flow 12.86 prints "12.9" (3 sig figs), matching the print.
+  function orcaNumStr(v, precision) {
+    var sig = precision ? (v >= 1000 ? precision : precision - 1) : 6;
+    if (sig < 1) sig = 1;
+    var s = String(+(+v).toPrecision(sig));
     return s.slice(0, CONST.maxNumberLen);
   }
 
@@ -100,9 +104,10 @@
     return spec.map(function (pr) { var a = P[pr[0]], b = P[pr[1]]; return { x1: a[0], y1: a[1], x2: b[0], y2: b[1] }; });
   }
   // A number = stacked digits (Bottom_To_Top): char i at (sx, sy + i*number_spacing).
-  function drawNumber(sx, sy, value, d) {
-    var s = numStr(value), out = [];
-    for (var i = 0; i < s.length && i < CONST.maxNumberLen; i++) {
+  // numberLen = the block's max_numbering_length: sets the print precision AND caps the glyph count.
+  function drawNumber(sx, sy, value, d, numberLen) {
+    var s = orcaNumStr(value, numberLen), out = [];
+    for (var i = 0; i < s.length && i < numberLen; i++) {
       out = out.concat(drawDigit(sx, sy + i * d.numberSpacing, s[i], d.lineWidth));
     }
     return out;
@@ -140,27 +145,33 @@
       byPa[pa] = segs;
     });
 
+    var flow = (p.flow != null && p.flow !== "" && isFinite(+p.flow)) ? +p.flow : null;
+    var accel = (p.accel != null && p.accel !== "" && isFinite(+p.accel)) ? +p.accel : null;
+
+    // Orca max_numbering_length: widest of the shown PA labels and the accel label (NOT flow —
+    // Orca prints "as many fractional digits as fit"), capped at maxNumberLen. This one value sets
+    // both the digit precision for EVERY label and the number-tab depth. So 4-digit accels →
+    // numberLen 4 → flow at 3 sig figs (12.86 → "12.9"); a 5-digit accel bumps it and the block grows.
+    var numberLen = 1;
+    for (var jj = 0; jj < num; jj += 2) numberLen = Math.max(numberLen, orcaNumStr(vals[jj]).length);
+    if (accel != null) numberLen = Math.max(numberLen, orcaNumStr(accel).length);
+    numberLen = Math.min(numberLen, CONST.maxNumberLen);
+
     // digits: PA every other pattern, flow at num+2, accel at num+4 (all below/beside the frame)
     var digitY = d.fullH + CONST.glyphPadV + d.lineWidth;
     var text = [];
-    for (var j = 0; j < num; j += 2) text = text.concat(drawNumber(glyphStartX(j, d), digitY, vals[j], d));
-    var flow = (p.flow != null && p.flow !== "" && isFinite(+p.flow)) ? +p.flow : null;
-    var accel = (p.accel != null && p.accel !== "" && isFinite(+p.accel)) ? +p.accel : null;
-    if (flow != null) text = text.concat(drawNumber(glyphStartX(num + 2, d), digitY, flow, d));
-    if (accel != null) text = text.concat(drawNumber(glyphStartX(num + 4, d), digitY, accel, d));
+    for (var j = 0; j < num; j += 2) text = text.concat(drawNumber(glyphStartX(j, d), digitY, vals[j], d, numberLen));
+    if (flow != null) text = text.concat(drawNumber(glyphStartX(num + 2, d), digitY, flow, d, numberLen));
+    if (accel != null) text = text.concat(drawNumber(glyphStartX(num + 4, d), digitY, accel, d, numberLen));
 
     // block width: chevrons plus any flow/accel glyph columns that stick out past them.
     var allX = [d.patternShift + (num - 1) * d.rowPitch + d.armDX + d.walls * d.lsa];
     text.forEach(function (s) { allX.push(s.x1, s.x2); });
     var printSizeX = Math.max.apply(null, allX) + CONST.glyphPadH;
 
-    // tab DEPTH grows with the longest number printed (incl. accel) — Orca max_numbering_length.
-    // A 5-char accel (e.g. 12000) makes the tab deeper, enlarging the whole block.
-    var strs = []; for (var jj = 0; jj < num; jj += 2) strs.push(numStr(vals[jj]));
-    if (flow != null) strs.push(numStr(flow));
-    if (accel != null) strs.push(numStr(accel));
-    var maxChars = Math.min(strs.reduce(function (m, s) { return Math.max(m, s.length); }, 1), CONST.maxNumberLen);
-    var numHeight = maxChars * CONST.digitSegmentLen + (maxChars - 1) * CONST.digitGapLen; // max_numbering_height
+    // tab DEPTH = max_numbering_height, driven by numberLen (a 5-char accel like 12000 makes the
+    // tab deeper, enlarging the whole block — exactly as it prints).
+    var numHeight = numberLen * CONST.digitSegmentLen + (numberLen - 1) * CONST.digitGapLen;
     var tabY0 = d.fullH + d.lineSpacing;
     var tabMaxY = tabY0 + numHeight + d.lineSpacing + CONST.glyphPadV * 2;
 
@@ -235,6 +246,6 @@
     return { count: n, plates: plates, perPlate: perPlate, cols: cols, rows: rows, objW: maxW, objH: maxH, fits: fits, items: items };
   }
 
-  root.PAPattern = { synthBlock: synthBlock, objectSize: objectSize, planPlates: planPlates, derive: derive, paValues: paValues, drawDigit: drawDigit, CONST: CONST };
+  root.PAPattern = { synthBlock: synthBlock, objectSize: objectSize, planPlates: planPlates, derive: derive, paValues: paValues, drawDigit: drawDigit, numStr: orcaNumStr, CONST: CONST };
   if (typeof module !== "undefined" && module.exports) module.exports = root.PAPattern;
 })();

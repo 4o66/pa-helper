@@ -47,8 +47,19 @@ Monthly tripwire: confirm `auto_extrusion_width` still returns `1.125×` for the
 - `pattern_shift() = (walls−1)·line_spacing_first_layer + line_width_first_layer + glyph_padding_horizontal`.
 - `glyph_start_x(i)` — centers the glyph column on pattern *i*.
 - `glyph_length_x() = line_width + 2·digit_segment_len`.
-- `max_numbering_length()` — includes the **accel** string, so a wide accel (`12000`) enlarges the
-  number tab (and thus the block).
+- `max_numbering_length()` — the widest of the shown **PA** labels and the **accel** label (flow is
+  NOT measured), capped at `m_max_number_len`. A wide accel (`12000`) enlarges the number tab (and
+  the block). This length also sets the **print precision** for every label (see below).
+- `flow_val() = speed · Flow(line_width, layer_height, nozzle).mm3_per_mm() · flow_ratio` — the flow
+  label is the **volumetric flow** (rounded-bead `mm3_per_mm`, matching `beadArea()`), not the speed.
+- `convert_number_to_string(num, precision)` — **significant-figure** formatting (C++
+  `std::defaultfloat`): `setprecision(num >= 1000 ? precision : precision − 1)`, i.e. a sub-1000 value
+  loses one digit to the decimal point. `draw_number` passes `m_number_len = max_numbering_length()`.
+  So with 4-char accels (`1000/2000/5000`) `m_number_len = 4` and the flow prints at **3 sig figs**
+  (`12.86 → "12.9"`); a 5-digit accel makes it 4 sig figs. **We must match this exactly** or the
+  picker's rendered numbers won't match the physical print. `js/pattern.js: orcaNumStr()`.
+  ⚠ **Monthly tripwire:** if Orca changes `convert_number_to_string` precision, the default
+  `ostringstream` precision (6), or which value (`flow_val` vs speed) is drawn, our labels drift.
 
 ## Structure we mirror (`calib.cpp` `generate` / helpers)
 
