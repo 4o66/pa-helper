@@ -179,7 +179,7 @@
             <label>Printer max accel (mm/s²) <input id="accelLimit" type="number" step="500" value="12000" disabled title="Set on the Printer tab — this is what the selected printer can do"></label>
             <label style="flex:1;min-width:15rem">Accel values to test (mm/s², comma-separated) <input id="accelList" type="text" placeholder="blank = auto 1000 → printer max"></label>
           </div>
-          <p class="hint">Adaptive PA depends on both flow and acceleration. Leave accel values blank to auto-scale 5 steps from 1000 to your max (Orca suggests 1000, 2000, 4000, 8000, 12000, 16000). The test grid is every flow × every accel.</p>
+          <p class="hint">Adaptive PA depends on both flow and acceleration. The point counts start from a smart default that scales with your printer's envelope — a narrow accel or flow range needs fewer points, so a low-accel/low-flow machine won't be forced into a big matrix. Both counts are yours to override, and the value lists auto-fill from them (or type your own). The test grid is every speed × every accel.</p>
         </div>
         <div class="row"><button id="recommendBtn">Recommend settings</button></div>
         <pre id="recommendOut" class="out"></pre>

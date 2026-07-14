@@ -19,7 +19,7 @@
   const PALETTE = ["#4aa8ff", "#37c98b", "#ffb84a", "#c98bff", "#5de0e6", "#ff8f5d", "#8bff9e"];
 
   // ---- session state ----
-  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, pendingTab = null, importPlates = [], coverageMissing = [], accelListAuto = true, speedListAuto = true;
+  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, pendingTab = null, importPlates = [], coverageMissing = [], accelListAuto = true, speedListAuto = true, accelPtsAuto = true, speedPtsAuto = true;
   const PA_FACTORS = ["toolhead", "extruder", "drive", "hotend"];
   const FILAMENT_PA_FACTORS = ["material", "formulation", "fiber", "fiberName", "fiberPct", "hardness", "diameter"];
 
@@ -654,6 +654,10 @@
   const unitIsSpeed = () => $("unitMode").value === "speed";
   const accelPtsN = () => Math.max(1, Math.round(num($("accelPoints").value) || 5));
   const speedPtsN = () => Math.max(2, Math.round(num($("flowPoints").value) || 5));
+  // Smart default point counts: sample density tracks the span each axis sweeps, because a
+  // narrower range holds less curve to characterize. Heuristic, not hard data; floored at 2.
+  const suggestAccelPts = (mx) => Math.max(2, Math.min(5, Math.round(Math.log2((mx || 1000) / 1000)) + 1));   // log span from 1000
+  const suggestSpeedPts = (mf) => Math.max(2, Math.min(6, Math.round((mf - P.adaptive.minFlow) / 5) + 1));    // ~1 point per 5 mm³/s
   // Speed axis, in whatever unit the user is displaying. Nozzle velocity (mm/s) and
   // volumetric rate (mm³/s) are the same test; conversion is speed = flow / (LH·LW).
   const axisRnd = (v) => unitIsSpeed() ? Math.round(v) : Math.round(v * 100) / 100;
@@ -682,6 +686,8 @@
     const inst = (p.multi && data.lastInstanceId) ? " · unit " + data.lastInstanceId : "";
     const mx = num(p.maxAccel) || 12000;
     $("accelLimit").value = mx;
+    // Smart default: fewer accel points for a narrow accel range (unless the user set the count).
+    if (accelPtsAuto) $("accelPoints").value = suggestAccelPts(mx);
     // Re-scale the suggested accel sweep to THIS printer's max (unless the user typed their own).
     if (accelListAuto) $("accelList").value = logAccels(1000, mx, accelPtsN()).join(", ");
     ctx.innerHTML = `<b>${printerLabel(p)}</b>${inst}<br><span class="muted">${p.toolhead || "—"} · ${p.extruder || "—"} (${p.drive || "?"}) · ${p.hotend || "—"} · max accel ${mx} mm/s²</span><br>Nozzle: <b>${nozzleLabel(n)}</b><br>Filament: <b>${filamentLabel(f)}</b>`;
@@ -696,6 +702,8 @@
     } else if (fh) {
       fh.textContent = "Enter your max volumetric speed (mm³/s) from the results of your Max Flowrate test (in Orca) for this printer/nozzle/filament.";
     }
+    // Smart default: fewer speed points for a small flow envelope (unless the user set the count).
+    { const mf = num($("maxFlow").value); if (speedPtsAuto && mf != null) $("flowPoints").value = suggestSpeedPts(mf); }
     regenAxis();   // refresh the greyed max-speed box + speed list from the (possibly new) max flow / geometry
     applyMode();
   }
@@ -1573,8 +1581,8 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     // "Accel points" drives how many accel values we auto-space from 1000 → printer max.
     // Regenerate live (input) as you bump the field, and clamp on change/blur.
     const regenAccels = () => { accelListAuto = true; $("accelList").value = logAccels(1000, num($("accelLimit").value) || 12000, accelPtsN()).join(", "); };
-    $("accelPoints").addEventListener("input", regenAccels);
-    $("accelPoints").addEventListener("change", () => { $("accelPoints").value = accelPtsN(); regenAccels(); });
+    $("accelPoints").addEventListener("input", () => { accelPtsAuto = false; regenAccels(); });   // user owns the count now
+    $("accelPoints").addEventListener("change", () => { accelPtsAuto = false; $("accelPoints").value = accelPtsN(); regenAccels(); });
     $("recommendOut").addEventListener("click", (e) => {
       const b = e.target.closest("[data-copy]"); if (!b) return;
       const val = b.getAttribute("data-copy");
@@ -1593,7 +1601,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("coverageImport").addEventListener("click", () => { $("coverageModal").hidden = true; $("gcodeInputAdd").click(); });
     $("coverageContinue").addEventListener("click", () => { $("coverageModal").hidden = true; });
     window.PA_parseGcode = parsePaGcode;
-    window.PA_test = { importGcode, addPlate, resetGcode, buildPaBlocks, colorList, colorFill };   // test hooks (jsdom smoke)
+    window.PA_test = { importGcode, addPlate, resetGcode, buildPaBlocks, colorList, colorFill, suggestAccelPts, suggestSpeedPts };   // test hooks (jsdom smoke)
     $("loadPointsBtn").addEventListener("click", (e) => { loadGrid(e.target._points || []); sortResults(); markJobDirty(); });
     $("resultSort").addEventListener("change", sortResults);
     $("savePlannedBtn").addEventListener("click", savePlanned);
@@ -1617,10 +1625,11 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       $("nozzleSeedModal").hidden = true; $("nozzleAdd").open = true;
       if ($("nozzleAdd").scrollIntoView) $("nozzleAdd").scrollIntoView({ behavior: "smooth", block: "nearest" });
     });
-    $("flowPoints").addEventListener("input", regenAxis);
-    $("flowPoints").addEventListener("change", () => { let n = Math.round(num($("flowPoints").value)); if (!(n >= 2)) n = 5; $("flowPoints").value = n; regenAxis(); });
-    // max speed is back-calculated from max volumetric flow + geometry; both refresh the axis
-    $("maxFlow").addEventListener("input", regenAxis);
+    $("flowPoints").addEventListener("input", () => { speedPtsAuto = false; regenAxis(); });   // user owns the count now
+    $("flowPoints").addEventListener("change", () => { speedPtsAuto = false; let n = Math.round(num($("flowPoints").value)); if (!(n >= 2)) n = 5; $("flowPoints").value = n; regenAxis(); });
+    // max speed is back-calculated from max volumetric flow + geometry; both refresh the axis.
+    // While the count is still auto, a new max flow also re-suggests how many speed points to use.
+    $("maxFlow").addEventListener("input", () => { const mf = num($("maxFlow").value); if (speedPtsAuto && mf != null) $("flowPoints").value = suggestSpeedPts(mf); regenAxis(); });
     $("layerH").addEventListener("input", regenAxis);
     // if the user types their own speed/flow list, stop auto-generating it; sync the point count
     $("speedList").addEventListener("input", () => {

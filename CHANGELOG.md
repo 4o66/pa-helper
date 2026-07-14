@@ -10,6 +10,12 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
 ## [Unreleased]
 
 ### Added
+- **Smart default point counts**: the speed and accel point counts now start from a heuristic that
+  scales with how wide a range each axis actually sweeps — accel by log span from 1000 (2000→2 points,
+  12000→5), speed by the flow envelope (~1 point per 5 mm³/s), both floored at 2. A low-accel/low-flow
+  machine gets e.g. a 2×2 instead of a fixed 5×5, cutting print time for the same coverage. The counts
+  re-suggest when you pick a printer/filament or enter your max flow, but stop auto-adjusting the moment
+  you set a count yourself. (Heuristic, not hard data — see the tuning note in the code.)
 - **Speed axis now mirrors the accel axis**: alongside "Speed points" there's a greyed **Max speed
   (mm/s)** box — back-calculated from your max *volumetric* flow (mm³/s) and the layer-height × line-width
   geometry — and an editable **Speed values to test** list, auto-spaced from the count. This resolves the
