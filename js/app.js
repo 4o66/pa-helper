@@ -793,14 +793,29 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     if (arr.length >= 2 && arr[arr.length - 1].s >= 1.8 * arr[arr.length - 2].s) arr.pop();
     if (arr.length >= 3) { let mi = 0; for (let i = 1; i < arr.length; i++) if (arr[i].c > arr[mi].c) mi = i; const rest = arr.filter((_, i) => i !== mi).map(e => e.c); if (arr[mi].c >= 3 * Math.max(...rest)) arr.splice(mi, 1); }
     r.speeds = arr.map(e => e.s);
-    // TRUE volumetric flow per (accel|speed) cell, from the extrusion geometry (filament_area ×
-    // E-per-XY-mm × speed) — matches the flow number Orca prints on each pattern block.
-    r.flow = {}; for (const k in flowAcc) { const c = flowAcc[k]; if (c.L > 0) r.flow[k] = filA * (c.E / c.L) * (+k.split("|")[1]); }
+    // TRUE volumetric flow per (accel|speed) cell (filament_area × E-per-XY-mm × speed). Snap the
+    // raw speeds (Orca emits ±1 pairs like 33/34) to the denoised test speeds and DROP cells whose
+    // speed isn't a test speed — those are the anchor/frame (a low anchor speed like 30 that the
+    // denoise removed). Without this the anchor shows up as a spurious combo and as a false
+    // cross-plate "duplicate" (e.g. 500|30 appears on every plate).
+    const snapSpd = (s) => { let best = null, bd = Infinity; for (const ts of r.speeds) { const d = Math.abs(ts - s) / ts; if (d <= 0.03 && d < bd) { bd = d; best = ts; } } return best; };
+    const agg = {}, accSeen = {};
+    for (const k in flowAcc) {
+      const parts = k.split("|"), a = +parts[0], ts = snapSpd(+parts[1]);
+      if (ts == null) continue;
+      const key = a + "|" + ts; (agg[key] = agg[key] || { E: 0, L: 0 });
+      agg[key].E += flowAcc[k].E; agg[key].L += flowAcc[k].L; accSeen[a] = 1;
+    }
+    r.flow = {};
+    for (const key in agg) { const c = agg[key]; if (c.L > 0) r.flow[key] = filA * (c.E / c.L) * (+key.split("|")[1]); }
+    r.accels = Object.keys(accSeen).map(Number).sort((a, b) => a - b);   // real test accels (anchor/stray accels dropped)
     return r;
   }
   // Extract per-(accel|speed) block geometry from the g-code toolpath for the pattern picker.
   // Each real test block has many PA chevrons; we also grab the label/frame segments in its box.
-  function buildPaBlocks(text) {
+  function buildPaBlocks(text, testSpeeds) {
+    const tset = new Set(testSpeeds || []);
+    const snapS = (s) => { let best = s, bd = Infinity; tset.forEach(ts => { const d = Math.abs(ts - s) / ts; if (d <= 0.03 && d < bd) { bd = d; best = ts; } }); return best; };
     const lines = String(text).split(/\r?\n/);
     const hasMarkers = /start pressure advance pattern/i.test(text);
     let inpat = !hasMarkers, x = 0, y = 0, pa = 0, accel = 0, f = 0, z = 0;
@@ -817,7 +832,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
         if (gf) f = parseFloat(gf[1]);
         const nx = gx ? parseFloat(gx[1]) : x, ny = gy ? parseFloat(gy[1]) : y;
         if (ge && parseFloat(ge[1]) > 0 && (nx !== x || ny !== y)) {   // capture ALL extrusion (the square prints outside the markers)
-          const spd = Math.round(f / 60);
+          const spd = snapS(Math.round(f / 60));
           const key = [Math.round(x * 10), Math.round(y * 10), Math.round(nx * 10), Math.round(ny * 10)].join(",");
           if (!seen.has(key)) { seen.add(key); segs.push({ x1: x, y1: y, x2: nx, y2: ny, pa, accel, spd, z, inpat }); }
         }
@@ -831,10 +846,10 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const blocks = {};
     const pseg = (px, py, ax, ay, bx, by) => { const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy; let t = l2 ? ((px - ax) * dx + (py - ay) * dy) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(px - (ax + t * dx), py - (ay + t * dy)); };
     const sdist = (a, b) => Math.min(pseg(a.x1, a.y1, b.x1, b.y1, b.x2, b.y2), pseg(a.x2, a.y2, b.x1, b.y1, b.x2, b.y2), pseg(b.x1, b.y1, a.x1, a.y1, a.x2, a.y2), pseg(b.x2, b.y2, a.x1, a.y1, a.x2, a.y2));
-    const isTest = (s) => (s.spd === 50 || s.spd === 100 || s.spd === 150) && s.accel >= 1000;
+    const isTest = (s) => (tset.size ? tset.has(s.spd) : (s.spd === 50 || s.spd === 100 || s.spd === 150)) && s.accel >= 1000;
     for (const k in byKey) {
       const g = byKey[k]; const pas = [...new Set(g.map(s => s.pa))];
-      if (pas.length < 5 || k.endsWith("|30")) continue;              // real test block (skip anchor/frame @30mm/s)
+      if (pas.length < 5 || (tset.size ? !tset.has(+k.split("|")[1]) : k.endsWith("|30"))) continue;   // real test block (skip anchor/frame)
       const xs = g.flatMap(s => [s.x1, s.x2]), ys = g.flatMap(s => [s.y1, s.y2]);
       const bbox = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
       const byPa = {}; g.forEach(s => { (byPa[s.pa] = byPa[s.pa] || []).push(s); });
@@ -885,7 +900,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const text = await file.text();
     const r = parsePaGcode(text);
     if (r.paStart == null && !r.accels.length && !r.speeds.length) return null;
-    return { name: file.name, r, blocks: buildPaBlocks(text) };
+    return { name: file.name, r, blocks: buildPaBlocks(text, r.speeds) };
   }
   // combos (accel|speed) actually present across all imported plates, from the flow keys
   function presentCombos() { const s = new Set(); importPlates.forEach(p => Object.keys(p.r.flow || {}).forEach(k => s.add(k))); return s; }
@@ -1474,7 +1489,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("coverageImport").addEventListener("click", () => { $("coverageModal").hidden = true; $("gcodeInputAdd").click(); });
     $("coverageContinue").addEventListener("click", () => { $("coverageModal").hidden = true; });
     window.PA_parseGcode = parsePaGcode;
-    window.PA_test = { importGcode, addPlate, resetGcode };   // test hooks (jsdom smoke)
+    window.PA_test = { importGcode, addPlate, resetGcode, buildPaBlocks };   // test hooks (jsdom smoke)
     $("loadPointsBtn").addEventListener("click", (e) => { loadGrid(e.target._points || []); sortResults(); markJobDirty(); });
     $("resultSort").addEventListener("change", sortResults);
     $("savePlannedBtn").addEventListener("click", savePlanned);

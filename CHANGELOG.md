@@ -39,6 +39,10 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
 ### Fixed
 - A remembered custom printer model no longer appears under every maker (the model dropdown no longer
   pools global custom entries).
+- G-code import no longer treats the **anchor/frame** (accel 500 / speed 30) or Orca's ±1 speed pairs
+  (e.g. 33/34) as real test combos. This fixes a false "duplicate combos" warning across plates and a
+  wrong matrix (e.g. an anchor cell inflating the grid), and makes the picker find the right block for
+  tests that don't use 50/100/150 mm/s.
 - **Orca-method PA-pattern replica** (`js/pattern.js`) — generates the exact block that OrcaSlicer
   prints for the no-g-code picker: chevrons, the anchoring frame, the filled number tab, the
   seven-segment PA / flow / acceleration glyphs (Orca's own digit method, not a font), and the
