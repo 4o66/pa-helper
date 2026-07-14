@@ -1,0 +1,84 @@
+name: Bug report
+description: Something broke, looked wrong, or confused you while testing PA-Helper.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing PA-Helper! The more of the below you can fill in, the faster it can be fixed.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+      placeholder: |
+        1. Went to the PA Test tab and...
+        2. Expected...
+        3. Instead...
+    validations:
+      required: true
+  - type: input
+    id: build
+    attributes:
+      label: Build hash
+      description: The short hash shown at the bottom of the app (e.g. 7fd11a44c4).
+      placeholder: "7fd11a44c4"
+    validations:
+      required: true
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Chrome
+        - Edge
+        - Brave
+        - Firefox
+        - Safari
+        - Other (note it below)
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "macOS 15 / Windows 11 / Ubuntu 24.04"
+    validations:
+      required: true
+  - type: dropdown
+    id: how-run
+    attributes:
+      label: How are you running it?
+      options:
+        - Hosted (GitHub Pages / a web server)
+        - Opened the local file directly
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware (if calibration- or g-code-related)
+      description: Extruder + drive (direct/bowden), hotend, nozzle, and filament.
+      placeholder: "Clockwork2 / direct, Rapido HF, 0.4 brass, QIDI PLA"
+    validations:
+      required: false
+  - type: textarea
+    id: extras
+    attributes:
+      label: Screenshots, g-code, or pa_data.json export
+      description: >
+        Drag in a screenshot for visual bugs. For g-code import/parse issues, attach the
+        OrcaSlicer .gcode you imported. You can also attach an Export of your pa_data.json to
+        reproduce a state — it holds only printer/filament/run data (no accounts, no secrets),
+        but skim it first if you'd rather not share hardware names.
+    validations:
+      required: false
+  - type: textarea
+    id: console
+    attributes:
+      label: Console errors (optional)
+      description: Any red errors from the browser console (F12 → Console).
+      render: shell
+    validations:
+      required: false

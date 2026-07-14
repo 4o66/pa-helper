@@ -1,0 +1,19 @@
+name: Feature request / idea
+description: Suggest an improvement or a rough edge worth smoothing.
+title: "[Idea]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+      description: Describe the idea and the problem it solves for you.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else?
+      description: Workflow, hardware, or examples that help explain the need.
+    validations:
+      required: false
