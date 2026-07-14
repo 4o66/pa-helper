@@ -164,6 +164,8 @@
           <p class="hint">Speed is what you type into Orca; flow (speed × layer-height × line-width) is what actually prints and is comparable across printers. LH + line width only convert between them.</p>
           <div class="row">
             <label id="pointsLabel"><span id="pointsLabelText">Flow points</span> <input id="flowPoints" type="number" step="1" min="2" value="5"></label>
+          </div>
+          <div class="row">
             <label>Accel points <input id="accelPoints" type="number" step="1" min="1" value="5" title="How many acceleration values to test — auto-spaced from 1000 to your printer's max. Independent of the flow/speed points."></label>
             <label>Printer max accel (mm/s²) <input id="accelLimit" type="number" step="500" value="12000" disabled title="Set on the Printer tab — this is what the selected printer can do"></label>
             <label style="flex:1;min-width:15rem">Accel values to test (mm/s², comma-separated) <input id="accelList" type="text" placeholder="blank = auto 1000 → printer max"></label>

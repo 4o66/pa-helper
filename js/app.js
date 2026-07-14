@@ -1530,13 +1530,11 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       accelListAuto = !has;
       if (has) { const c = parseList($("accelList").value).filter(a => a >= 100).length; if (c) $("accelPoints").value = c; }
     });
-    // "Accel points" drives how many accel values we auto-space from 1000 → printer max
-    $("accelPoints").addEventListener("change", () => {
-      const n = accelPtsN(); $("accelPoints").value = n;
-      accelListAuto = true;
-      const mx = num($("accelLimit").value) || 12000;
-      $("accelList").value = logAccels(1000, mx, n).join(", ");
-    });
+    // "Accel points" drives how many accel values we auto-space from 1000 → printer max.
+    // Regenerate live (input) as you bump the field, and clamp on change/blur.
+    const regenAccels = () => { accelListAuto = true; $("accelList").value = logAccels(1000, num($("accelLimit").value) || 12000, accelPtsN()).join(", "); };
+    $("accelPoints").addEventListener("input", regenAccels);
+    $("accelPoints").addEventListener("change", () => { $("accelPoints").value = accelPtsN(); regenAccels(); });
     $("recommendOut").addEventListener("click", (e) => {
       const b = e.target.closest("[data-copy]"); if (!b) return;
       const val = b.getAttribute("data-copy");
