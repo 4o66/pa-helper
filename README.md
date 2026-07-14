@@ -79,6 +79,24 @@ version it, or delete it.
   Orca, what to enter, in order. *Expert* shows minimal guidance with the advanced
   options tucked behind dropdowns.
 
+## Contributing & reporting bugs
+This is an early **testing preview**, so feedback is exactly what it needs right now.
+
+**Found a bug or something confusing?** Open an issue:
+<https://github.com/4o66/pa-helper/issues>. It helps a lot if you include:
+- Your **browser + OS**, and the **build hash** shown at the bottom of the app.
+- What you did, what you expected, and what happened instead — a screenshot if it's visual.
+- For calibration or g-code import problems: the OrcaSlicer **`.gcode`** you imported, plus
+  your extruder/drive, hotend, nozzle and filament.
+
+You can also attach an **Export** of your `pa_data.json` to reproduce a state — it only holds
+your printer/filament/run data (no accounts, no secrets), but skim it first if you'd rather
+not share hardware names.
+
+**Code contributions** are welcome via pull request. It's deliberately plain
+HTML/CSS/vanilla‑JS with **no build step and no dependencies** — please keep it that way.
+By submitting a PR you agree your contribution is licensed under **AGPLv3**.
+
 ## License
 GNU **AGPLv3** — open, attribution preserved, share-alike, and (unlike GPL) any
 *hosted* modified version must also offer its source. See [`LICENSE`](LICENSE). A
