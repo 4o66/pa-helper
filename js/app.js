@@ -941,10 +941,21 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const axes = unionAxes(), accels = axes.accels, speeds = axes.speeds, present = presentCombos(), missing = [];
     accels.forEach(a => speeds.forEach(s => { if (!present.has(a + "|" + s)) missing.push({ accel: a, speed: s }); }));
     coverageMissing = missing;
-    if (!missing.length) { $("coverageModal").hidden = true; return; }
+    const nP = importPlates.length, nC = presentCombos().size;
+    if (!missing.length) {
+      // A complete cross-product can STILL be a subset of a multi-plate job we can't see (e.g. a
+      // 5×4 plate 1 of a 5×5 test). Always offer to import more; the user confirms when it's whole.
+      $("coverageTitle").textContent = nP > 1 ? "Plates imported" : "Plate imported";
+      $("coverageComplete").hidden = true;
+      $("coverageContinue").textContent = "That's the whole job";
+      $("coverageMsg").textContent = `${nP} plate${nP > 1 ? "s" : ""} imported — ${nC} combo${nC !== 1 ? "s" : ""} — and this matrix is complete on its own. If the test was split across more plates, import them; otherwise you're all set.`;
+      $("coverageModal").hidden = false;
+      return;
+    }
     const reconstructable = accels.length >= 2 && speeds.length >= 2;
     $("coverageTitle").textContent = "This looks like part of a larger test";
     $("coverageComplete").hidden = !reconstructable;
+    $("coverageContinue").textContent = "Continue with these";
     $("coverageMsg").textContent = reconstructable
       ? `The full matrix looks like ${accels.length} accels × ${speeds.length} speeds = ${accels.length * speeds.length} combos, but ${missing.length} ${missing.length === 1 ? "is" : "are"} missing — probably on other plates. Complete the matrix (fill the gaps with generated patterns), import the other plate(s), or continue with these.`
       : `This plate's matrix looks incomplete — ${missing.length} combo${missing.length !== 1 ? "s" : ""} missing. Import the other plate(s), or continue with these.`;
