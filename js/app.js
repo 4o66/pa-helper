@@ -14,7 +14,7 @@
   const PALETTE = ["#4aa8ff", "#37c98b", "#ffb84a", "#c98bff", "#5de0e6", "#ff8f5d", "#8bff9e"];
 
   // ---- session state ----
-  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, pendingTab = null, importPlates = [], coverageMissing = [];
+  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, pendingTab = null, importPlates = [], coverageMissing = [], accelListAuto = true;
   const PA_FACTORS = ["toolhead", "extruder", "drive", "hotend"];
   const FILAMENT_PA_FACTORS = ["material", "formulation", "fiber", "fiberName", "fiberPct", "hardness", "diameter"];
 
@@ -637,6 +637,8 @@
     const inst = (p.multi && data.lastInstanceId) ? " · unit " + data.lastInstanceId : "";
     const mx = num(p.maxAccel) || 12000;
     $("accelLimit").value = mx;
+    // Re-scale the suggested accel sweep to THIS printer's max (unless the user typed their own).
+    if (accelListAuto) $("accelList").value = logAccels(1000, mx, 5).join(", ");
     ctx.innerHTML = `<b>${printerLabel(p)}</b>${inst}<br><span class="muted">${p.toolhead || "—"} · ${p.extruder || "—"} (${p.drive || "?"}) · ${p.hotend || "—"} · max accel ${mx} mm/s²</span><br>Nozzle: <b>${nozzleLabel(n)}</b><br>Filament: <b>${filamentLabel(f)}</b>`;
     $("testBody").hidden = false;
     // Max volumetric speed comes from a separate flow-rate calibration; pre-fill from the
@@ -1484,6 +1486,8 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("unitMode").addEventListener("change", updateUnitUI);
     [...document.getElementsByName("pvUnit")].forEach(r => r.addEventListener("change", () => { if (r.checked) { $("unitMode").value = r.value; updateUnitUI(); } }));
     $("recommendBtn").addEventListener("click", recommend);
+    // if the user types their own accel list, stop auto-rescaling it to the printer max
+    $("accelList").addEventListener("input", () => { accelListAuto = !$("accelList").value.trim(); });
     $("recommendOut").addEventListener("click", (e) => {
       const b = e.target.closest("[data-copy]"); if (!b) return;
       const val = b.getAttribute("data-copy");
