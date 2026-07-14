@@ -168,12 +168,14 @@ footer a{color:var(--accent)}
 #patternSvgWrap{overflow:hidden;background:var(--bg);border:1px solid var(--line);border-radius:8px;margin:.5rem 0}
 #patternSvg{width:100%;height:auto;max-height:58vh;display:block}
 .paline{cursor:pointer}
-.paline .zig{stroke:#808080;stroke-width:2;fill:none;vector-effect:non-scaling-stroke}
+.paline .zig{stroke:#808080;stroke-width:1.5;fill:none;vector-effect:non-scaling-stroke}
 .paline .hit{stroke:transparent;stroke-width:6;vector-effect:non-scaling-stroke}
-.paline:hover .zig{stroke:var(--accent2);stroke-width:3}
-.paline.sel .zig{stroke:var(--accent2);stroke-width:3.5}
+.paline:hover .zig{stroke:var(--accent2);stroke-width:2.4}
+.paline.sel .zig{stroke:var(--accent2);stroke-width:2.8}
 .bgfill{stroke:var(--accent);stroke-width:0.62;stroke-linecap:square}
-.labtext{stroke:var(--ink);stroke-width:1.2;vector-effect:non-scaling-stroke}
+.labtext{stroke:var(--ink);stroke-width:.7;vector-effect:non-scaling-stroke;stroke-linecap:round}
+.betabar{background:#b45309;color:#fff;text-align:center;padding:.45rem .8rem;font-weight:700;font-size:.82rem;letter-spacing:.01em}
+.tabfill{fill:var(--accent);opacity:.9}
 .sframe{fill:none;stroke:var(--accent);stroke-width:2;vector-effect:non-scaling-stroke}
 .sbar{fill:var(--accent)}
 .snum{fill:var(--ink);font-size:12px;font-weight:600;font-family:ui-monospace,Menlo,monospace}

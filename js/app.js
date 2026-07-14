@@ -878,18 +878,35 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     [...$("patternSvg").querySelectorAll(".paline")].forEach(e2 => e2.classList.toggle("sel", e2.dataset.pa === String(pa)));
     $("patternSel").textContent = "Selected PA: " + pa;
   }
+  // Build a synthetic (no-g-code) block from the current PA settings, using the Orca-derived
+  // generator, so the picker looks like the real print even when nothing was imported.
+  function synthPatternBlock(tr) {
+    const s = currentSettings || {};
+    if (s.paStart == null || s.paEnd == null || !s.paStep || !window.PAPattern) return null;
+    const flow = tr ? tr.querySelector('input[data-key="flow"]').value : null;
+    const accel = tr ? tr.querySelector('input[data-key="accel"]').value : null;
+    return window.PAPattern.synthBlock({ paStart: s.paStart, paEnd: s.paEnd, paStep: s.paStep, lineWidth: num(s.lineW), layerHeight: num(s.layerH), wallLoops: 3, flow: flow, accel: accel });
+  }
   function openPattern(tr) {
     patternTr = tr; patternSel = null;
     const accel = +tr.querySelector('input[data-key="accel"]').value;
     const speed = tr.dataset.speed != null ? +tr.dataset.speed : NaN;
     const block = (gcodeBlocks && gcodeBlocks.byKey && isFinite(accel) && isFinite(speed)) ? gcodeBlocks.byKey[accel + "|" + speed] : null;
-    if (block) renderRealPattern(tr, block, accel, speed); else { $("patternThumb").innerHTML = ""; renderSchematic(tr); }
+    $("patternThumb").innerHTML = "";
+    if (block) { renderRealPattern(tr, block, accel, speed); }
+    else {
+      const synth = synthPatternBlock(tr);
+      if (synth) renderRealPattern(tr, synth, accel, isFinite(speed) ? speed : "?");
+      else renderSchematic(tr);   // last-ditch fallback (no PA range available)
+    }
     $("patternModal").hidden = false;
   }
   function renderThumb(curKey) {
     const thumb = $("patternThumb"); if (!thumb) return;
     while (thumb.firstChild) thumb.removeChild(thumb.firstChild);
-    const plate = gcodeBlocks && gcodeBlocks.plate; if (!plate) return;
+    const plate = gcodeBlocks && gcodeBlocks.plate;
+    thumb.style.display = plate ? "" : "none";   // no plate (generated test) → hide the empty box
+    if (!plate) return;
     const [minx, miny, maxx, maxy] = plate.box, pad = 2;
     thumb.setAttribute("viewBox", `0 0 ${(maxx - minx + 2 * pad).toFixed(1)} ${(maxy - miny + 2 * pad).toFixed(1)}`);
     const bg = svgEl("rect"); bg.setAttribute("x", 0.5); bg.setAttribute("y", 0.5); bg.setAttribute("width", (maxx - minx + 2 * pad - 1).toFixed(1)); bg.setAttribute("height", (maxy - miny + 2 * pad - 1).toFixed(1)); bg.setAttribute("fill", "none"); bg.setAttribute("stroke", "#8b97a7"); bg.setAttribute("stroke-width", 1.5); thumb.append(bg);
@@ -911,7 +928,11 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     // Y-flip, then rotate 90° clockwise so the printed numbers read upright.
     const P = (px, py) => { const u = px - minx, v = maxy - py; return [(VH - v) + pad, u + pad]; };
     const line = (seg, cls) => { const a = P(seg.x1, seg.y1), b = P(seg.x2, seg.y2); const l = svgEl("line"); l.setAttribute("x1", a[0].toFixed(2)); l.setAttribute("y1", a[1].toFixed(2)); l.setAttribute("x2", b[0].toFixed(2)); l.setAttribute("y2", b[1].toFixed(2)); if (cls) l.setAttribute("class", cls); return l; };
-    (block.bg || []).forEach(seg => svg.append(line(seg, "bgfill")));   // layer-1 frame + tab, solid blue
+    (block.fills || []).forEach(poly => {                                // filled number tab (synthetic block)
+      const pts = poly.map(pt => { const q = P(pt.x, pt.y); return q[0].toFixed(2) + "," + q[1].toFixed(2); }).join(" ");
+      const pg = svgEl("polygon"); pg.setAttribute("points", pts); pg.setAttribute("class", "tabfill"); svg.append(pg);
+    });
+    (block.bg || []).forEach(seg => svg.append(line(seg, "bgfill")));   // frame + square (imported: layer-1 fill too)
     const pas = Object.keys(block.byPa).map(Number).sort((a, b) => a - b);
     patternSel = (cur != null && pas.includes(cur)) ? cur : null;
     pas.forEach(pa => {
@@ -921,7 +942,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       g.addEventListener("click", () => patternSelectPa(pa));
       svg.append(g);
     });
-    (block.text || []).forEach(seg => svg.append(line(seg, "labtext")));  // layer-2 digits on top
+    (block.text || []).forEach(seg => svg.append(line(seg, "labtext")));  // digits: imported strokes or synthetic seven-segment glyphs
     $("patternSel").textContent = patternSel != null ? "Selected PA: " + patternSel : "No line selected yet — click a chevron.";
   }
   // Synthetic pattern for the no-g-code case: mimics the layout OrcaSlicer's Pressure Advance
@@ -1177,7 +1198,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
 
   function init() {
     applyTheme(data.theme);
-    const v = window.PA_VERSION; if (v && $("buildStamp")) $("buildStamp").textContent = "build " + v.hash + " · " + v.date;
+    const v = window.PA_VERSION; if (v && $("buildStamp")) $("buildStamp").textContent = "v" + (v.version || v.hash) + " · " + v.date;
     printerForm = buildForm($("printerForm"), PRINTER_FIELDS);
     nozzleForm = buildForm($("nozzleForm"), NOZZLE_FIELDS);
     filamentForm = buildForm($("filamentForm"), FILAMENT_FIELDS);

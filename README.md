@@ -1,5 +1,10 @@
 # PA-Helper
 
+> ⚠️ **EARLY BETA — PROCEED WITH CAUTION.**
+> This is unfinished, largely untested software under active development. Features may break or
+> change without notice, and results may be wrong. **Verify every output against your own judgment
+> before trusting it on a real print.** No warranty of any kind (see [LICENSE](LICENSE)).
+
 A calibration companion for **OrcaSlicer Pressure Advance** tuning — it takes the
 tedium out of the *after-print* step: recommend the right test settings, capture
 which line looked best, plot the results, flag the outliers, and hand you the exact
