@@ -10,6 +10,11 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
 ## [Unreleased]
 
 ### Added
+- **Symmetric point-count controls**: the recommend form now has an **Accel points** count next to the
+  flow/speed **points** count. Each auto-spaces its own axis (flow/speed across the flow range; accel
+  log-spaced 1000 → your printer's max) and the two are **independent**, so you can run e.g. 5 speeds ×
+  3 accels. The accel value list is still editable as an override, and its count stays in sync with what
+  you type. The points label reads "Speed points" or "Flow points" depending on the selected unit.
 - **Bed size on printers** (`js/beds.js` + printer form): maker-driven **model dropdown** (newest
   first) that auto-fills bed shape / X / Y / origin, with Custom + manual entry. A printer must have
   a bed before you can leave the Printers tab (bounce-back gate) — this also migrates existing

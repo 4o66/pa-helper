@@ -163,9 +163,10 @@
           <p class="hint" id="geomHint"></p>
           <p class="hint">Speed is what you type into Orca; flow (speed × layer-height × line-width) is what actually prints and is comparable across printers. LH + line width only convert between them.</p>
           <div class="row">
-            <label>Flow points <input id="flowPoints" type="number" step="1" min="2" value="5"></label>
+            <label id="pointsLabel"><span id="pointsLabelText">Flow points</span> <input id="flowPoints" type="number" step="1" min="2" value="5"></label>
+            <label>Accel points <input id="accelPoints" type="number" step="1" min="1" value="5" title="How many acceleration values to test — auto-spaced from 1000 to your printer's max. Independent of the flow/speed points."></label>
             <label>Printer max accel (mm/s²) <input id="accelLimit" type="number" step="500" value="12000" disabled title="Set on the Printer tab — this is what the selected printer can do"></label>
-            <label style="flex:1;min-width:15rem">Accel values to test (mm/s², comma-separated) <input id="accelList" type="text" placeholder="blank = auto 1000 → printer max, 5 steps"></label>
+            <label style="flex:1;min-width:15rem">Accel values to test (mm/s², comma-separated) <input id="accelList" type="text" placeholder="blank = auto 1000 → printer max"></label>
           </div>
           <p class="hint">Adaptive PA depends on both flow and acceleration. Leave accel values blank to auto-scale 5 steps from 1000 to your max (Orca suggests 1000, 2000, 4000, 8000, 12000, 16000). The test grid is every flow × every accel.</p>
         </div>

@@ -619,6 +619,7 @@
   /* =================== PA TEST TAB =================== */
   const isBasic = () => $("testMode").value === "basic";
   const unitIsSpeed = () => $("unitMode").value === "speed";
+  const accelPtsN = () => Math.max(1, Math.round(num($("accelPoints").value) || 5));
   const convFactor = () => (num($("layerH").value) || 0.2) * (num($("lineW").value) || 0.45);
   const xToFlow = (x) => unitIsSpeed() ? x * convFactor() : x;
   const flowToX = (f) => unitIsSpeed() ? f / convFactor() : f;
@@ -638,7 +639,7 @@
     const mx = num(p.maxAccel) || 12000;
     $("accelLimit").value = mx;
     // Re-scale the suggested accel sweep to THIS printer's max (unless the user typed their own).
-    if (accelListAuto) $("accelList").value = logAccels(1000, mx, 5).join(", ");
+    if (accelListAuto) $("accelList").value = logAccels(1000, mx, accelPtsN()).join(", ");
     ctx.innerHTML = `<b>${printerLabel(p)}</b>${inst}<br><span class="muted">${p.toolhead || "—"} · ${p.extruder || "—"} (${p.drive || "?"}) · ${p.hotend || "—"} · max accel ${mx} mm/s²</span><br>Nozzle: <b>${nozzleLabel(n)}</b><br>Filament: <b>${filamentLabel(f)}</b>`;
     $("testBody").hidden = false;
     // Max volumetric speed comes from a separate flow-rate calibration; pre-fill from the
@@ -708,7 +709,7 @@ Run Orca's Pressure Advance ${method} test with that range, then read the single
     let accelMax = num($("accelLimit").value);
     if (!accelMax || accelMax < 500) { accelMax = 12000; $("accelLimit").value = accelMax; }   // guard: accel, not PA
     let accels = parseList($("accelList").value).filter(a => a >= 100);                          // drop stray PA-scale values
-    if (!accels.length) accels = logAccels(1000, accelMax, 5);
+    if (!accels.length) accels = logAccels(1000, accelMax, accelPtsN());
     $("accelList").value = accels.join(", ");
     const cf = convFactor();
     const flowsMm3 = linspace(P.adaptive.minFlow, maxFlow, nFlow);
@@ -1255,6 +1256,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     });
   }
   function updateUnitUI() {
+    if ($("pointsLabelText")) $("pointsLabelText").textContent = (unitIsSpeed() ? "Speed" : "Flow") + " points";
     $("pvFlowsLabel").textContent = (unitIsSpeed() ? "Speed" : "Flow") + " points tested (" + unitName() + ", comma-separated)";
     $("pvFlows").placeholder = unitIsSpeed() ? "e.g. 60, 120, 180, 240" : "e.g. 5, 10, 15, 20";
     [...document.getElementsByName("pvUnit")].forEach(r => { r.checked = (r.value === $("unitMode").value); });
@@ -1459,7 +1461,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     filamentForm = buildForm($("filamentForm"), FILAMENT_FIELDS);
     initPrinterDefaults(); updateFilamentConditionals();
     $("basicMethod").value = P.basicDefault;
-    $("flowPoints").value = 5;   // deterministic default (defeat browser form-restore)
+    $("flowPoints").value = 5; $("accelPoints").value = 5;   // deterministic defaults (defeat browser form-restore)
     document.querySelectorAll("input, select").forEach(e => e.setAttribute("autocomplete", "off"));
     updateUnitUI(); reloadAll();
     $("printerForm").addEventListener("change", (e) => {
@@ -1488,8 +1490,20 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("unitMode").addEventListener("change", updateUnitUI);
     [...document.getElementsByName("pvUnit")].forEach(r => r.addEventListener("change", () => { if (r.checked) { $("unitMode").value = r.value; updateUnitUI(); } }));
     $("recommendBtn").addEventListener("click", recommend);
-    // if the user types their own accel list, stop auto-rescaling it to the printer max
-    $("accelList").addEventListener("input", () => { accelListAuto = !$("accelList").value.trim(); });
+    // if the user types their own accel list, stop auto-rescaling it to the printer max;
+    // keep the "Accel points" count in sync with what they typed
+    $("accelList").addEventListener("input", () => {
+      const has = !!$("accelList").value.trim();
+      accelListAuto = !has;
+      if (has) { const c = parseList($("accelList").value).filter(a => a >= 100).length; if (c) $("accelPoints").value = c; }
+    });
+    // "Accel points" drives how many accel values we auto-space from 1000 → printer max
+    $("accelPoints").addEventListener("change", () => {
+      const n = accelPtsN(); $("accelPoints").value = n;
+      accelListAuto = true;
+      const mx = num($("accelLimit").value) || 12000;
+      $("accelList").value = logAccels(1000, mx, n).join(", ");
+    });
     $("recommendOut").addEventListener("click", (e) => {
       const b = e.target.closest("[data-copy]"); if (!b) return;
       const val = b.getAttribute("data-copy");
