@@ -10,6 +10,13 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
 ## [Unreleased]
 
 ### Added
+- **Speed axis now mirrors the accel axis**: alongside "Speed points" there's a greyed **Max speed
+  (mm/s)** box — back-calculated from your max *volumetric* flow (mm³/s) and the layer-height × line-width
+  geometry — and an editable **Speed values to test** list, auto-spaced from the count. This resolves the
+  mismatch that Orca's flow-rate test reports volumetric flow while the PA dialog takes nozzle velocity.
+- **"Display speed as" radio** (Nozzle velocity / Volumetric rate) replaces the old unit dropdown, with a
+  short explanation. Default is **nozzle velocity (mm/s)** because that's how Orca's PA Pattern dialog is
+  configured. Switching recalculates and converts the max box and value list between the two views.
 - **Multi-colour filament swatches**: the "Dual Color" formulation is renamed **Multi-Color**, and a
   Multi-Color spool's swatch is now a left→right **gradient** built from every colour named in the
   colour field, in the order you typed them (e.g. "Rainbow Purple/Pink/White" → purple → pink → white).

@@ -156,14 +156,23 @@
       <div class="subtab" id="subtab-recommend">
         <div id="advancedControls" class="advanced-only">
           <div class="row">
-            <label>Test points in <select id="unitMode"><option value="flow">Volumetric flow (mm³/s)</option><option value="speed">Speed (mm/s)</option></select></label>
             <label>Layer height (mm) <input id="layerH" type="number" step="0.02" value="0.2"></label>
             <input id="lineW" type="hidden" value="0.45">
           </div>
           <p class="hint" id="geomHint"></p>
-          <p class="hint">Speed is what you type into Orca; flow (speed × layer-height × line-width) is what actually prints and is comparable across printers. LH + line width only convert between them.</p>
           <div class="row">
-            <label id="pointsLabel"><span id="pointsLabelText">Flow points</span> <input id="flowPoints" type="number" step="1" min="2" value="5"></label>
+            <fieldset class="unit-radios">
+              <legend>Display speed as</legend>
+              <label><input type="radio" name="recUnit" value="speed" checked> Nozzle velocity (mm/s)</label>
+              <label><input type="radio" name="recUnit" value="flow"> Volumetric rate (mm³/s)</label>
+            </fieldset>
+            <select id="unitMode" hidden><option value="flow">Volumetric flow (mm³/s)</option><option value="speed">Speed (mm/s)</option></select>
+          </div>
+          <p class="hint">Nozzle velocity (mm/s) is what Orca's PA Pattern dialog actually asks for, so it's the default. Volumetric rate (mm³/s) is the same test expressed as flow — comparable across printers and nozzles. Switching converts the values below.</p>
+          <div class="row">
+            <label id="pointsLabel"><span id="pointsLabelText">Speed points</span> <input id="flowPoints" type="number" step="1" min="2" value="5"></label>
+            <label id="axisMaxLabel"><span id="axisMaxLabelText">Max speed (mm/s)</span> <input id="axisMax" type="number" disabled title="Back-calculated from your max volumetric speed (above) and the layer-height × line-width geometry."></label>
+            <label style="flex:1;min-width:15rem" id="speedListLabel"><span id="speedListLabelText">Speed values to test (mm/s, comma-separated)</span> <input id="speedList" type="text" placeholder="blank = auto from max ÷ points"></label>
           </div>
           <div class="row">
             <label>Accel points <input id="accelPoints" type="number" step="1" min="1" value="5" title="How many acceleration values to test — auto-spaced from 1000 to your printer's max. Independent of the flow/speed points."></label>

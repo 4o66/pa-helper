@@ -102,6 +102,10 @@ button:hover{filter:brightness(1.08)}
 .custom-in{margin-top:.25rem}
 .radlabel{font-size:.8rem;color:var(--muted);align-self:center}
 .row label.radio{flex-direction:row;align-items:center;gap:.35rem;color:var(--ink);font-size:.85rem}
+.unit-radios{border:1px solid var(--line);border-radius:8px;padding:.4rem .7rem .55rem;margin:0;display:flex;gap:1.1rem;align-items:center;flex-wrap:wrap}
+.unit-radios legend{font-size:.72rem;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);padding:0 .3rem}
+.unit-radios label{flex-direction:row;align-items:center;gap:.35rem;color:var(--ink);font-size:.85rem;cursor:pointer}
+.unit-radios input{margin:0}
 .help{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;
   border-radius:50%;border:1px solid var(--muted);color:var(--muted);font-size:10px;font-weight:700;
   line-height:1;cursor:help;text-transform:none;vertical-align:middle}

@@ -19,7 +19,7 @@
   const PALETTE = ["#4aa8ff", "#37c98b", "#ffb84a", "#c98bff", "#5de0e6", "#ff8f5d", "#8bff9e"];
 
   // ---- session state ----
-  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, pendingTab = null, importPlates = [], coverageMissing = [], accelListAuto = true;
+  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, pendingTab = null, importPlates = [], coverageMissing = [], accelListAuto = true, speedListAuto = true;
   const PA_FACTORS = ["toolhead", "extruder", "drive", "hotend"];
   const FILAMENT_PA_FACTORS = ["material", "formulation", "fiber", "fiberName", "fiberPct", "hardness", "diameter"];
 
@@ -653,6 +653,17 @@
   const isBasic = () => $("testMode").value === "basic";
   const unitIsSpeed = () => $("unitMode").value === "speed";
   const accelPtsN = () => Math.max(1, Math.round(num($("accelPoints").value) || 5));
+  const speedPtsN = () => Math.max(2, Math.round(num($("flowPoints").value) || 5));
+  // Speed axis, in whatever unit the user is displaying. Nozzle velocity (mm/s) and
+  // volumetric rate (mm³/s) are the same test; conversion is speed = flow / (LH·LW).
+  const axisRnd = (v) => unitIsSpeed() ? Math.round(v) : Math.round(v * 100) / 100;
+  const axisMinVal = () => { const mf = P.adaptive.minFlow; return unitIsSpeed() ? mf / convFactor() : mf; };
+  const axisMaxVal = () => { const mf = num($("maxFlow").value); if (mf == null) return null; return unitIsSpeed() ? mf / convFactor() : mf; };
+  function regenAxis() {                       // refresh the greyed max box + (if auto) the value list
+    const mx = axisMaxVal();
+    if ($("axisMax")) $("axisMax").value = (mx == null) ? "" : axisRnd(mx);
+    if (speedListAuto && mx != null && $("speedList")) $("speedList").value = linspace(axisMinVal(), mx, speedPtsN()).map(axisRnd).join(", ");
+  }
   const convFactor = () => (num($("layerH").value) || 0.2) * (num($("lineW").value) || 0.45);
   const xToFlow = (x) => unitIsSpeed() ? x * convFactor() : x;
   const flowToX = (f) => unitIsSpeed() ? f / convFactor() : f;
@@ -685,6 +696,7 @@
     } else if (fh) {
       fh.textContent = "Enter your max volumetric speed (mm³/s) from the results of your Max Flowrate test (in Orca) for this printer/nozzle/filament.";
     }
+    regenAxis();   // refresh the greyed max-speed box + speed list from the (possibly new) max flow / geometry
     applyMode();
   }
   function applyMode() {
@@ -738,16 +750,26 @@ Run Orca's Pressure Advance ${method} test with that range, then read the single
     }
     const maxFlow = num($("maxFlow").value);
     if (!maxFlow) { alert("Enter your max volumetric speed (mm³/s) first — from the results of your Max Flowrate test in Orca."); $("maxFlow").focus(); return; }
-    const nFlow = Math.max(2, Math.round(num($("flowPoints").value) || 5));
+    const nFlow = speedPtsN();
     let accelMax = num($("accelLimit").value);
     if (!accelMax || accelMax < 500) { accelMax = 12000; $("accelLimit").value = accelMax; }   // guard: accel, not PA
     let accels = parseList($("accelList").value).filter(a => a >= 100);                          // drop stray PA-scale values
     if (!accels.length) accels = logAccels(1000, accelMax, accelPtsN());
     $("accelList").value = accels.join(", ");
     const cf = convFactor();
-    const flowsMm3 = linspace(P.adaptive.minFlow, maxFlow, nFlow);
-    const speeds = flowsMm3.map(f => Math.round(f / cf));                 // mm/s — what Orca's dialog wants
+    // Speed axis: use the (editable) value list if present, else auto-space min → max flow.
+    // The list is in the displayed unit — convert to flow (mm³/s) and nozzle speed (mm/s).
+    let axisVals = parseList($("speedList").value).filter(v => v > 0);
+    let flowsMm3, speeds;
+    if (axisVals.length) {
+      if (unitIsSpeed()) { speeds = axisVals.map(v => Math.round(v)); flowsMm3 = axisVals.map(v => v * cf); }
+      else { flowsMm3 = axisVals.slice(); speeds = axisVals.map(v => Math.round(v / cf)); }
+    } else {
+      flowsMm3 = linspace(P.adaptive.minFlow, maxFlow, nFlow);
+      speeds = flowsMm3.map(f => Math.round(f / cf));                     // mm/s — what Orca's dialog wants
+    }
     const flowPts = flowsMm3.map(f => Math.round(f * 100) / 100);         // results table is always in flow (mm³/s)
+    $("speedList").value = (unitIsSpeed() ? speeds : flowPts).join(", ");  // reflect what we'll actually test
     const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
     const cp = (val) => ` <button class="copybtn" data-copy="${esc(val)}" title="Copy to clipboard" aria-label="Copy to clipboard">⧉</button>`;
     $("recommendOut").innerHTML =
@@ -1289,9 +1311,13 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     });
   }
   function updateUnitUI() {
-    if ($("pointsLabelText")) $("pointsLabelText").textContent = (unitIsSpeed() ? "Speed" : "Flow") + " points";
-    $("pvFlowsLabel").textContent = (unitIsSpeed() ? "Speed" : "Flow") + " points tested (" + unitName() + ", comma-separated)";
-    $("pvFlows").placeholder = unitIsSpeed() ? "e.g. 60, 120, 180, 240" : "e.g. 5, 10, 15, 20";
+    const spd = unitIsSpeed();
+    if ($("pointsLabelText")) $("pointsLabelText").textContent = (spd ? "Speed" : "Flow") + " points";
+    if ($("axisMaxLabelText")) $("axisMaxLabelText").textContent = spd ? "Max speed (mm/s)" : "Max flow (mm³/s)";
+    if ($("speedListLabelText")) $("speedListLabelText").textContent = (spd ? "Speed values to test (mm/s" : "Flow values to test (mm³/s") + ", comma-separated)";
+    [...document.getElementsByName("recUnit")].forEach(r => { r.checked = (r.value === $("unitMode").value); });
+    $("pvFlowsLabel").textContent = (spd ? "Speed" : "Flow") + " points tested (" + unitName() + ", comma-separated)";
+    $("pvFlows").placeholder = spd ? "e.g. 60, 120, 180, 240" : "e.g. 5, 10, 15, 20";
     [...document.getElementsByName("pvUnit")].forEach(r => { r.checked = (r.value === $("unitMode").value); });
   }
 
@@ -1428,7 +1454,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("testMode").value = r.mode || "advanced";
     if ((r.mode || "advanced") === "basic") lastBasicMethod = r.basicMethod || P.basicDefault;
     $("basicMethod").value = r.basicMethod || P.basicDefault;
-    $("unitMode").value = r.unit || "flow";
+    $("unitMode").value = r.unit || "speed";
     if (r.layerH != null) $("layerH").value = r.layerH;
     if (r.lineW != null) $("lineW").value = r.lineW;
     if (r.maxFlow != null) $("maxFlow").value = r.maxFlow;
@@ -1495,6 +1521,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     initPrinterDefaults(); updateFilamentConditionals();
     $("basicMethod").value = P.basicDefault;
     $("flowPoints").value = 5; $("accelPoints").value = 5;   // deterministic defaults (defeat browser form-restore)
+    $("unitMode").value = "speed";                            // default display = nozzle velocity (how Orca's PA dialog is configured)
     document.querySelectorAll("input, select").forEach(e => e.setAttribute("autocomplete", "off"));
     updateUnitUI(); reloadAll();
     $("printerForm").addEventListener("change", (e) => {
@@ -1521,6 +1548,19 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("testMode").addEventListener("change", applyMode);
     $("basicMethod").addEventListener("change", () => { if (!$("basicMethod").disabled) lastBasicMethod = $("basicMethod").value; updateModeHint(); });
     $("unitMode").addEventListener("change", updateUnitUI);
+    // "Display speed as" — switching converts the current numbers between nozzle velocity and flow
+    [...document.getElementsByName("recUnit")].forEach(r => r.addEventListener("change", () => {
+      if (!r.checked || r.value === $("unitMode").value) return;
+      const cf = convFactor();
+      $("unitMode").value = r.value;
+      updateUnitUI();
+      const conv = (v) => unitIsSpeed() ? v / cf : v * cf;   // flow→speed = /cf, speed→flow = ·cf
+      if (speedListAuto) { regenAxis(); }
+      else {
+        $("speedList").value = parseList($("speedList").value).map(v => axisRnd(conv(v))).join(", ");
+        const mx = axisMaxVal(); $("axisMax").value = (mx == null) ? "" : axisRnd(mx);
+      }
+    }));
     [...document.getElementsByName("pvUnit")].forEach(r => r.addEventListener("change", () => { if (r.checked) { $("unitMode").value = r.value; updateUnitUI(); } }));
     $("recommendBtn").addEventListener("click", recommend);
     // if the user types their own accel list, stop auto-rescaling it to the printer max;
@@ -1577,7 +1617,18 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       $("nozzleSeedModal").hidden = true; $("nozzleAdd").open = true;
       if ($("nozzleAdd").scrollIntoView) $("nozzleAdd").scrollIntoView({ behavior: "smooth", block: "nearest" });
     });
-    $("flowPoints").addEventListener("change", () => { let n = Math.round(num($("flowPoints").value)); if (!(n >= 2)) n = 5; $("flowPoints").value = n; });
+    $("flowPoints").addEventListener("input", regenAxis);
+    $("flowPoints").addEventListener("change", () => { let n = Math.round(num($("flowPoints").value)); if (!(n >= 2)) n = 5; $("flowPoints").value = n; regenAxis(); });
+    // max speed is back-calculated from max volumetric flow + geometry; both refresh the axis
+    $("maxFlow").addEventListener("input", regenAxis);
+    $("layerH").addEventListener("input", regenAxis);
+    // if the user types their own speed/flow list, stop auto-generating it; sync the point count
+    $("speedList").addEventListener("input", () => {
+      const has = !!$("speedList").value.trim();
+      speedListAuto = !has;
+      if (has) { const c = parseList($("speedList").value).filter(v => v > 0).length; if (c >= 2) $("flowPoints").value = c; }
+      else regenAxis();
+    });
     $("addRowBtn").addEventListener("click", () => addRow());
     $("analyzeBtn").addEventListener("click", analyze);
     $("exportBtnModel").addEventListener("click", exportModel);
