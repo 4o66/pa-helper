@@ -1705,19 +1705,20 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   }
 
   function updateIroningPlan() {
-    const out = $("ironingPlanOut"), btn = $("ironingDownloadBtn");
+    const out = $("ironingPlanOut"), btn = $("ironingDownloadBtn"), brim = $("ironingBrimInstructions");
     if (!out || !btn) return;
+    const gap = num($("ironGap").value);
     const p = getPrinter(data.lastPrinterId);
-    if (!p || !hasBed(p)) { out.textContent = ""; btn.disabled = true; return; }
+    if (!p || !hasBed(p)) { out.textContent = ""; btn.disabled = true; if (brim) brim.textContent = ""; return; }
     const speeds = ironSpeeds(), flows = ironFlows();
     if (speeds.length < 2 || flows.length < 2) {
       out.innerHTML = '<span class="badge warn">incomplete</span> Enter at least 2 speed and 2 flow values.';
-      btn.disabled = true; return;
+      btn.disabled = true; if (brim) brim.textContent = ""; return;
     }
     const grid = window.PAIroning.planGrid({
       speeds, flows, bed: p.bed,
       padDiameter: num($("ironPadDiameter").value) || undefined,
-      gap: num($("ironGap").value)
+      gap: gap
     });
     if (!grid.fits) {
       out.innerHTML = `<span class="badge bad">doesn't fit</span> ${grid.cols}×${grid.rows} grid (${grid.gridW.toFixed(1)}×${grid.gridH.toFixed(1)}mm) is bigger than ${printerLabel(p)}'s usable bed (${grid.ux.toFixed(1)}×${grid.uy.toFixed(1)}mm). Reduce points, pad size, or gap — multi-plate isn't supported yet.`;
@@ -1726,6 +1727,24 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       out.innerHTML = `<span class="badge ok">fits</span> ${grid.cols}×${grid.rows} = ${grid.cols * grid.rows} pads, ${grid.gridW.toFixed(1)}×${grid.gridH.toFixed(1)}mm on a ${grid.ux.toFixed(1)}×${grid.uy.toFixed(1)}mm usable bed.`;
       btn.disabled = false;
     }
+    updateIroningBrimInstructions(gap, grid.cols * grid.rows);
+  }
+
+  // The per-object brim_type/brim_object_gap metadata we write does NOT join the pads into one
+  // piece — that's controlled by Orca's GLOBAL brim settings (brim_width + combine_brims), which
+  // live in your active profile, not in the 3MF. We deliberately do NOT embed a project_settings.config
+  // to set these automatically: that file is a full 654-key snapshot of your ENTIRE active profile
+  // when Orca writes one, and by default Orca applies it wholesale when a .3mf with one is opened on
+  // an empty plate (OrcaSlicer#8106 — real reports of people losing tuned printer/filament settings
+  // this way). Since PA-Helper never reads your actual Orca profile, we can't safely construct a full
+  // replacement — so instead: a precise, computed instruction, not a vague warning.
+  function updateIroningBrimInstructions(gap, padCount) {
+    const el2 = $("ironingBrimInstructions"); if (!el2) return;
+    const width = (gap != null ? gap + 2 : null);
+    if (width == null) { el2.textContent = ""; return; }
+    el2.innerHTML = '<span class="badge warn">important</span> In Orca, <b>before slicing</b> — Print Settings → Strength → Brim: set <b>Brim type</b> to <b>Outer brim only</b>, <b>Brim width</b> to <b>' + width.toFixed(1) + 'mm</b>, and enable <b>Combine brims</b>.' +
+      ' Without this, the ' + (padCount || "") + ' pads print as ' + (padCount || "") + ' separate objects instead of one joined piece — likely a failed print.' +
+      ' (Brim width = your pad gap of ' + gap + 'mm + 2mm margin, so adjacent brims always overlap.)';
   }
 
   function downloadIroning3mf() {
