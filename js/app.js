@@ -19,7 +19,7 @@
   const PALETTE = ["#4aa8ff", "#37c98b", "#ffb84a", "#c98bff", "#5de0e6", "#ff8f5d", "#8bff9e"];
 
   // ---- session state ----
-  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, pendingTab = null, importPlates = [], coverageMissing = [], accelListAuto = true, speedListAuto = true, accelPtsAuto = true, speedPtsAuto = true, viewMode = false, maxFlowConfirmed = false;
+  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, pendingTab = null, importPlates = [], coverageMissing = [], accelListAuto = true, speedListAuto = true, accelPtsAuto = true, speedPtsAuto = true, maxFlowConfirmed = false;
   const PA_FACTORS = ["toolhead", "extruder", "drive", "hotend"];
   const FILAMENT_PA_FACTORS = ["material", "formulation", "fiber", "fiberName", "fiberPct", "hardness", "diameter"];
 
@@ -132,6 +132,7 @@
     { key: "material", label: "Material", kind: "select", options: P.nozzleMaterials, customKey: "nozzleMaterial" }
   ];
   const FILAMENT_FIELDS = [
+    { key: "name", label: "Filament name (optional)", kind: "text", newRow: true, help: "A nickname shown as the card title. Leave blank to use maker + material + colour." },
     { key: "maker", label: "Filament maker", kind: "select", options: P.filamentMakers, customKey: "filamentMaker" },
     { key: "material", label: "Material", kind: "select", options: P.filamentMaterials, customKey: "filamentMaterial" },
     { key: "formulation", label: "Formulation", kind: "select", groups: P.filamentFormulations, customKey: "filamentFormulation", optional: true, default: "Basic", help: "Optional sub-type or product line that isn't its own material — e.g. Matte, Silk, Odorless, High Speed. It's what turns \"ABS\" into \"QIDI Odorless ABS\". Basic = a standard formulation." },
@@ -249,7 +250,7 @@
   // multi-select later is just a UI change — storage/label/filter already cope.
   const formList = (f) => { const v = f && f.formulation; return Array.isArray(v) ? v.filter(Boolean) : (v ? [v] : []); };
   const formText = (f) => formList(f).join(" ");
-  const filamentLabel = (f) => f ? [f.maker, f.material, fiberTag(f), f.hardness, formText(f), f.color].filter(Boolean).join(" ") || "(unnamed filament)" : "?";
+  const filamentLabel = (f) => f ? (f.name || [f.maker, f.material, fiberTag(f), f.hardness, formText(f), f.color].filter(Boolean).join(" ")) || "(unnamed filament)" : "?";
   function updateFilamentConditionals() {
     if (!filamentForm) return;
     const mat = filamentForm.material ? filamentForm.material.get() : "";
@@ -272,7 +273,6 @@
     document.querySelectorAll(".tab").forEach(s => s.classList.toggle("active", s.id === "tab-" + name));
   }
   function switchTab(name) {
-    if (viewMode && name !== "test") exitView();   // leaving a read-only run view resets the test tab
     // Gate: the selected printer must have a bed size before leaving the Printers tab (it's
     // needed to work out how many test plates a job takes). Bounce back and open its editor.
     if (name !== "printers") {
@@ -292,11 +292,27 @@
     document.querySelectorAll(".subtab").forEach(s => s.classList.toggle("active", s.id === "subtab-" + name));
     if (name === "printed") prefillProvide();
   }
+  // A tab's selection subtitle: a leading icon/swatch (vertically centred) with two text lines.
+  function tabSel(host, icon, line1, line2) {
+    if (!host) return;
+    host.innerHTML = "";
+    if (icon) host.append(icon);
+    const t = el("div", "tstext");
+    const a = el("div", "tsname"); a.textContent = line1; t.append(a);
+    const b = el("div", "tssub"); b.textContent = line2 || ""; t.append(b);
+    host.append(t);
+  }
   function updateTabLabels() {
     const p = getPrinter(data.lastPrinterId), n = getSelectedNozzle(), f = getFilament(data.lastFilamentId);
     const tp = $("tabSelPrinter"), tf = $("tabSelFilament");
-    if (tp) tp.textContent = p ? (printerLabel(p) + (n ? " · " + nozzleLabel(n) : "")) : "Not selected";
-    if (tf) tf.textContent = f ? filamentLabel(f) : "Not selected";
+    if (tp) {
+      if (p) tabSel(tp, makerFavicon(p.maker), printerLabel(p), n ? nozzleLabel(n) : "No nozzle");
+      else { tp.innerHTML = ""; tp.textContent = "Not selected"; }
+    }
+    if (tf) {
+      if (f) tabSel(tf, colorSquare(f, "colorsq tabsw"), filLine1(f), filLine2(f));
+      else { tf.innerHTML = ""; tf.textContent = "Not selected"; }
+    }
   }
 
   /* =================== PRINTERS TAB =================== */
@@ -316,6 +332,12 @@
     });
     fav.src = icon;
     return fav;
+  }
+  // Icon-only red "Remove" button (trashcan). Meaning is clear from the glyph; keeps card rows compact.
+  const TRASH_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+  function removeButton(onClick) {
+    const b = el("button", "danger iconbtn"); b.type = "button"; b.title = "Remove"; b.setAttribute("aria-label", "Remove");
+    b.innerHTML = TRASH_SVG; b.addEventListener("click", onClick); return b;
   }
   function renderPrinters() {
     const wrap = $("printerList"); wrap.innerHTML = "";
@@ -341,8 +363,7 @@
       selBtn.addEventListener("click", () => selectPrinter(p.id));
       const edit = el("button", "secondary"); edit.textContent = "Edit"; edit.addEventListener("click", () => editPrinter(p.id));
       const clone = el("button", "secondary"); clone.textContent = "Clone"; clone.addEventListener("click", () => clonePrinter(p.id));
-      const rm = el("button", "danger"); rm.textContent = "Remove";
-      rm.addEventListener("click", () => removePrinter(p.id));
+      const rm = removeButton(() => removePrinter(p.id));
       actions.append(selBtn, edit, clone, rm); card.append(actions);
       wrap.append(card);
     });
@@ -528,13 +549,24 @@
     selBtn.addEventListener("click", () => selectFilament(f.id));
     const edit = el("button", "secondary"); edit.textContent = "Edit"; edit.addEventListener("click", () => editFilament(f.id));
     const clone = el("button", "secondary"); clone.textContent = "Clone"; clone.addEventListener("click", () => cloneFilament(f.id));
-    const rm = el("button", "danger"); rm.textContent = "Remove";
-    rm.addEventListener("click", () => removeFilament(f.id));
-    actions.append(selBtn, edit, clone, rm); return actions;
+    const rm = removeButton(() => removeFilament(f.id));
+    actions.append(selBtn, edit, clone);
+    const rc = data.runs.filter(r => r.filamentId === f.id && r.status === "complete").length;
+    if (rc) { const res = el("button"); res.textContent = "Results" + (rc > 1 ? " (" + rc + ")" : ""); res.addEventListener("click", () => openResults(f.id)); actions.append(res); }
+    actions.append(rm); return actions;
   }
   function pinIcon() { const s = el("span", "pin-ic"); s.textContent = "📌"; s.title = "Restricted to specific printer(s)"; return s; }
   function filMeta(f) { const done = data.runs.filter(r => r.filamentId === f.id && r.status === "complete").length; return `${f.diameter || "?"} mm · ${done} completed run${done === 1 ? "" : "s"}`; }
 
+  // Filament label split over two lines (used by the Filament tab button): maker + material on
+  // top, characteristics + colour beneath.
+  const filLine1 = (f) => [f.maker, f.material].filter(Boolean).join(" ") || "(unnamed filament)";
+  const filLine2 = (f) => [fiberTag(f), f.hardness, formText(f), f.color].filter(Boolean).join(" ");
+  function colorSquare(f, cls) {
+    const sq = el("div", cls || "colorsq"); const fill = colorFill(f);
+    if (fill) sq.style.background = fill; else sq.classList.add("nocolor");
+    return sq;
+  }
   function filamentCard(f) {
     const card = el("div", "card fcard" + (f.id === data.lastFilamentId ? " selected" : ""));
     const band = el("div", "colorband"); const fill = colorFill(f); if (fill) band.style.background = fill; else band.classList.add("nocolor"); card.append(band);
@@ -566,20 +598,6 @@
     const box = $("filamentPrinters"); if (!box) return; box.innerHTML = "";
     if (!data.printers.length) { box.innerHTML = '<p class="hint">No printers yet — add one on the Printer tab first.</p>'; return; }
     data.printers.forEach(p => { const l = el("label", "checkline"); const cb = el("input"); cb.type = "checkbox"; cb.value = p.id; l.append(cb, document.createTextNode(" " + printerLabel(p))); box.append(l); });
-  }
-  function renderCompletedRuns() {
-    const wrap = $("completedWrap"), list = $("completedList");
-    if (!wrap) return;
-    const done = data.runs.filter(r => r.status === "complete");
-    wrap.hidden = done.length === 0; list.innerHTML = "";
-    done.slice(0, 30).forEach(r => {
-      const f = getFilament(r.filamentId), p = getPrinter(r.printerId);
-      const card = el("div", "card");
-      const title = el("div", "title"); title.textContent = filamentLabel(f); card.append(title);
-      const meta = el("div", "meta"); meta.textContent = `${printerLabel(p)} · ${r.date} · ${r.results.length} pts`; card.append(meta);
-      const actions = el("div", "actions"); const op = el("button"); op.textContent = "Open"; op.addEventListener("click", () => viewRun(r.id)); actions.append(op); card.append(actions);
-      list.append(card);
-    });
   }
   function renderFilaments() {
     const pid = data.lastPrinterId;
@@ -632,6 +650,7 @@
     const f = getFilament(id); if (!f) return;
     const copy = Object.assign({}, f, {
       id: Store.uid(),
+      name: f.name ? f.name + " (copy)" : "",
       color: f.color ? f.color + " (copy)" : "(copy)",
       printers: (f.printers || []).slice(),
       created: new Date().toISOString()
@@ -739,7 +758,7 @@
   function gateMaxFlow() {
     const gated = $("gatedBody"), btn = $("maxFlowConfirm");
     const mf = num($("maxFlow").value), valid = mf != null && mf > 0;
-    if (viewMode || isBasic()) { if (gated) gated.hidden = false; if (btn) btn.hidden = true; return; }
+    if (isBasic()) { if (gated) gated.hidden = false; if (btn) btn.hidden = true; return; }
     if (btn) {
       btn.hidden = false;
       btn.disabled = !valid || maxFlowConfirmed;
@@ -1433,15 +1452,19 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     if (accelSet.length > 1) accelSet.forEach((a, i) => { const ly = m.t + 4 + i * 15; const sw = svgEl("rect"); sw.setAttribute("x", W - m.r - 96); sw.setAttribute("y", ly - 8); sw.setAttribute("width", 10); sw.setAttribute("height", 10); sw.setAttribute("fill", colorOf(a)); svg.append(sw); text(W - m.r - 82, ly + 1, a + " mm/s²", "start"); });
   }
 
+  // The Adaptive-PA model box (label + textarea + copy) only appears once there's something to show,
+  // so an un-generated Export section is just the Generate button.
+  function syncModelBlock() { const mb = $("modelBlock"); if (mb) mb.hidden = !($("modelOut").value || "").trim(); }
   function exportModel() {
     if (isBasic()) {
       const pa = num($("basicBestPA").value);
       $("singlePaOut").innerHTML = pa != null ? 'Set this PA value in Orca: <b>' + pa + '</b>' : "Enter your best PA above.";
-      $("modelOut").value = ""; return;
+      $("modelOut").value = ""; syncModelBlock(); return;
     }
     const rows = readResults().filter(r => r.x != null && r.bestPA != null).sort((a, b) => (a.x - b.x) || ((a.accel || 0) - (b.accel || 0)));
-    if (!rows.length) { $("modelOut").value = ""; $("singlePaOut").textContent = "Enter some results first."; return; }
+    if (!rows.length) { $("modelOut").value = ""; syncModelBlock(); $("singlePaOut").textContent = "Enter some results first."; return; }
     $("modelOut").value = rows.map(r => `${r.bestPA}, ${r.x.toFixed(2)}, ${r.accel != null ? r.accel : ""}`).join("\n");
+    syncModelBlock();
     const ys = rows.map(r => r.bestPA).slice().sort((a, b) => a - b), median = ys[Math.floor(ys.length / 2)];
     let single = median;
     if (lastFit) { const midX = (Math.min(...rows.map(r => r.x)) + Math.max(...rows.map(r => r.x))) / 2; const accs = rows.map(r => r.accel).filter(a => a != null).sort((a, b) => a - b); const midA = accs.length ? accs[Math.floor(accs.length / 2)] : 0; single = lastFit.type === "mlr" ? lastFit.predict(midX, midA) : lastFit.predict(midX); }
@@ -1484,80 +1507,90 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     exportModel();   // generate the Orca export text now so it's stored with the run (shown on reopen)
     const run = collectRun("complete"); currentRunId = run.id; upsertRun(run);
     cacheBlocksFor(run.id);   // keep the geometry so a completed test can be reopened in the real picker
-    persist(); renderInProgress(); renderCompletedRuns(); clearJobDirty();
+    persist(); renderInProgress(); renderFilaments(); clearJobDirty();
     alert("Run saved.");
   }
-  const resumeRun = (id) => openRun(id, false);   // planned run → editable
-  const viewRun = (id) => openRun(id, true);      // completed run → read-only view
-  function setTestReadOnly(on) {
-    const body = $("testBody"); if (!body) return;
-    // No entries can be made: disable inputs/selects, make textareas read-only (so the Orca export text
-    // stays selectable/copyable — the reason to reopen a run), and HIDE every button (only the view
-    // bar's Clone/Delete/Close remain). Only touch controls we lock, so pre-existing disabled/hidden
-    // ones (locked flow/accel cells, the hidden loadPoints button) are preserved on exit.
-    body.querySelectorAll("input, select, textarea, button").forEach(el => {
-      if (on) {
-        if (el.tagName === "BUTTON") { if (!el.hidden) { el.hidden = true; el.dataset.vroBtn = "1"; } }
-        else if (el.tagName === "TEXTAREA") { if (!el.readOnly) { el.readOnly = true; el.dataset.vroRo = "1"; } }
-        else if (!el.disabled) { el.disabled = true; el.dataset.vroLocked = "1"; }
-      } else {
-        if (el.dataset.vroBtn) { el.hidden = false; delete el.dataset.vroBtn; }
-        if (el.dataset.vroRo) { el.readOnly = false; delete el.dataset.vroRo; }
-        if (el.dataset.vroLocked) { el.disabled = false; delete el.dataset.vroLocked; }
-      }
-    });
-    body.classList.toggle("viewlocked", on);
-    const bar = $("runViewBar"); if (bar) bar.hidden = !on;
+  const resumeRun = (id) => openRun(id);   // planned run → editable in the PA tab
+
+  /* ---- Saved-results modal (per filament) ---- */
+  let resultsRunId = null;
+  const completedRunsFor = (fid) => data.runs
+    .filter(r => r.status === "complete" && r.filamentId === fid)
+    .sort((a, b) => String(b.created || b.date || "").localeCompare(String(a.created || a.date || "")));   // newest first
+  function openResults(fid) {
+    const runs = completedRunsFor(fid); if (!runs.length) return;
+    const fil = getFilament(fid);
+    $("resultsTitle").textContent = filamentLabel(fil);
+    const sw = $("resultsSwatch"); const fill = fil ? colorFill(fil) : null;   // colour swatch in the title bar
+    if (sw) { sw.style.background = fill || ""; sw.classList.toggle("nocolor", !fill); }
+    const pick = $("resultsPick"); pick.innerHTML = "";
+    runs.forEach(r => { const o = el("option"); o.value = r.id; o.textContent = printerLabel(getPrinter(r.printerId)) + " · " + r.date; pick.append(o); });
+    $("resultsPickWrap").hidden = runs.length < 2;
+    pick.value = runs[0].id;
+    renderResultsRun(runs[0]);
+    $("resultsModal").hidden = false;
   }
-  function exitView() {
-    if (!viewMode) return;
-    viewMode = false; setTestReadOnly(false);
-    resetTestTab();
+  function renderResultsRun(run) {
+    resultsRunId = run.id;
+    const p = getPrinter(run.printerId), f = getFilament(run.filamentId), s = run.settings || {};
+    const esc = (v) => String(v == null ? "" : v).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const copy = (val) => (val != null && String(val) !== "") ? ` <button class="copybtn" data-copy="${esc(val)}" title="Copy to clipboard" aria-label="Copy">⧉</button>` : "";
+    const dl = (rows) => '<dl class="results-dl">' + rows.filter(r => r[1] != null && String(r[1]) !== "").map(([k, v, c]) => `<dt>${esc(k)}</dt><dd>${esc(v)}${c != null ? copy(c) : ""}</dd>`).join("") + "</dl>";
+    const nz = run.nozzle || (data.lastRunNozzle);
+    const bed = p && p.bed ? (p.bed.shape === "round" ? (p.bed.diameter + " mm ø") : (p.bed.x + "×" + p.bed.y + " mm")) : "";
+    const printer = p ? [["Maker", p.maker], ["Model", p.model], ["Toolhead", p.toolhead], ["Extruder", (p.extruder || "") + (p.drive ? " (" + p.drive + ")" : "")], ["Hotend", p.hotend], ["Nozzle", nz ? nozzleLabel(nz) : ""], ["Bed", bed]] : [["Status", "(deleted)"]];
+    const fil = f ? [["Maker", f.maker], ["Material", f.material], ["Formulation", formText(f)], ["Color", f.color], ["Diameter", f.diameter ? f.diameter + " mm" : ""], ["Fiber", fiberTag(f)], ["Hardness", f.hardness]] : [["Status", "(deleted)"]];
+    const settings = [
+      ["Mode", (run.mode || "advanced") + (run.basicMethod ? " (" + run.basicMethod + ")" : "")],
+      ["Date", run.date],
+      ["Max volumetric speed", run.maxFlow != null ? run.maxFlow + " mm³/s" : "", run.maxFlow],
+      ["Layer × line width", (run.layerH != null && run.lineW != null) ? (run.layerH + " × " + run.lineW + " mm") : ""],
+      ["Start PA", s.paStart, s.paStart], ["End PA", s.paEnd, s.paEnd], ["PA step", s.paStep, s.paStep],
+      ["Accelerations", (s.accels || []).join(", "), (s.accels || []).join(",")],
+      ["Speeds (mm/s)", (s.speeds || []).join(", "), (s.speeds || []).join(",")]
+    ];
+    let orca = "";
+    if (run.modelText) orca += `<label class="blocklabel">Adaptive PA model — paste into Orca${copy(run.modelText)}</label><pre class="resultblock">${esc(run.modelText)}</pre>`;
+    if (run.singlePaText) orca += `<div class="out">${run.singlePaText}</div>`;
+    if (!orca) orca = '<p class="hint">No exported values were saved for this run.</p>';
+    // Printer / Filament / Test settings collapse (collapsed by default); Results stays open/static.
+    const sec = (title, body) => `<details class="rsec"><summary>${esc(title)}</summary>${body}</details>`;
+    $("resultsBodyView").innerHTML =
+      sec("Printer - " + (p ? printerLabel(p) : "(deleted)"), dl(printer)) +
+      sec("Filament - " + (f ? filamentLabel(f) : "(deleted)"), dl(fil)) +
+      sec("Test settings", dl(settings)) +
+      `<h3 class="rsec-static">Results</h3>${orca}`;
   }
-  // Blank the ENTIRE PA-test tab back to a fresh state — results, plot, analysis, the Orca export
-  // boxes, max flow, the basic fields, AND the recommend/provide config (accel/speed lists, point
-  // counts, provided values) plus any imported g-code. Used when leaving a saved-run view so the tab
-  // never reappears as that run.
-  function resetTestTab() {
-    maxFlowConfirmed = false; currentRunId = null; currentSettings = null; lastFit = null;
-    if (gcodeImported) resetGcode();
-    loadGrid([]); drawPlot([], null, []); $("analysisOut").innerHTML = ""; $("recommendOut").textContent = "";
-    $("modelOut").value = ""; $("singlePaOut").innerHTML = "";
-    $("maxFlow").value = ""; $("basicBestPA").value = ""; $("basicNotes").value = "";
-    ["accelList", "speedList", "axisMax", "pvFlows", "pvAccels"].forEach(id => { if ($(id)) $(id).value = ""; });
-    $("flowPoints").value = 5; $("accelPoints").value = 5;
-    accelListAuto = speedListAuto = accelPtsAuto = speedPtsAuto = true;
-    switchSubtab("recommend");
-    // Prefill max flow from a prior run for this combo (blank if none); the gate then hides the rest of
-    // the form until it's confirmed. (The whole form being HIDDEN — not disabled — is the clear signal.)
-    resetMaxFlowForCombo();
-    clearJobDirty();
-  }
-  function cloneRun() {   // same settings/grid, fresh blank results, editable — a re-run
-    viewMode = false; setTestReadOnly(false); currentRunId = null;   // new run: won't overwrite the original
+  function closeResults() { $("resultsModal").hidden = true; resultsRunId = null; }
+  function cloneFromRun(id) {   // load a saved run's settings into a fresh editable run (a re-run)
+    closeResults();
+    openRun(id);                // resume-load into the PA tab (editable)
+    currentRunId = null;        // …but make it a NEW run so it can't overwrite the original
     [...$("resultsBody").querySelectorAll("tr")].forEach(tr => {
-      const b = tr.querySelector('input[data-key="bestPA"]'); if (b) { b.value = ""; b.dispatchEvent(new window.Event("input", { bubbles: true })); }
+      const b = tr.querySelector('input[data-key="bestPA"]'); if (b) b.value = "";
       const n = tr.querySelector('input[data-key="notes"]'); if (n) n.value = "";
+      // blanking a value doesn't fire the input handlers, so clear the stale flags by hand
+      tr.classList.remove("outlier");
+      const ew = tr.querySelector(".edgewarn"); if (ew) ew.hidden = true;
+      const ow = tr.querySelector(".outlierwarn"); if (ow) ow.hidden = true;
     });
-    if (isBasic() && $("basicBestPA")) { $("basicBestPA").value = ""; $("basicNotes").value = ""; }
-    drawPlot([], null, []); $("analysisOut").innerHTML = ""; lastFit = null;
-    $("recommendOut").textContent = "Cloned to a new run — same settings, blank results. Re-print, enter the best PA per row, then Save.";
+    if ($("basicBestPA")) { $("basicBestPA").value = ""; $("basicNotes").value = ""; }
+    drawPlot([], null, []); $("analysisOut").innerHTML = ""; $("modelOut").value = ""; $("singlePaOut").innerHTML = ""; lastFit = null; syncModelBlock();
+    $("recommendOut").textContent = "Cloned from a saved run — same settings, blank results. Re-print, enter the best PA per row, then Save.";
     markJobDirty();
   }
-  function deleteRun() {
-    const r = data.runs.find(x => x.id === currentRunId); if (!r) return;
-    if (!confirm("Delete this saved run permanently? This can't be undone.")) return;
-    const i = data.runs.findIndex(x => x.id === currentRunId);
-    if (i >= 0) data.runs.splice(i, 1);
-    if (data.gcodeCache) delete data.gcodeCache[currentRunId];
-    viewMode = false; setTestReadOnly(false); currentRunId = null; currentSettings = null;
-    loadGrid([]); drawPlot([], null, []); $("analysisOut").innerHTML = ""; $("recommendOut").textContent = "";
-    clearJobDirty(); persist(); renderCompletedRuns(); renderInProgress(); renderFilaments();
-    switchTab("filaments");
-  }
-  function openRun(id, viewOnly) {
+  function deleteRunById(id) {
     const r = data.runs.find(x => x.id === id); if (!r) return;
-    setTestReadOnly(false);   // start unlocked; re-lock below if viewing
+    if (!confirm("Delete this saved run permanently? This can't be undone.")) return;
+    const fid = r.filamentId, i = data.runs.findIndex(x => x.id === id);
+    if (i >= 0) data.runs.splice(i, 1);
+    if (data.gcodeCache) delete data.gcodeCache[id];
+    if (currentRunId === id) currentRunId = null;
+    persist(); renderInProgress(); renderFilaments();
+    if (completedRunsFor(fid).length) openResults(fid); else closeResults();   // stay on the modal if runs remain
+  }
+  function openRun(id) {
+    const r = data.runs.find(x => x.id === id); if (!r) return;
     currentRunId = id;
     gcodeBlocks = (data.gcodeCache && data.gcodeCache[id]) ? data.gcodeCache[id] : null;   // restore real pattern geometry
     data.lastPrinterId = r.printerId; data.lastInstanceId = r.instanceId || null; data.lastFilamentId = r.filamentId;
@@ -1570,30 +1603,24 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     if (r.layerH != null) $("layerH").value = r.layerH;
     if (r.lineW != null) $("lineW").value = r.lineW;
     if (r.maxFlow != null) $("maxFlow").value = r.maxFlow;
-    $("modelOut").value = r.modelText || "";                      // restore the stored Orca export text
+    $("modelOut").value = r.modelText || ""; syncModelBlock();     // restore the stored Orca export text
     $("singlePaOut").innerHTML = r.singlePaText || "";
     currentSettings = r.settings || null;
     updateUnitUI();
     const s = r.settings || {};
     if (r.mode === "basic") {
       if (r.results && r.results[0]) { $("basicBestPA").value = r.results[0].bestPA != null ? r.results[0].bestPA : ""; $("basicNotes").value = r.results[0].notes || ""; }
-      $("recommendOut").textContent = viewOnly
-        ? `Saved basic ${r.basicMethod || "tower"} run — read-only. PA range ${s.paStart}–${s.paEnd} step ${s.paStep}.`
-        : `Resumed planned basic ${r.basicMethod || "tower"} run. PA range ${s.paStart}–${s.paEnd} step ${s.paStep}. Enter the best PA below.`;
+      $("recommendOut").textContent = `Resumed planned basic ${r.basicMethod || "tower"} run. PA range ${s.paStart}–${s.paEnd} step ${s.paStep}. Enter the best PA below.`;
     } else {
       if (r.results && r.results.length) loadGrid(r.results.map(x => ({ flow: x.x, accel: x.accel, bestPA: x.bestPA, notes: x.notes, override: x.override, speed: x.speed })));
       else if (s.points && s.accels) loadGrid(buildGridRows(s.points, s.accels));
       sortResults();
-      $("recommendOut").textContent = viewOnly
-        ? `Saved run — read-only. PA range ${s.paStart}–${s.paEnd} step ${s.paStep}. Clone it to run again.`
-        : `Resumed planned run. PA range ${s.paStart}–${s.paEnd} step ${s.paStep}. Fill in the best PA per row.`;
+      $("recommendOut").textContent = `Resumed planned run. PA range ${s.paStart}–${s.paEnd} step ${s.paStep}. Fill in the best PA per row.`;
     }
     maxFlowConfirmed = true;   // a saved run's max flow is trusted — don't re-gate it
     renderPrinters(); renderNozzles(); renderFilaments(); updateTestContext();
     switchTab("test");
-    viewMode = !!viewOnly;
-    if (viewOnly) { setTestReadOnly(true); if (r.mode !== "basic") analyze(); clearJobDirty(); }
-    else { persist(); markJobDirty(); }
+    persist(); markJobDirty();
   }
 
   function setStatus() {
@@ -1638,7 +1665,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     persist(); rebuildForms(); reloadAll();
     $("debugModal").hidden = true;
   }
-  function reloadAll() { renderPrinters(); renderNozzles(); renderFilaments(); renderInProgress(); renderCompletedRuns(); renderFilamentPrinterPicker(); deriveGeometryFromNozzle(); updateTestContext(); setStatus(); updateTabLabels(); $("themeSel").value = data.theme || "system"; applyTheme(data.theme); }
+  function reloadAll() { renderPrinters(); renderNozzles(); renderFilaments(); renderInProgress(); renderFilamentPrinterPicker(); deriveGeometryFromNozzle(); updateTestContext(); setStatus(); updateTabLabels(); $("themeSel").value = data.theme || "system"; applyTheme(data.theme); }
 
   function init() {
     applyTheme(data.theme);
@@ -1725,9 +1752,15 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("loadPointsBtn").addEventListener("click", (e) => { loadGrid(e.target._points || []); sortResults(); markJobDirty(); });
     $("resultSort").addEventListener("change", sortResults);
     $("savePlannedBtn").addEventListener("click", savePlanned);
-    $("viewCloneBtn").addEventListener("click", cloneRun);
-    $("viewDeleteBtn").addEventListener("click", deleteRun);
-    $("viewCloseBtn").addEventListener("click", () => { exitView(); switchTab("filaments"); });
+    $("resultsClone").addEventListener("click", () => { if (resultsRunId) cloneFromRun(resultsRunId); });
+    $("resultsDelete").addEventListener("click", () => { if (resultsRunId) deleteRunById(resultsRunId); });
+    $("resultsClose").addEventListener("click", closeResults);
+    $("resultsPick").addEventListener("change", (e) => { const r = data.runs.find(x => x.id === e.target.value); if (r) renderResultsRun(r); });
+    $("resultsBodyView").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-copy]"); if (!b) return;
+      if (navigator.clipboard) navigator.clipboard.writeText(b.getAttribute("data-copy"));
+      b.classList.add("copied"); setTimeout(() => b.classList.remove("copied"), 1300);
+    });
     // Unsaved-PA-job guard: mark the job dirty on edits, prompt on navigation / tab close.
     $("resultsBody").addEventListener("input", markJobDirty);
     if ($("basicBestPA")) $("basicBestPA").addEventListener("input", markJobDirty);

@@ -10,6 +10,42 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
 ## [Unreleased]
 
 ### Added
+- **Optional filament name** (nickname), like the printer name — shown as the card title / label when set.
+
+### Changed
+- **"Save as planned run" is orange** — matching the "planned" badge on the filament screen.
+- **Modal + Export polish.** The run-delete control is now a red trashcan icon placed to the right of Close.
+  Rerunning a saved run clears the stale per-row warning flags (blank grid = no warnings). The Analyze and
+  Export sections show only their button until there's output — no more empty boxes. Modal section headings
+  are blue again, and the title-bar colour swatch is vertically centred with the filament name.
+- **Results modal reworked.** Fixed title bar at the top (filament name + colour swatch; the "Results —"
+  prefix is gone) and a fixed button bar at the bottom that stays put while the body scrolls. Printer,
+  Filament and Test-settings are now collapsible sections (collapsed by default, right-side ▶/▼ triangle);
+  the Results section is always open. Section titles read "Printer - [name]" / "Filament - [name]", and the
+  lists now show maker + model / maker + material instead of repeating the name. The run-clone button is
+  "Rerun with these settings"; Close is right-justified. The adaptive-PA export shows as a plain text block
+  (with a copy icon), not an input-style box.
+- **Remove is a red trashcan icon** on printer and filament cards, and **filament cards now have a uniform
+  width** (like printer cards) sized so Select / Edit / Clone / Results / Remove sit on one row.
+- **Results modal tidy-up.** Section heading is now just "Results" (the "paste into Orca" cue already
+  sits on the block label right below it), and the adaptive PA model shows as a wrapping text block
+  with a copy icon instead of a `<textarea>` — so it no longer gets its own inner scrollbar.
+- **Selected-item tab subtitles restacked with a leading icon.** The Printer tab now shows the maker
+  favicon on the left (vertically centred), the printer name on the first line and the selected nozzle
+  on the second. The Filament tab mirrors it: a square colour swatch on the left (solid or gradient,
+  same fill as the card band), maker + material on the first line, characteristics + colour on the second.
+- **Printer cards are a uniform width**, sized so Select / Edit / Clone / Remove sit on one row without
+  wrapping.
+- **Saved runs are now a per-filament "Results" modal** (replaces the global "Completed runs" list and
+  the read-only PA-tab view). Each filament card/row with completed runs gets a **Results** button
+  (count badge when >1). It opens a large modal over a dimmed backdrop showing the full **printer** and
+  **filament** parameters, the **test settings** (mode, PA range, max flow, layer × line width, accel &
+  speed lists), and the **results to paste into Orca** — the adaptive PA model and each Orca-bound value
+  with **Copy** buttons. A filament with multiple runs shows the newest by default with a **dropdown** to
+  pick another. **Clone** starts a fresh editable run with the same settings; **Delete** removes the run
+  (with confirm), from inside the modal.
+
+### Added
 - **Smart default point counts**: the speed and accel point counts now start from a heuristic that
   scales with how wide a range each axis actually sweeps — accel by log span from 1000 (2000→2 points,
   12000→5), speed by the flow envelope (~1 point per 5 mm³/s), both floored at 2. A low-accel/low-flow

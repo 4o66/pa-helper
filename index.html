@@ -98,11 +98,6 @@
       <div id="inProgressList" class="cards"></div>
     </div>
 
-    <details id="completedWrap" hidden>
-      <summary>Completed runs — reopen to view</summary>
-      <div id="completedList" class="cards"></div>
-    </details>
-
     <p class="hint">Pick the filament you're calibrating, or add a new one. Filaments work on any printer unless you restrict them. Runs you've started but not finished appear pinned above.</p>
     <div class="filbar">
       <div id="filamentFilters" class="filters"></div>
@@ -127,14 +122,6 @@
   <section class="tab" id="tab-test">
     <h2>PA Test</h2>
     <div id="testContext" class="context"></div>
-    <div id="runViewBar" class="viewbar" hidden>
-      <span><b>Viewing a saved run — read-only.</b> Clone it to run again, or delete it.</span>
-      <div class="actions">
-        <button id="viewCloneBtn">Clone to a new run</button>
-        <button id="viewDeleteBtn" class="danger">Delete run</button>
-        <button id="viewCloseBtn" class="secondary">Close</button>
-      </div>
-    </div>
 
     <div id="testBody" hidden>
       <!-- max volumetric speed (from a prior flow calibration) — advanced only; gates the rest until confirmed -->
@@ -255,7 +242,7 @@
         <h3>Export for Orca</h3>
         <button id="exportBtnModel">Generate</button>
         <div id="singlePaOut" class="out"></div>
-        <div class="advanced-only">
+        <div class="advanced-only" id="modelBlock" hidden>
           <label class="blocklabel">Adaptive PA model (paste into Orca — verify field format):</label>
           <textarea id="modelOut" rows="7" spellcheck="false"></textarea>
           <button id="copyModelBtn">Copy</button>
@@ -264,7 +251,7 @@
 
       <div class="subsec">
         <h3>Save this run</h3>
-        <div class="row"><button id="savePlannedBtn" class="secondary">Save as planned run (enter results later)</button><button id="saveRunBtn">Save completed run</button></div>
+        <div class="row"><button id="savePlannedBtn" class="warn">Save as planned run (enter results later)</button><button id="saveRunBtn">Save completed run</button></div>
       </div>
       </div><!-- /#gatedBody -->
     </div>
@@ -302,6 +289,27 @@
       <button id="jobGuardSave">Save as in-progress</button>
       <button id="jobGuardAbandon" class="danger">Abandon</button>
       <button id="jobGuardCancel" class="secondary">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="resultsModal" class="modal" hidden>
+  <div class="modal-box plain results-box">
+    <div class="results-head">
+      <div class="results-title">
+        <span id="resultsSwatch" class="colorsq tabsw"></span>
+        <div>
+          <h2 id="resultsTitle">Saved results</h2>
+          <p class="hint" id="resultsSub"></p>
+        </div>
+      </div>
+      <label id="resultsPickWrap" hidden>Run <select id="resultsPick"></select></label>
+    </div>
+    <div id="resultsBodyView" class="results-body"></div>
+    <div class="actions results-foot">
+      <button id="resultsClone">Rerun with these settings</button>
+      <button id="resultsClose" class="secondary">Close</button>
+      <button id="resultsDelete" class="danger iconbtn" title="Delete this run" aria-label="Delete this run"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
     </div>
   </div>
 </div>
