@@ -98,7 +98,8 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   speed↔flow conversion, this stops a stale or blank value from silently poisoning the recommendation.
   Basic mode (which needs no flow) and the read-only run view are never gated.
 - **Read-only view for completed runs.** Opening a saved run from the Completed list now shows it
-  **locked** (whole test body is `inert`) with the **plot auto-drawn** — no accidental edits. A view bar
+  **locked** — every field is `disabled` (not just `inert`), so no entries can be made at all — with the
+  **plot auto-drawn** — no accidental edits. A view bar
   gives you **Clone** (start a fresh editable run with the same settings and blank results — a re-run)
   and **Delete** (with a confirm, from inside the view). Fixes the old behaviour where opening a
   completed run treated it as the current editable job, and "Abandon" silently deleted it from history.

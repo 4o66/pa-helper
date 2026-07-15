@@ -1487,7 +1487,15 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   const resumeRun = (id) => openRun(id, false);   // planned run → editable
   const viewRun = (id) => openRun(id, true);      // completed run → read-only view
   function setTestReadOnly(on) {
-    const body = $("testBody"); if (body) body.inert = on;   // locks + defocuses the whole editable body
+    const body = $("testBody"); if (!body) return;
+    body.inert = on;   // defocus/non-interactive (belt) …
+    // … and actually disable every field so nothing can be typed. Only touch controls we lock, so
+    // pre-existing disabled ones (locked flow/accel cells, the read-only accel ceiling) are preserved.
+    body.querySelectorAll("input, select, textarea, button").forEach(el => {
+      if (on) { if (!el.disabled) { el.disabled = true; el.dataset.vroLocked = "1"; } }
+      else if (el.dataset.vroLocked) { el.disabled = false; delete el.dataset.vroLocked; }
+    });
+    body.classList.toggle("viewlocked", on);
     const bar = $("runViewBar"); if (bar) bar.hidden = !on;
   }
   function exitView() {
