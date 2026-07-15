@@ -106,6 +106,8 @@ button{background:var(--accent);color:var(--btnink);border:0;border-radius:6px;
 button.secondary,header button,.tab-btn{font-weight:500}
 button.secondary,header button{background:var(--panel2);color:var(--ink);border:1px solid var(--line)}
 button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad)}
+/* "planned" = the same orange as the planned badge on the filament screen */
+button.warn{background:transparent;color:var(--warn);border:1px solid var(--warn)}
 button:hover{filter:brightness(1.08)}
 .custom-in{margin-top:.25rem}
 .radlabel{font-size:.8rem;color:var(--muted);align-self:center}
