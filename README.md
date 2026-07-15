@@ -60,6 +60,12 @@ options, your last-used profile, and the full history of runs. You can hand-edit
 version it, or delete it.
 
 ## Roadmap
+- **"Tuning runs" — one-click follow-up jobs.** From a finished run, offer buttons to spawn a
+  follow-up test that either (a) **extends the range** when the best PA landed on the range top/bottom
+  edge (home in past the clipped optimum), or (b) **reduces the step** to fine-tune around the found
+  value. These should be created and labelled as **tuning runs** (distinct from a fresh test), so the
+  in-progress/history list shows they descend from an earlier run. Pairs with the range now shown on
+  the in-progress cards and the range-edge ⚠ flag.
 - **View / reuse a completed run's data.** From a filament that's done, be able to reopen a past run to
   see its settings and results — to re-run the same job, or to recover the PA value(s) and re-enter them
   in Orca after wiping the slicer config. (Read-only history + "clone this run's settings".)

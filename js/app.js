@@ -484,7 +484,9 @@
       const f = getFilament(r.filamentId), p = getPrinter(r.printerId);
       const card = el("div", "card pin");
       const title = el("div", "title"); title.innerHTML = '<span class="badge warn">planned</span>' + filamentLabel(f); card.append(title);
-      const meta = el("div", "meta"); meta.textContent = `${printerLabel(p)} · ${r.mode}${r.basicMethod ? " (" + r.basicMethod + ")" : ""} · ${r.date}`; card.append(meta);
+      const s = r.settings || {};
+      const rng = (s.paStart != null && s.paEnd != null) ? ` · PA ${s.paStart}–${s.paEnd}${s.paStep ? " step " + s.paStep : ""}` : "";
+      const meta = el("div", "meta"); meta.textContent = `${printerLabel(p)} · ${r.mode}${r.basicMethod ? " (" + r.basicMethod + ")" : ""}${rng} · ${r.date}`; card.append(meta);
       const actions = el("div", "actions");
       const res = el("button"); res.textContent = "Resume"; res.addEventListener("click", () => resumeRun(r.id));
       const ab = el("button", "danger"); ab.textContent = "Abandon"; ab.addEventListener("click", () => abandonRun(r.id));
