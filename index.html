@@ -98,11 +98,6 @@
       <div id="inProgressList" class="cards"></div>
     </div>
 
-    <details id="completedWrap" hidden>
-      <summary>Completed runs — reopen to view</summary>
-      <div id="completedList" class="cards"></div>
-    </details>
-
     <p class="hint">Pick the filament you're calibrating, or add a new one. Filaments work on any printer unless you restrict them. Runs you've started but not finished appear pinned above.</p>
     <div class="filbar">
       <div id="filamentFilters" class="filters"></div>
@@ -127,14 +122,6 @@
   <section class="tab" id="tab-test">
     <h2>PA Test</h2>
     <div id="testContext" class="context"></div>
-    <div id="runViewBar" class="viewbar" hidden>
-      <span><b>Viewing a saved run — read-only.</b> Clone it to run again, or delete it.</span>
-      <div class="actions">
-        <button id="viewCloneBtn">Clone to a new run</button>
-        <button id="viewDeleteBtn" class="danger">Delete run</button>
-        <button id="viewCloseBtn" class="secondary">Close</button>
-      </div>
-    </div>
 
     <div id="testBody" hidden>
       <!-- max volumetric speed (from a prior flow calibration) — advanced only; gates the rest until confirmed -->
@@ -302,6 +289,24 @@
       <button id="jobGuardSave">Save as in-progress</button>
       <button id="jobGuardAbandon" class="danger">Abandon</button>
       <button id="jobGuardCancel" class="secondary">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="resultsModal" class="modal" hidden>
+  <div class="modal-box plain results-box">
+    <div class="results-head">
+      <div>
+        <h2 id="resultsTitle">Saved results</h2>
+        <p class="hint" id="resultsSub"></p>
+      </div>
+      <label id="resultsPickWrap" hidden>Run <select id="resultsPick"></select></label>
+    </div>
+    <div id="resultsBodyView"></div>
+    <div class="actions">
+      <button id="resultsClone">Clone to a new run</button>
+      <button id="resultsDelete" class="danger">Delete this run</button>
+      <button id="resultsClose" class="secondary">Close</button>
     </div>
   </div>
 </div>

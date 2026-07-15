@@ -9,6 +9,16 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
 
 ## [Unreleased]
 
+### Changed
+- **Saved runs are now a per-filament "Results" modal** (replaces the global "Completed runs" list and
+  the read-only PA-tab view). Each filament card/row with completed runs gets a **Results** button
+  (count badge when >1). It opens a large modal over a dimmed backdrop showing the full **printer** and
+  **filament** parameters, the **test settings** (mode, PA range, max flow, layer × line width, accel &
+  speed lists), and the **results to paste into Orca** — the adaptive PA model and each Orca-bound value
+  with **Copy** buttons. A filament with multiple runs shows the newest by default with a **dropdown** to
+  pick another. **Clone** starts a fresh editable run with the same settings; **Delete** removes the run
+  (with confirm), from inside the modal.
+
 ### Added
 - **Smart default point counts**: the speed and accel point counts now start from a heuristic that
   scales with how wide a range each axis actually sweeps — accel by log span from 1000 (2000→2 points,
