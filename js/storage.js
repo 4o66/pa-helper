@@ -38,8 +38,11 @@ window.PAStore = (function () {
       lastFilamentId: null,
       gcodeCache: {},                // runId -> parsed pattern-block geometry, so the picker
                                     // still renders the real pattern after a reload/resume
-      ironingSettings: null          // last-used Ironing Test tab settings (speed/flow sweep,
+      ironingSettings: null,         // last-used Ironing Test tab settings (speed/flow sweep,
                                       // pad geometry) — see updateIroningContext() in app.js
+      ironingRuns: []                // saved ironing tests — {id, status:"complete", date, printerId,
+                                      // instanceId, nozzleId, filamentId, settings}. No "planned" state
+                                      // yet (no results-entry step to wait on) — saving IS complete.
     };
   }
 

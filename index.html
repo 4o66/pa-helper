@@ -47,7 +47,7 @@
     <div class="modal-actions">
       <button class="danger" data-clear="printers">Printers</button>
       <button class="danger" data-clear="filaments">Filaments</button>
-      <button class="danger" data-clear="history">PA history + remembered inputs</button>
+      <button class="danger" data-clear="history">PA + ironing history + remembered inputs</button>
       <button class="danger" data-clear="all">Clear ALL</button>
       <button class="secondary" data-clear="cancel">Cancel</button>
     </div>
@@ -99,6 +99,11 @@
       <h3 class="pinhead">In progress — printed, waiting for data entry</h3>
       <div id="inProgressList" class="cards"></div>
     </div>
+
+    <details id="ironingRunsWrap" hidden>
+      <summary>Saved ironing tests — reopen to view</summary>
+      <div id="ironingRunsList" class="cards"></div>
+    </details>
 
     <p class="hint">Pick the filament you're calibrating, or add a new one. Filaments work on any printer unless you restrict them. Runs you've started but not finished appear pinned above.</p>
     <div class="filbar">
@@ -312,6 +317,12 @@
         <h3>Generate</h3>
         <button id="ironingDownloadBtn" disabled>Download .3mf</button>
         <p class="hint">Opens directly in Orca — double-click the downloaded file, or drag it in. Orca does the real slicing; the per-object ironing_speed / ironing_flow overrides are already set. Multi-plate isn't supported yet — if the grid doesn't fit, reduce points, pad size, or gap.</p>
+      </div>
+
+      <div class="subsec">
+        <h3>Save this test</h3>
+        <button id="ironingSaveBtn">Save</button>
+        <p class="hint">Records the printer, nozzle, filament, and settings used — reopen anytime from the Filament tab.</p>
       </div>
     </div>
   </section>
