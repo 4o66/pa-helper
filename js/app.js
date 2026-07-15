@@ -1509,6 +1509,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     cacheBlocksFor(run.id);   // keep the geometry so a completed test can be reopened in the real picker
     persist(); renderInProgress(); renderFilaments(); clearJobDirty();
     alert("Run saved.");
+    switchTab("filaments");   // completed → back to the filament page
   }
   const resumeRun = (id) => openRun(id);   // planned run → editable in the PA tab
 
