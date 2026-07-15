@@ -1497,10 +1497,22 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     };
   }
   function upsertRun(run) { const i = data.runs.findIndex(r => r.id === run.id); if (i >= 0) data.runs[i] = run; else data.runs.unshift(run); }
+  // Blank the PA test tab back to a fresh, gated state (used after saving a planned run).
+  function resetTestTab() {
+    currentRunId = null; currentSettings = null; lastFit = null;
+    loadGrid([]);                                   // empty the results grid
+    if ($("basicBestPA")) { $("basicBestPA").value = ""; $("basicNotes").value = ""; }
+    drawPlot([], null, []);
+    $("recommendOut").textContent = ""; $("analysisOut").innerHTML = "";
+    $("singlePaOut").innerHTML = ""; $("modelOut").value = ""; syncModelBlock();
+    resetMaxFlowForCombo();                         // re-prefill + re-gate max flow for the current combo
+    clearJobDirty();
+  }
   function savePlanned() {
     if (!data.lastPrinterId || !getSelectedNozzle() || !data.lastFilamentId) { alert("Select a printer, nozzle and filament first."); return; }
-    const run = collectRun("planned"); currentRunId = run.id; upsertRun(run); cacheBlocksFor(run.id); persist(); renderInProgress(); clearJobDirty();
-    alert("Saved as a planned run. Print it, then reopen PA-Helper → Filament tab → Resume to enter results.");
+    const run = collectRun("planned"); currentRunId = run.id; upsertRun(run); cacheBlocksFor(run.id); persist(); renderInProgress(); renderFilaments(); clearJobDirty();
+    switchTab("filaments");   // back to the filament page (the run shows pinned there — no popup needed)…
+    resetTestTab();           // …and leave the PA tab fresh for the next run
   }
   function saveRun() {
     if (!data.lastPrinterId || !getSelectedNozzle() || !data.lastFilamentId) { alert("Select a printer, nozzle and filament first."); return; }
@@ -1508,7 +1520,8 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const run = collectRun("complete"); currentRunId = run.id; upsertRun(run);
     cacheBlocksFor(run.id);   // keep the geometry so a completed test can be reopened in the real picker
     persist(); renderInProgress(); renderFilaments(); clearJobDirty();
-    alert("Run saved.");
+    switchTab("filaments");   // completed → back to the filament page (run shows under its filament)…
+    resetTestTab();           // …and leave the PA tab fresh for the next run
   }
   const resumeRun = (id) => openRun(id);   // planned run → editable in the PA tab
 
