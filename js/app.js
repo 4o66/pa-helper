@@ -300,14 +300,30 @@
   }
 
   /* =================== PRINTERS TAB =================== */
+  // Maker favicon, hotlinked live from the vendor (never downloaded/stored). Uses the URL in beds.js;
+  // if that 404s or fails to load, falls back to <domain>/favicon.ico, and if that fails too, shows
+  // nothing. (We can't re-parse the vendor's <link rel="icon"> at runtime — cross-origin HTML reads are
+  // blocked by CORS — so the automatic runtime fallback is the domain default favicon.ico.)
+  function makerFavicon(maker) {
+    const be = bedEntry(maker) || {};
+    const fallback = be.domain ? "https://" + be.domain + "/favicon.ico" : null;
+    const icon = be.favicon || fallback;
+    if (!icon) return null;
+    const fav = el("img", "favicon"); fav.alt = ""; fav.setAttribute("loading", "lazy");
+    fav.addEventListener("error", () => {
+      if (fallback && fav.getAttribute("src") !== fallback) fav.src = fallback;   // try domain default once
+      else fav.remove();
+    });
+    fav.src = icon;
+    return fav;
+  }
   function renderPrinters() {
     const wrap = $("printerList"); wrap.innerHTML = "";
     if (!data.printers.length) { wrap.innerHTML = '<p class="hint">No printers yet — add one below.</p>'; return; }
     data.printers.forEach(p => {
       const card = el("div", "card" + (p.id === data.lastPrinterId ? " selected" : ""));
       const title = el("div", "title");
-      const dom = (bedEntry(p.maker) || {}).domain;   // maker favicon, hotlinked live (never stored)
-      if (dom) { const fav = el("img", "favicon"); fav.src = "https://" + dom + "/favicon.ico"; fav.alt = ""; fav.setAttribute("loading", "lazy"); fav.addEventListener("error", () => fav.remove()); title.append(fav); }
+      const fav = makerFavicon(p.maker); if (fav) title.append(fav);
       title.append(document.createTextNode(printerLabel(p)));
       card.append(title);
       const meta = el("div", "meta");

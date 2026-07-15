@@ -82,6 +82,14 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   clean and the "best" just pins to a range edge. The auto sweep starts at `adaptive.accelFloor` (2000)
   instead, saving plastic and time. Low values are still allowed if you type them into the accel list.
 
+### Changed
+- **Explicit favicon URL per maker** (`js/beds.js` now has a `favicon` field). Each vendor's icon URL
+  was found from their homepage's `<link rel="icon">` (prefer PNG/SVG over .ico), falling back to
+  `<domain>/favicon.ico` where no tag exists. At runtime, if the stored URL fails to load (e.g. 404),
+  the card automatically retries `<domain>/favicon.ico`, and shows nothing if that also fails. (We can't
+  re-parse the vendor's `<link>` at runtime — cross-origin HTML reads are CORS-blocked — so the runtime
+  fallback is the domain default favicon.)
+
 ### Added
 - **Max volumetric speed is now gated (advanced mode).** Max flow is treated as a property of the exact
   printer+nozzle+filament combo: selecting a combo **prefills** it from a prior run for that combo (or
