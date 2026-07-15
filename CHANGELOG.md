@@ -126,6 +126,11 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   the view bar was effectively always visible on the PA tab — making a fresh tab look like the read-only
   view. Added `.viewbar[hidden]{display:none}` (the same guard `.modal` already had). jsdom doesn't
   compute CSS display, which is why the smoke tests missed it.
+- **After closing a run view, the config stayed locked.** The full reset blanked max flow and then
+  re-ran the max-flow gate, which left `#gatedBody` `inert` (browser-dimmed / non-interactive) — reading
+  as "all form controls disabled." (jsdom ignores `inert`, so the smoke didn't catch it.) A freshly reset
+  tab is now left **editable**; the max-flow gate re-engages when you enter a max flow or select a
+  filament to set up a new test.
 - **Closing a saved-run view left stale data on the PA tab.** After viewing a run and clicking Close,
   reopening the PA tab still showed that run's data/config. Close now does a **full reset** of the PA
   tab — results, plot, analysis, Orca export box, max flow, basic fields, AND the recommend/provide

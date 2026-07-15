@@ -1526,7 +1526,11 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("flowPoints").value = 5; $("accelPoints").value = 5;
     accelListAuto = speedListAuto = accelPtsAuto = speedPtsAuto = true;
     switchSubtab("recommend");
-    gateMaxFlow();   // blank max flow ⇒ re-lock the config until it's entered + confirmed
+    // Leave the reset tab EDITABLE — don't gate a blank tab (that reads as "everything disabled").
+    // The max-flow gate re-engages when the user enters a max flow or selects a filament for a new test.
+    maxFlowConfirmed = false;
+    if ($("gatedBody")) $("gatedBody").inert = false;
+    const cb = $("maxFlowConfirm"); if (cb) { cb.hidden = false; cb.disabled = true; cb.textContent = "Confirm"; cb.classList.remove("confirmed"); }
     clearJobDirty();
   }
   function cloneRun() {   // same settings/grid, fresh blank results, editable — a re-run
