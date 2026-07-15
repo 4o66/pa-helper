@@ -137,15 +137,16 @@
     </div>
 
     <div id="testBody" hidden>
-      <!-- shared: max volumetric speed (from a prior flow calibration) -->
-      <div class="subsec">
+      <!-- max volumetric speed (from a prior flow calibration) — advanced only; gates the rest until confirmed -->
+      <div class="subsec advanced-only">
         <div class="row">
           <label>Max volumetric speed (mm³/s) <input id="maxFlow" type="number" step="0.5" placeholder="from flow calibration"></label>
+          <button id="maxFlowConfirm" type="button">Confirm</button>
         </div>
         <p class="hint" id="flowHint"></p>
       </div>
 
-      <!-- shared: what kind of test -->
+      <!-- shared: what kind of test (never gated — you can always switch to basic, which needs no max flow) -->
       <div class="subsec">
         <h3>Test type</h3>
         <div class="row">
@@ -155,6 +156,7 @@
         <p class="hint" id="modeHint"></p>
       </div>
 
+      <div id="gatedBody">
       <nav class="subtabs">
         <button class="subtab-btn" data-subtab="recommend">Recommend settings</button>
         <button class="subtab-btn" data-subtab="printed">Settings I already printed</button>
@@ -264,6 +266,7 @@
         <h3>Save this run</h3>
         <div class="row"><button id="savePlannedBtn" class="secondary">Save as planned run (enter results later)</button><button id="saveRunBtn">Save completed run</button></div>
       </div>
+      </div><!-- /#gatedBody -->
     </div>
   </section>
 </main>

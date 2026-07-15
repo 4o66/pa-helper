@@ -60,11 +60,6 @@ options, your last-used profile, and the full history of runs. You can hand-edit
 version it, or delete it.
 
 ## Roadmap
-- **Max volumetric speed is per printer+filament — gate it.** Treat max flow as a property of the
-  exact printer+filament combo: prefill it from a prior run for that combo, blank it when there's no
-  prior, and add a **confirm** step. Until the volumetric rate is confirmed, block all other data
-  entry on the PA-test screen (it feeds the whole speed↔flow conversion, so a wrong/blank value
-  silently poisons the recommendation).
 - **"Tuning runs" — one-click follow-up jobs.** From a finished run, offer buttons to spawn a
   follow-up test that either (a) **extends the range** when the best PA landed on the range top/bottom
   edge (home in past the clipped optimum), or (b) **reduces the step** to fine-tune around the found

@@ -83,6 +83,12 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   instead, saving plastic and time. Low values are still allowed if you type them into the accel list.
 
 ### Added
+- **Max volumetric speed is now gated (advanced mode).** Max flow is treated as a property of the exact
+  printer+nozzle+filament combo: selecting a combo **prefills** it from a prior run for that combo (or
+  **blanks** it if there's none), and the whole test config below stays **locked** until you press
+  **Confirm**. Editing the value re-locks until you re-confirm. Since max flow drives the entire
+  speed↔flow conversion, this stops a stale or blank value from silently poisoning the recommendation.
+  Basic mode (which needs no flow) and the read-only run view are never gated.
 - **Read-only view for completed runs.** Opening a saved run from the Completed list now shows it
   **locked** (whole test body is `inert`) with the **plot auto-drawn** — no accidental edits. A view bar
   gives you **Clone** (start a fresh editable run with the same settings and blank results — a re-run)

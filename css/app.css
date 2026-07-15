@@ -133,6 +133,8 @@ details[open] summary{margin-bottom:.7rem}
 .context{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:.6rem .8rem;font-size:.9rem}
 .viewbar{display:flex;gap:1rem;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--panel2);border:1px solid var(--accent2);border-radius:8px;padding:.5rem .8rem;margin-top:.5rem;font-size:.9rem}
 .viewbar .actions{display:flex;gap:.4rem}
+#gatedBody[inert]{opacity:.5}
+#maxFlowConfirm.confirmed{background:var(--accent2);border-color:var(--accent2);color:#fff}
 
 table{width:100%;border-collapse:collapse;margin:.3rem 0 .6rem}
 th,td{border:1px solid var(--line);padding:.35rem .4rem;text-align:left;font-size:.9rem}

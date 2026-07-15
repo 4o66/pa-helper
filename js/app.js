@@ -19,7 +19,7 @@
   const PALETTE = ["#4aa8ff", "#37c98b", "#ffb84a", "#c98bff", "#5de0e6", "#ff8f5d", "#8bff9e"];
 
   // ---- session state ----
-  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, pendingTab = null, importPlates = [], coverageMissing = [], accelListAuto = true, speedListAuto = true, accelPtsAuto = true, speedPtsAuto = true, viewMode = false;
+  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, pendingTab = null, importPlates = [], coverageMissing = [], accelListAuto = true, speedListAuto = true, accelPtsAuto = true, speedPtsAuto = true, viewMode = false, maxFlowConfirmed = false;
   const PA_FACTORS = ["toolhead", "extruder", "drive", "hotend"];
   const FILAMENT_PA_FACTORS = ["material", "formulation", "fiber", "fiberName", "fiberPct", "hardness", "diameter"];
 
@@ -336,7 +336,7 @@
     const p = getPrinter(id);
     data.lastInstanceId = (p && p.multi && p.instances && p.instances.length) ? p.instances[0].id : null;
     if (!(p && p.nozzles && p.nozzles.some(n => n.id === data.lastNozzleId))) data.lastNozzleId = (p && p.nozzles && p.nozzles.length) ? p.nozzles[0].id : null;
-    persist(); renderPrinters(); renderNozzles(); renderFilaments(); deriveGeometryFromNozzle(); updateTestContext(); updateTabLabels();
+    persist(); renderPrinters(); renderNozzles(); renderFilaments(); deriveGeometryFromNozzle(); updateTestContext(); resetMaxFlowForCombo(); updateTabLabels();
   }
   function removePrinter(id) {
     const p = getPrinter(id); if (!p) return;
@@ -423,7 +423,7 @@
       actions.append(sel, rm); card.append(actions); list.append(card);
     });
   }
-  function selectNozzle(id) { data.lastNozzleId = id; persist(); renderNozzles(); deriveGeometryFromNozzle(); updateTestContext(); updateTabLabels(); }
+  function selectNozzle(id) { data.lastNozzleId = id; persist(); renderNozzles(); deriveGeometryFromNozzle(); updateTestContext(); resetMaxFlowForCombo(); updateTabLabels(); }
   function removeNozzle(id) {
     const p = getPrinter(data.lastPrinterId); if (!p) return;
     const n = (p.nozzles || []).find(x => x.id === id); if (!n) return;
@@ -583,7 +583,7 @@
     $("filamentViewToggle").querySelectorAll("button").forEach(b => b.classList.toggle("active", b.dataset.view === view));
     updateTabLabels();
   }
-  function selectFilament(id) { data.lastFilamentId = id; persist(); renderFilaments(); updateTestContext(); updateTabLabels(); }
+  function selectFilament(id) { data.lastFilamentId = id; persist(); renderFilaments(); updateTestContext(); resetMaxFlowForCombo(); updateTabLabels(); }
   function removeFilament(id) {
     const f = getFilament(id); if (!f) return;
     if (!confirm(`Remove filament "${filamentLabel(f)}"? This cannot be undone.`)) return;
@@ -708,20 +708,47 @@
     // last run for this exact printer+nozzle+filament, else prompt the user to enter it.
     const prior = lastMaxFlowFor(data.lastPrinterId, data.lastNozzleId, data.lastFilamentId);
     const fh = $("flowHint");
-    if (prior != null) {
-      if (!num($("maxFlow").value)) $("maxFlow").value = prior;
-      if (fh) fh.textContent = `Last max volumetric speed for this printer/nozzle/filament: ${prior} mm³/s. Change it if your flow calibration differs.`;
-    } else if (fh) {
-      fh.textContent = "Enter your max volumetric speed (mm³/s) from the results of your Max Flowrate test (in Orca) for this printer/nozzle/filament.";
-    }
+    if (fh) fh.textContent = prior != null
+      ? `Last max volumetric speed for this printer/nozzle/filament: ${prior} mm³/s (prefilled). Confirm it, or change it if your flow calibration differs.`
+      : "Enter your max volumetric speed (mm³/s) from your Max Flowrate test (in Orca) for this printer/nozzle/filament, then Confirm — everything below stays locked until you do.";
     // Smart default: fewer speed points for a small flow envelope (unless the user set the count).
     { const mf = num($("maxFlow").value); if (speedPtsAuto && mf != null) $("flowPoints").value = suggestSpeedPts(mf); }
     regenAxis();   // refresh the greyed max-speed box + speed list from the (possibly new) max flow / geometry
+    gateMaxFlow();
     applyMode();
+  }
+  // Max volumetric speed gate: in advanced mode the whole test config below stays locked (inert) until
+  // the max flow — a per printer+nozzle+filament value that drives the entire speed↔flow conversion —
+  // is confirmed. Basic mode and the read-only run view are never gated.
+  function gateMaxFlow() {
+    const gated = $("gatedBody"), btn = $("maxFlowConfirm");
+    const mf = num($("maxFlow").value), valid = mf != null && mf > 0;
+    if (viewMode || isBasic()) { if (gated) gated.inert = false; if (btn) btn.hidden = true; return; }
+    if (btn) {
+      btn.hidden = false;
+      btn.disabled = !valid || maxFlowConfirmed;
+      btn.textContent = maxFlowConfirmed ? "✓ Confirmed" : "Confirm";
+      btn.classList.toggle("confirmed", maxFlowConfirmed);
+    }
+    if (gated) gated.inert = !maxFlowConfirmed;
+  }
+  // On a fresh printer/nozzle/filament selection: prefill max flow from a prior run for that exact
+  // combo (blank if none), and require a fresh Confirm before anything else can be entered.
+  function resetMaxFlowForCombo() {
+    const prior = lastMaxFlowFor(data.lastPrinterId, data.lastNozzleId, data.lastFilamentId);
+    $("maxFlow").value = (prior != null) ? prior : "";
+    maxFlowConfirmed = false;
+    regenAxis(); gateMaxFlow();
+  }
+  function confirmMaxFlow() {
+    const mf = num($("maxFlow").value);
+    if (mf == null || mf <= 0) { alert("Enter your max volumetric speed (mm³/s) first."); $("maxFlow").focus(); return; }
+    maxFlowConfirmed = true; gateMaxFlow();
   }
   function applyMode() {
     const basic = isBasic();
     $("tab-test").dataset.mode = basic ? "basic" : "advanced";
+    gateMaxFlow();   // basic ↔ advanced changes whether the gate applies
     const m = $("basicMethod");
     if (basic) { m.disabled = false; m.value = lastBasicMethod || P.basicDefault; }
     else { if (!m.disabled) lastBasicMethod = m.value; m.value = "pattern"; m.disabled = true; }
@@ -1449,7 +1476,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   }
   function exitView() {
     if (!viewMode) return;
-    viewMode = false; setTestReadOnly(false);
+    viewMode = false; setTestReadOnly(false); maxFlowConfirmed = false;
     currentRunId = null; currentSettings = null; lastFit = null;
     loadGrid([]); drawPlot([], null, []); $("analysisOut").innerHTML = ""; $("recommendOut").textContent = "";
     clearJobDirty();
@@ -1507,6 +1534,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
         ? `Saved run — read-only. PA range ${s.paStart}–${s.paEnd} step ${s.paStep}. Clone it to run again.`
         : `Resumed planned run. PA range ${s.paStart}–${s.paEnd} step ${s.paStep}. Fill in the best PA per row.`;
     }
+    maxFlowConfirmed = true;   // a saved run's max flow is trusted — don't re-gate it
     renderPrinters(); renderNozzles(); renderFilaments(); updateTestContext();
     switchTab("test");
     viewMode = !!viewOnly;
@@ -1569,7 +1597,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("flowPoints").value = 5; $("accelPoints").value = 5;   // deterministic defaults (defeat browser form-restore)
     $("unitMode").value = "speed";                            // default display = nozzle velocity (how Orca's PA dialog is configured)
     document.querySelectorAll("input, select").forEach(e => e.setAttribute("autocomplete", "off"));
-    updateUnitUI(); reloadAll();
+    updateUnitUI(); reloadAll(); resetMaxFlowForCombo();   // prefill+gate max flow for any pre-selected combo
     $("printerForm").addEventListener("change", (e) => {
       const f = e.target.closest(".field"); if (!f) return;
       if (f.dataset.key === "maker") { applyModelOptions(); applyPrinterDefaults(); autofillBed(); }
@@ -1676,7 +1704,8 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("flowPoints").addEventListener("change", () => { speedPtsAuto = false; let n = Math.round(num($("flowPoints").value)); if (!(n >= 2)) n = 5; $("flowPoints").value = n; regenAxis(); });
     // max speed is back-calculated from max volumetric flow + geometry; both refresh the axis.
     // While the count is still auto, a new max flow also re-suggests how many speed points to use.
-    $("maxFlow").addEventListener("input", () => { const mf = num($("maxFlow").value); if (speedPtsAuto && mf != null) $("flowPoints").value = suggestSpeedPts(mf); regenAxis(); });
+    $("maxFlow").addEventListener("input", () => { const mf = num($("maxFlow").value); if (speedPtsAuto && mf != null) $("flowPoints").value = suggestSpeedPts(mf); regenAxis(); maxFlowConfirmed = false; gateMaxFlow(); });
+    $("maxFlowConfirm").addEventListener("click", confirmMaxFlow);
     $("layerH").addEventListener("input", regenAxis);
     // if the user types their own speed/flow list, stop auto-generating it; sync the point count
     $("speedList").addEventListener("input", () => {
