@@ -1468,7 +1468,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       unit: $("unitMode").value, layerH: num($("layerH").value), lineW: num($("lineW").value), maxFlow: num($("maxFlow").value),
       settings: currentSettings || null, results,
       analysis: lastFit ? (lastFit.type === "mlr" ? { fit: { b0: lastFit.b0, b1: lastFit.b1, b2: lastFit.b2, r2: lastFit.r2 } } : { fit: { slope: lastFit.slope, intercept: lastFit.intercept, r2: lastFit.r2 } }) : null,
-      modelText: $("modelOut").value || null, shareCommunity: false
+      modelText: $("modelOut").value || null, singlePaText: $("singlePaOut").innerHTML || null, shareCommunity: false
     };
   }
   function upsertRun(run) { const i = data.runs.findIndex(r => r.id === run.id); if (i >= 0) data.runs[i] = run; else data.runs.unshift(run); }
@@ -1479,6 +1479,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   }
   function saveRun() {
     if (!data.lastPrinterId || !getSelectedNozzle() || !data.lastFilamentId) { alert("Select a printer, nozzle and filament first."); return; }
+    exportModel();   // generate the Orca export text now so it's stored with the run (shown on reopen)
     const run = collectRun("complete"); currentRunId = run.id; upsertRun(run);
     cacheBlocksFor(run.id);   // keep the geometry so a completed test can be reopened in the real picker
     persist(); renderInProgress(); renderCompletedRuns(); clearJobDirty();
@@ -1488,12 +1489,20 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   const viewRun = (id) => openRun(id, true);      // completed run → read-only view
   function setTestReadOnly(on) {
     const body = $("testBody"); if (!body) return;
-    body.inert = on;   // defocus/non-interactive (belt) …
-    // … and actually disable every field so nothing can be typed. Only touch controls we lock, so
-    // pre-existing disabled ones (locked flow/accel cells, the read-only accel ceiling) are preserved.
+    // No entries can be made: disable inputs/selects, make textareas read-only (so the Orca export text
+    // stays selectable/copyable — the reason to reopen a run), and HIDE every button (only the view
+    // bar's Clone/Delete/Close remain). Only touch controls we lock, so pre-existing disabled/hidden
+    // ones (locked flow/accel cells, the hidden loadPoints button) are preserved on exit.
     body.querySelectorAll("input, select, textarea, button").forEach(el => {
-      if (on) { if (!el.disabled) { el.disabled = true; el.dataset.vroLocked = "1"; } }
-      else if (el.dataset.vroLocked) { el.disabled = false; delete el.dataset.vroLocked; }
+      if (on) {
+        if (el.tagName === "BUTTON") { if (!el.hidden) { el.hidden = true; el.dataset.vroBtn = "1"; } }
+        else if (el.tagName === "TEXTAREA") { if (!el.readOnly) { el.readOnly = true; el.dataset.vroRo = "1"; } }
+        else if (!el.disabled) { el.disabled = true; el.dataset.vroLocked = "1"; }
+      } else {
+        if (el.dataset.vroBtn) { el.hidden = false; delete el.dataset.vroBtn; }
+        if (el.dataset.vroRo) { el.readOnly = false; delete el.dataset.vroRo; }
+        if (el.dataset.vroLocked) { el.disabled = false; delete el.dataset.vroLocked; }
+      }
     });
     body.classList.toggle("viewlocked", on);
     const bar = $("runViewBar"); if (bar) bar.hidden = !on;
@@ -1542,6 +1551,8 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     if (r.layerH != null) $("layerH").value = r.layerH;
     if (r.lineW != null) $("lineW").value = r.lineW;
     if (r.maxFlow != null) $("maxFlow").value = r.maxFlow;
+    $("modelOut").value = r.modelText || "";                      // restore the stored Orca export text
+    $("singlePaOut").innerHTML = r.singlePaText || "";
     currentSettings = r.settings || null;
     updateUnitUI();
     const s = r.settings || {};

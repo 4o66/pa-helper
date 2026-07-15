@@ -98,11 +98,13 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   speed↔flow conversion, this stops a stale or blank value from silently poisoning the recommendation.
   Basic mode (which needs no flow) and the read-only run view are never gated.
 - **Read-only view for completed runs.** Opening a saved run from the Completed list now shows it
-  **locked** — every field is `disabled` (not just `inert`), so no entries can be made at all — with the
-  **plot auto-drawn** — no accidental edits. A view bar
-  gives you **Clone** (start a fresh editable run with the same settings and blank results — a re-run)
-  and **Delete** (with a confirm, from inside the view). Fixes the old behaviour where opening a
-  completed run treated it as the current editable job, and "Abandon" silently deleted it from history.
+  **locked** — every field is `disabled` (no entries possible) and every in-form **button is hidden**,
+  so the only actions are the view bar's **Clone / Delete / Close**. The **plot is auto-drawn**, and the
+  **Orca export text is stored with the run and shown** in its box (read-only but still selectable, so you
+  can copy the PA model back into Orca — e.g. after wiping a slicer config). **Clone** starts a fresh
+  editable run with the same settings and blank results (a re-run); **Delete** removes it with a confirm,
+  from inside the view. Fixes the old behaviour where opening a completed run treated it as the current
+  editable job, and "Abandon" silently deleted it from history.
 - **Outlier flag on results.** A Best-PA cell that's out of line with its neighbours (same accel row or
   same flow column) — not just globally — gets a red ◆ marker; the tooltip suggests re-checking that
   block. Because the PA surface has a real trend, this uses a neighbour median + MAD with a ~2-step
