@@ -73,6 +73,14 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   chevrons, numbers), and plates are ordered **low → high acceleration** (as Orca lays them out)
   regardless of the order you import them.
 
+### Fixed
+- **Saving a second planned job could delete the first (data loss).** After you saved a job for later,
+  `currentRunId` still pointed at it; setting up a *different* printer/filament job and saving reused that
+  id and overwrote the first saved run instead of creating a new one. `collectRun` now detects when the
+  in-progress job's printer/filament/nozzle differs from the run `currentRunId` points at and mints a
+  fresh id, so each distinct job is saved as its own planned run. (Re-saving the *same* combo still
+  updates its existing run, as before.)
+
 ### Changed
 - **Picker plate thumbnails removed.** OrcaSlicer positions the pattern objects with its **bin-packing
   arranger** (`arrangement::arrange`, confirmed in `Plater::_calib_pa_pattern` — not a grid), so a

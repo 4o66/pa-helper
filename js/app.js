@@ -1357,7 +1357,13 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
 
   // ---- run lifecycle ----
   function collectRun(status) {
-    const existing = data.runs.find(r => r.id === currentRunId);
+    let existing = data.runs.find(r => r.id === currentRunId);
+    // Guard against clobbering a saved run: if currentRunId still points at a run for a DIFFERENT
+    // printer/filament/nozzle (e.g. you saved one job, switched combos, and saved another), this is a
+    // new job — mint a fresh id instead of overwriting the earlier saved run.
+    if (existing && (existing.printerId !== data.lastPrinterId || existing.filamentId !== data.lastFilamentId || existing.nozzleId !== data.lastNozzleId)) {
+      existing = null; currentRunId = null;
+    }
     const nozzle = getSelectedNozzle();
     const results = isBasic()
       ? (num($("basicBestPA").value) != null ? [{ x: null, accel: null, bestPA: num($("basicBestPA").value), notes: $("basicNotes").value }] : [])
@@ -1536,7 +1542,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("coverageImport").addEventListener("click", () => { $("coverageModal").hidden = true; $("gcodeInputAdd").click(); });
     $("coverageContinue").addEventListener("click", () => { $("coverageModal").hidden = true; });
     window.PA_parseGcode = parsePaGcode;
-    window.PA_test = { importGcode, addPlate, resetGcode, buildPaBlocks, colorList, colorFill, suggestAccelPts, suggestSpeedPts, beadArea };   // test hooks (jsdom smoke)
+    window.PA_test = { importGcode, addPlate, resetGcode, buildPaBlocks, colorList, colorFill, suggestAccelPts, suggestSpeedPts, beadArea, selectFilament, savePlanned };   // test hooks (jsdom smoke)
     $("loadPointsBtn").addEventListener("click", (e) => { loadGrid(e.target._points || []); sortResults(); markJobDirty(); });
     $("resultSort").addEventListener("change", sortResults);
     $("savePlannedBtn").addEventListener("click", savePlanned);
