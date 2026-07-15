@@ -194,3 +194,5 @@ footer a{color:var(--accent)}
 .iconbtn{padding:.15rem .45rem;font-size:.95rem;line-height:1}
 .edgewarn{color:#e8a13a;cursor:help;font-size:.95rem;line-height:1;flex:0 0 auto}
 .edgewarn[hidden]{display:none}
+.outlierwarn{color:#e05a5a;cursor:help;font-size:.8rem;line-height:1;flex:0 0 auto}
+.outlierwarn[hidden]{display:none}

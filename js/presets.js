@@ -101,7 +101,10 @@ window.PA_PRESETS = {
 
   /* ---- How many flow/accel points to propose for an adaptive test ---- */
   adaptive: {
-    minFlow: 3,          // mm^3/s — lowest test flow
+    // Lowest test flow. Like low acceleration, very low flow barely builds pressure, so PA is hard to
+    // read there (real ABS runs: the ~4 mm³/s column was noise while 8+ was clean). Klipper's own PA
+    // test deliberately runs high flow (~8 mm³/s for a 0.4 nozzle at 0.2 layer, 100 mm/s). Floor here.
+    minFlow: 5,          // mm^3/s — lowest test flow
     flowPoints: 5,       // number of flow steps from minFlow up to the printer's max
     accelFractions: [0.4, 1.0],  // test accels = these fractions of the accel ceiling
     // Lowest acceleration worth testing. Below this the PA pattern barely discriminates — the

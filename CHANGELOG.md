@@ -74,12 +74,20 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   regardless of the order you import them.
 
 ### Changed
+- **Lowest test flow raised (3 → 5 mm³/s).** Like low acceleration, very low flow barely builds
+  pressure, so PA reads there are noise (real ABS run: the ~4 mm³/s column was junk while 8+ was clean).
+  `adaptive.minFlow` now floors at 5.
 - **Default accel sweep now floors at ~2000, not 1000.** Real PLA runs showed the ~1000 mm/s² row
   barely discriminates — the corner velocity change is too gentle to build pressure, so every PA looks
   clean and the "best" just pins to a range edge. The auto sweep starts at `adaptive.accelFloor` (2000)
   instead, saving plastic and time. Low values are still allowed if you type them into the accel list.
 
 ### Added
+- **Outlier flag on results.** A Best-PA cell that's out of line with its neighbours (same accel row or
+  same flow column) — not just globally — gets a red ◆ marker; the tooltip suggests re-checking that
+  block. Because the PA surface has a real trend, this uses a neighbour median + MAD with a ~2-step
+  floor, so a local mispick (e.g. one cell reading 0.04 when its neighbours sit at 0–0.01) is caught
+  while genuine gradients aren't. Confirmed against a real ABS run.
 - **Export is harder to get stale/confused.** The download is now dated (`pa_data_YYYY-MM-DD.json`) so
   repeated exports don't overwrite/collide in Downloads; each file carries an `exportedAt` timestamp; the
   data-status line shows when you last exported and turns amber ("⚠ newer than your last export") once

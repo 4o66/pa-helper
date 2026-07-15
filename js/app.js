@@ -1119,11 +1119,41 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
         : `Best PA is at the bottom of the tested range (${lo}). The real optimum may be lower — lower Start PA and re-test.`;
     };
     inputs.bestPA.addEventListener("input", checkEdge); checkEdge();
+    // outlier marker: set by refreshOutliers() when this cell is out of line with its row/col neighbours
+    const outl = el("span", "outlierwarn"); outl.textContent = "◆"; outl.hidden = true; cells[2].append(outl);
+    inputs.bestPA.addEventListener("input", refreshOutliers);
     const tdDel = el("td"); const del = el("button", "secondary"); del.textContent = "✕"; del.style.padding = ".2rem .5rem";
     del.addEventListener("click", () => tr.remove()); tdDel.append(del);
     tr.append(tdOv, ...cells, tdDel); $("resultsBody").append(tr);
   }
-  const loadGrid = (rows) => { $("resultsBody").innerHTML = ""; rows.forEach(r => addRow(r, r.override === true)); };
+  const loadGrid = (rows) => { $("resultsBody").innerHTML = ""; rows.forEach(r => addRow(r, r.override === true)); refreshOutliers(); };
+  // Flag Best-PA cells that are out of line with their NEIGHBOURS (same accel row or same flow column),
+  // not globally — the PA surface has a real trend, so a global test misses local mispicks (e.g. one
+  // cell reading 0.04 when its row/column neighbours sit at 0–0.01). Uses a neighbour median + MAD with
+  // an absolute floor of ~2 steps, so it only fires when a point is both statistically and practically off.
+  const median = (a) => { const s = [...a].sort((x, y) => x - y), n = s.length; return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : 0; };
+  function computeOutliers() {
+    const rows = [...$("resultsBody").querySelectorAll("tr")].map(tr => ({
+      tr, flow: num(tr.querySelector('input[data-key="flow"]').value),
+      accel: num(tr.querySelector('input[data-key="accel"]').value), pa: num(tr.querySelector('input[data-key="bestPA"]').value)
+    })).filter(r => r.pa != null);
+    const step = num((currentSettings || {}).paStep) || 0.005, out = new Set();
+    rows.forEach(r => {
+      const nb = rows.filter(o => o !== r && (o.accel === r.accel || o.flow === r.flow)).map(o => o.pa);
+      if (nb.length < 3) return;
+      const M = median(nb), mad = median(nb.map(v => Math.abs(v - M))), dev = Math.abs(r.pa - M);
+      if (dev >= step * 2 && dev > 3.5 * 1.4826 * mad) out.add(r.tr);
+    });
+    return out;
+  }
+  function refreshOutliers() {
+    const out = computeOutliers();
+    [...$("resultsBody").querySelectorAll("tr")].forEach(tr => {
+      const w = tr.querySelector(".outlierwarn"); if (!w) return;
+      w.hidden = !out.has(tr);
+      w.title = "This PA is out of line with its neighbouring blocks — likely a mispick. Re-check this block (or re-run it).";
+    });
+  }
   function readResults() {
     return [...$("resultsBody").querySelectorAll("tr")].map(tr => {
       const g = (k) => tr.querySelector(`input[data-key="${k}"]`).value;
@@ -1565,7 +1595,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("coverageImport").addEventListener("click", () => { $("coverageModal").hidden = true; $("gcodeInputAdd").click(); });
     $("coverageContinue").addEventListener("click", () => { $("coverageModal").hidden = true; });
     window.PA_parseGcode = parsePaGcode;
-    window.PA_test = { importGcode, addPlate, resetGcode, buildPaBlocks, colorList, colorFill, suggestAccelPts, suggestSpeedPts, beadArea, selectFilament, savePlanned };   // test hooks (jsdom smoke)
+    window.PA_test = { importGcode, addPlate, resetGcode, buildPaBlocks, colorList, colorFill, suggestAccelPts, suggestSpeedPts, beadArea, selectFilament, savePlanned, loadGrid };   // test hooks (jsdom smoke)
     $("loadPointsBtn").addEventListener("click", (e) => { loadGrid(e.target._points || []); sortResults(); markJobDirty(); });
     $("resultSort").addEventListener("change", sortResults);
     $("savePlannedBtn").addEventListener("click", savePlanned);
