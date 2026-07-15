@@ -11,6 +11,10 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 [`RELEASES.md`](RELEASES.md). **v1.0** will mark the first "fully usable" release.
 
 ## [Unreleased]
+
+## [0.2.31] "Clean Slate" — 2026-07-15
+Saving a run now returns you to the Filament page and leaves a clean PA bench.
+
 - **Saving a completed run returns to the Filament page and resets the PA tab** — after "Save
   completed run", the app switches back to the Filament tab (the run appears under its filament)
   and blanks the PA test tab, with no confirmation popup.
