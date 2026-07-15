@@ -79,14 +79,22 @@ window.PAStore = (function () {
   }
   function fileConnected() { return !!fileHandle; }
 
+  // Export a snapshot. Stamps `exportedAt` inside the file and dates the download name so repeated
+  // exports don't collide/overwrite in the Downloads folder (and you can tell which is newest).
   function exportJSON(data) {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const at = new Date().toISOString();
+    const stamped = Object.assign({}, data, { exportedAt: at });
+    const blob = new Blob([JSON.stringify(stamped, null, 2)], { type: "application/json" });
+    const d = new Date(), p = (n) => String(n).padStart(2, "0");
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = "pa_data.json"; a.click();
+    a.href = URL.createObjectURL(blob);
+    a.download = `pa_data_${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.json`;
+    a.click();
     URL.revokeObjectURL(a.href);
+    return at;
   }
 
   async function importJSON(file) { const data = merge(JSON.parse(await file.text())); await save(data); return data; }
 
-  return { defaultData, uid, load, save, connectFile, fileConnected, supportsFS, exportJSON, importJSON };
+  return { defaultData, uid, load, save, connectFile, fileConnected, supportsFS, exportJSON, importJSON, key: LS_KEY };
 })();

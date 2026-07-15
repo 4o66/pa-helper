@@ -80,6 +80,12 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   instead, saving plastic and time. Low values are still allowed if you type them into the accel list.
 
 ### Added
+- **Export is harder to get stale/confused.** The download is now dated (`pa_data_YYYY-MM-DD.json`) so
+  repeated exports don't overwrite/collide in Downloads; each file carries an `exportedAt` timestamp; the
+  data-status line shows when you last exported and turns amber ("⚠ newer than your last export") once
+  you've saved changes since. And PA-Helper now **syncs across browser tabs** (a `storage` listener) — a
+  second tab picks up saves from another, so it can't export a stale in-memory copy. (Root-causes the
+  "my completed run wasn't in the export" confusion, alongside the v0.1.33 fix.)
 - **Range-edge warning on results.** If a row's Best PA lands on the tested range's floor or ceiling, a
   ⚠ appears in the cell — the true optimum probably lies beyond the range, so an edge value shouldn't be
   mistaken for the answer. The tooltip says which end to extend and re-test.

@@ -30,6 +30,7 @@ h3.pinhead{color:var(--warn)}
 .toolbar{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
 .status{font-size:.8rem;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:.15rem .5rem}
 .status.file{color:var(--accent2);border-color:var(--accent2)}
+.status.stale{color:#e8a13a;border-color:#e8a13a}
 
 /* tabs */
 nav.tabs{display:flex;gap:.4rem;max-width:960px;margin:0 auto;padding:.8rem 1.2rem 0}

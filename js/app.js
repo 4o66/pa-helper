@@ -25,7 +25,7 @@
 
   // ---- persistence ----
   let saveTimer = null;
-  function persist() { Store.save(data); }
+  function persist() { data.lastModifiedAt = new Date().toISOString(); Store.save(data); if (typeof setStatus === "function") setStatus(); }
   function scheduleSave() { clearTimeout(saveTimer); saveTimer = setTimeout(persist, 400); }
 
   // ---- generic field builder ----
@@ -1439,9 +1439,15 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   }
 
   function setStatus() {
-    const s = $("dataStatus");
-    if (Store.fileConnected()) { s.textContent = "file: pa_data.json"; s.classList.add("file"); }
-    else { s.textContent = "local (this browser)"; s.classList.remove("file"); }
+    const s = $("dataStatus"); if (!s) return;
+    if (Store.fileConnected()) { s.textContent = "file: pa_data.json (live)"; s.classList.add("file"); s.classList.remove("stale"); s.title = "Every change is written straight to pa_data.json."; return; }
+    s.classList.remove("file");
+    const exp = data.lastExportedAt, mod = data.lastModifiedAt;
+    if (!exp) { s.textContent = "local — not exported"; s.classList.remove("stale"); s.title = "Saved in this browser only. Export to a file, or Connect file."; return; }
+    const stale = !!(mod && mod > exp);
+    s.textContent = "local · exported " + exp.slice(0, 10) + (stale ? "  ⚠ newer than your last export" : "");
+    s.classList.toggle("stale", stale);
+    s.title = stale ? "You've saved changes since your last export — Export again to capture them." : "Your last export is up to date with your saved data.";
   }
   function prefillProvide() {
     const { start, end, step } = materialRange();
@@ -1573,6 +1579,12 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     });
     $("jobGuardCancel").addEventListener("click", () => { $("jobGuardModal").hidden = true; pendingTab = null; });
     window.addEventListener("beforeunload", (e) => { if (jobDirty) { e.preventDefault(); e.returnValue = ""; } });
+    // Cross-tab sync: if PA-Helper is open in another tab and it saves, pick up the change here so
+    // this tab can't later export a stale in-memory copy. Skip while mid-edit so we don't clobber work.
+    window.addEventListener("storage", (e) => {
+      if (e.key !== Store.key || !e.newValue || jobDirty) return;
+      data = Store.load(); rebuildForms(); reloadAll();
+    });
     // Auto-seeded default nozzle prompt (after saving a new printer)
     $("nozzleSeedOk").addEventListener("click", () => { $("nozzleSeedModal").hidden = true; });
     $("nozzleSeedReplace").addEventListener("click", () => {
@@ -1606,7 +1618,12 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("debugClearBtn").addEventListener("click", () => { $("debugModal").hidden = false; });
     $("debugModal").addEventListener("click", (e) => { if (e.target === $("debugModal")) $("debugModal").hidden = true; });
     $("debugModal").querySelectorAll("button[data-clear]").forEach(b => b.addEventListener("click", () => doClear(b.dataset.clear)));
-    $("exportBtn").addEventListener("click", () => { persist(); Store.exportJSON(data); });
+    $("exportBtn").addEventListener("click", () => {
+      persist();
+      data.lastExportedAt = Store.exportJSON(data);   // stamp when we last wrote a file
+      Store.save(data);   // save directly (don't re-bump lastModifiedAt past the export time)
+      setStatus();
+    });
     $("importBtn").addEventListener("click", () => $("importInput").click());
     $("importInput").addEventListener("change", async (e) => { if (e.target.files[0]) { data = await Store.importJSON(e.target.files[0]); printerForm = buildForm($("printerForm"), PRINTER_FIELDS); nozzleForm = buildForm($("nozzleForm"), NOZZLE_FIELDS); filamentForm = buildForm($("filamentForm"), FILAMENT_FIELDS); initPrinterDefaults(); updateFilamentConditionals(); reloadAll(); } });
     $("connectFileBtn").addEventListener("click", async () => {
