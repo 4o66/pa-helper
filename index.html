@@ -58,6 +58,7 @@
   <button class="tab-btn" data-tab="printers"><span class="tt">Printer</span><span class="ts" id="tabSelPrinter">Not selected</span></button>
   <button class="tab-btn" data-tab="filaments"><span class="tt">Filament</span><span class="ts" id="tabSelFilament">Not selected</span></button>
   <button class="tab-btn" data-tab="test"><span class="tt">PA Test</span><span class="ts">&nbsp;</span></button>
+  <button class="tab-btn" data-tab="ironing"><span class="tt">Ironing Test</span><span class="ts">&nbsp;</span></button>
 </nav>
 
 <main>
@@ -257,6 +258,59 @@
       </div><!-- /#gatedBody -->
     </div>
   </section>
+
+  <!-- ============ TAB 4: IRONING TEST ============ -->
+  <section class="tab" id="tab-ironing">
+    <h2>Ironing Test</h2>
+    <p class="hint">Generates a grid of flat pads — one per (ironing speed, ironing flow) combo — as an OrcaSlicer 3MF project, so Orca does the real slicing. Print it, then note which pad gave the best top-surface finish.</p>
+    <div id="ironingContext" class="context"></div>
+
+    <div id="ironingBody" hidden>
+      <div class="subsec">
+        <h3>Speed sweep (X axis)</h3>
+        <div class="row">
+          <label>Min (mm/s) <input id="ironSpeedMin" type="number" step="1" value="10"></label>
+          <label>Max (mm/s) <input id="ironSpeedMax" type="number" step="1" value="100"></label>
+          <label>Points <input id="ironSpeedPoints" type="number" step="1" min="2" value="10"></label>
+        </div>
+        <div class="row">
+          <label style="flex:1;min-width:15rem">Speed values to test (mm/s, comma-separated) <input id="ironSpeedList" type="text" placeholder="blank = auto from min/max/points"></label>
+        </div>
+      </div>
+
+      <div class="subsec">
+        <h3>Flow sweep (Y axis)</h3>
+        <div class="row">
+          <label>Min (%) <input id="ironFlowMin" type="number" step="1" value="10"></label>
+          <label>Max (%) <input id="ironFlowMax" type="number" step="1" value="100"></label>
+          <label>Points <input id="ironFlowPoints" type="number" step="1" min="2" value="10"></label>
+        </div>
+        <div class="row">
+          <label style="flex:1;min-width:15rem">Flow values to test (%, comma-separated) <input id="ironFlowList" type="text" placeholder="blank = auto from min/max/points"></label>
+        </div>
+      </div>
+
+      <div class="subsec">
+        <h3>Pad geometry</h3>
+        <div class="row">
+          <label>Pad diameter (mm) <input id="ironPadDiameter" type="number" step="0.5" value="15"></label>
+          <label>Gap between pads (mm) <input id="ironGap" type="number" step="0.5" value="3"></label>
+        </div>
+        <p class="hint">A shared brim joins all pads into one piece — make sure your Orca profile's brim width is generous enough to bridge this gap.</p>
+      </div>
+
+      <div class="subsec">
+        <h3>Plan</h3>
+        <div id="ironingPlanOut" class="out"></div>
+      </div>
+
+      <div class="subsec">
+        <h3>Generate</h3>
+        <button id="ironingDownloadBtn" disabled>Download .3mf</button>
+        <p class="hint">Opens directly in Orca — double-click the downloaded file, or drag it in. Orca does the real slicing; the per-object ironing_speed / ironing_flow overrides are already set. Multi-plate isn't supported yet — if the grid doesn't fit, reduce points, pad size, or gap.</p>
+      </div>
+    </div>
+  </section>
 </main>
 
 <div id="coverageModal" class="modal" hidden>
@@ -327,6 +381,7 @@
 <script src="js/storage.js"></script>
 <script src="js/beds.js"></script>
 <script src="js/pattern.js"></script>
+<script src="js/ironing.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

@@ -20,6 +20,7 @@
 
   // ---- session state ----
   let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, pendingTab = null, importPlates = [], coverageMissing = [], accelListAuto = true, speedListAuto = true, accelPtsAuto = true, speedPtsAuto = true, maxFlowConfirmed = false;
+  let ironSpeedListAuto = true, ironFlowListAuto = true, ironingLoaded = false;
   const PA_FACTORS = ["toolhead", "extruder", "drive", "hotend"];
   const FILAMENT_PA_FACTORS = ["material", "formulation", "fiber", "fiberName", "fiberPct", "hardness", "diameter"];
 
@@ -355,7 +356,7 @@
         const sel = el("select");
         p.instances.forEach(inst => { const o = el("option"); o.value = inst.id; o.textContent = inst.label; sel.append(o); });
         if (p.id === data.lastPrinterId && data.lastInstanceId) sel.value = data.lastInstanceId;
-        sel.addEventListener("change", () => { data.lastInstanceId = sel.value; persist(); updateTestContext(); });
+        sel.addEventListener("change", () => { data.lastInstanceId = sel.value; persist(); updateTestContext(); updateIroningContext(); });
         const iw = el("div", "meta"); iw.append(document.createTextNode("Unit: ")); iw.append(sel); card.append(iw);
       }
       const actions = el("div", "actions");
@@ -373,7 +374,7 @@
     const p = getPrinter(id);
     data.lastInstanceId = (p && p.multi && p.instances && p.instances.length) ? p.instances[0].id : null;
     if (!(p && p.nozzles && p.nozzles.some(n => n.id === data.lastNozzleId))) data.lastNozzleId = (p && p.nozzles && p.nozzles.length) ? p.nozzles[0].id : null;
-    persist(); renderPrinters(); renderNozzles(); renderFilaments(); deriveGeometryFromNozzle(); updateTestContext(); resetMaxFlowForCombo(); updateTabLabels();
+    persist(); renderPrinters(); renderNozzles(); renderFilaments(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); resetMaxFlowForCombo(); updateTabLabels();
   }
   function removePrinter(id) {
     const p = getPrinter(id); if (!p) return;
@@ -383,7 +384,7 @@
     data.filaments.forEach(f => { if (Array.isArray(f.printers) && f.printers.length) f.printers = f.printers.filter(x => x !== id); });
     if (data.lastPrinterId === id) { data.lastPrinterId = null; data.lastInstanceId = null; data.lastNozzleId = null; }
     if (editingPrinterId === id) resetPrinterForm();
-    persist(); renderPrinters(); renderNozzles(); renderFilaments(); renderFilamentPrinterPicker(); updateTestContext(); updateTabLabels();
+    persist(); renderPrinters(); renderNozzles(); renderFilaments(); renderFilamentPrinterPicker(); updateTestContext(); updateIroningContext(); updateTabLabels();
   }
 
   // ---- edit / clone ----
@@ -460,14 +461,14 @@
       actions.append(sel, rm); card.append(actions); list.append(card);
     });
   }
-  function selectNozzle(id) { data.lastNozzleId = id; persist(); renderNozzles(); deriveGeometryFromNozzle(); updateTestContext(); resetMaxFlowForCombo(); updateTabLabels(); }
+  function selectNozzle(id) { data.lastNozzleId = id; persist(); renderNozzles(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); resetMaxFlowForCombo(); updateTabLabels(); }
   function removeNozzle(id) {
     const p = getPrinter(data.lastPrinterId); if (!p) return;
     const n = (p.nozzles || []).find(x => x.id === id); if (!n) return;
     if (!confirm(`Remove nozzle "${nozzleLabel(n)}"? This cannot be undone.`)) return;
     p.nozzles = p.nozzles.filter(x => x.id !== id);
     if (data.lastNozzleId === id) data.lastNozzleId = p.nozzles[0] ? p.nozzles[0].id : null;
-    persist(); renderNozzles(); deriveGeometryFromNozzle(); updateTestContext(); updateTabLabels();
+    persist(); renderNozzles(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); updateTabLabels();
   }
   function saveNozzle() {
     const p = getPrinter(data.lastPrinterId); if (!p) { alert("Select a printer first."); return; }
@@ -476,7 +477,7 @@
     p.nozzles = p.nozzles || []; p.nozzles.push(nz);
     rememberCustoms(nozzleForm); data.lastNozzleId = nz.id; persist();
     $("nozzleAdd").open = false; nozzleForm = buildForm($("nozzleForm"), NOZZLE_FIELDS);
-    renderNozzles(); deriveGeometryFromNozzle(); updateTestContext(); updateTabLabels();
+    renderNozzles(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); updateTabLabels();
   }
   function deriveGeometryFromNozzle() {
     const n = getSelectedNozzle(); const dia = n ? (num(n.diameter) || 0.4) : 0.4;
@@ -498,7 +499,7 @@
       if (changed && runCount > 0 && !confirm(`You changed a PA-determining part (toolhead / extruder / drive / hotend). The ${runCount} saved run${runCount > 1 ? "s" : ""} for "${printerLabel(p)}" were calibrated on the old setup and are no longer valid for the new one. Save anyway?`)) return;
       Object.assign(p, v);
       rememberCustoms(printerForm); persist();
-      resetPrinterForm(); renderPrinters(); renderNozzles(); renderFilamentPrinterPicker(); updateTestContext(); updateTabLabels();
+      resetPrinterForm(); renderPrinters(); renderNozzles(); renderFilamentPrinterPicker(); updateTestContext(); updateIroningContext(); updateTabLabels();
       return;
     }
     const pubId = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : Store.uid();
@@ -617,14 +618,14 @@
     $("filamentViewToggle").querySelectorAll("button").forEach(b => b.classList.toggle("active", b.dataset.view === view));
     updateTabLabels();
   }
-  function selectFilament(id) { data.lastFilamentId = id; persist(); renderFilaments(); updateTestContext(); resetMaxFlowForCombo(); updateTabLabels(); }
+  function selectFilament(id) { data.lastFilamentId = id; persist(); renderFilaments(); updateTestContext(); updateIroningContext(); resetMaxFlowForCombo(); updateTabLabels(); }
   function removeFilament(id) {
     const f = getFilament(id); if (!f) return;
     if (!confirm(`Remove filament "${filamentLabel(f)}"? This cannot be undone.`)) return;
     data.filaments = data.filaments.filter(x => x.id !== id);
     if (data.lastFilamentId === id) data.lastFilamentId = null;
     if (editingFilamentId === id) resetFilamentForm();
-    persist(); renderFilaments(); updateTestContext(); updateTabLabels();
+    persist(); renderFilaments(); updateTestContext(); updateIroningContext(); updateTabLabels();
   }
   function resetFilamentForm() {
     editingFilamentId = null;
@@ -678,7 +679,7 @@
       if (changed && runCount > 0 && !confirm(`You changed a PA-affecting property (material / formulation / fiber / hardness / diameter). The ${runCount} saved run${runCount > 1 ? "s" : ""} for "${filamentLabel(f)}" were calibrated on the old filament and are no longer valid. Save anyway?`)) return;
       Object.assign(f, fields);
       rememberCustoms(filamentForm); persist();
-      resetFilamentForm(); renderFilaments(); updateTestContext(); updateTabLabels();
+      resetFilamentForm(); renderFilaments(); updateTestContext(); updateIroningContext(); updateTabLabels();
       return;
     }
     const fil = Object.assign({ id: Store.uid() }, fields, { created: new Date().toISOString() });
@@ -1631,7 +1632,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       $("recommendOut").textContent = `Resumed planned run. PA range ${s.paStart}–${s.paEnd} step ${s.paStep}. Fill in the best PA per row.`;
     }
     maxFlowConfirmed = true;   // a saved run's max flow is trusted — don't re-gate it
-    renderPrinters(); renderNozzles(); renderFilaments(); updateTestContext();
+    renderPrinters(); renderNozzles(); renderFilaments(); updateTestContext(); updateIroningContext();
     switchTab("test");
     persist(); markJobDirty();
   }
@@ -1653,6 +1654,119 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     if (!$("pvEnd").value) $("pvEnd").value = +end.toFixed(3);
     if (!$("pvStep").value) $("pvStep").value = +step.toFixed(3);
     if (!$("pvAccels").value) $("pvAccels").value = ($("accelList").value || logAccels(accelFloor(),num($("accelLimit").value) || 12000, 5).join(", "));
+  }
+
+  /* =================== IRONING TEST TAB =================== */
+  // Same selected printer/nozzle/filament as PA Test — no separate picker. Generates a 3MF
+  // (window.PAIroning, js/ironing.js) instead of g-code; Orca does the real slicing. See
+  // docs/ironing-method-provenance.md for the file format this is built from.
+
+  function bedSizeLabel(p) {
+    const b = p && p.bed; if (!b) return "?";
+    return b.shape === "round" ? ("⌀" + b.diameter + "mm") : (b.x + "×" + b.y + "mm");
+  }
+
+  function updateIroningContext() {
+    const p = getPrinter(data.lastPrinterId), n = getSelectedNozzle(), f = getFilament(data.lastFilamentId);
+    const ctx = $("ironingContext"); if (!ctx) return;
+    if (!p || !n || !f) {
+      $("ironingBody").hidden = true;
+      ctx.innerHTML = '<span class="badge info">setup</span>To generate an ironing test, select a <b>printer</b> and <b>nozzle</b> (Printer tab), then a <b>filament</b> (Filament tab).' +
+        (!p ? "<br>• No printer selected." : "") + (p && !n ? "<br>• No nozzle selected." : "") + (!f ? "<br>• No filament selected." : "");
+      return;
+    }
+    const inst = (p.multi && data.lastInstanceId) ? " · unit " + data.lastInstanceId : "";
+    ctx.innerHTML = `<b>${printerLabel(p)}</b>${inst}<br><span class="muted">Bed: ${bedSizeLabel(p)}</span><br>Nozzle: <b>${nozzleLabel(n)}</b><br>Filament: <b>${filamentLabel(f)}</b>`;
+    $("ironingBody").hidden = false;
+    if (!ironingLoaded) { loadIroningSettings(); ironingLoaded = true; }
+    refreshIroning();
+  }
+
+  function ironSpeeds() { return parseList($("ironSpeedList").value).filter(v => v > 0); }
+  function ironFlows() { return parseList($("ironFlowList").value).filter(v => v > 0); }
+
+  function regenIroningAxes() {
+    if (ironSpeedListAuto) {
+      const n = Math.max(2, Math.round(num($("ironSpeedPoints").value) || 10));
+      $("ironSpeedList").value = linspace(num($("ironSpeedMin").value) || 10, num($("ironSpeedMax").value) || 100, n).map(v => Math.round(v)).join(", ");
+    }
+    if (ironFlowListAuto) {
+      const n = Math.max(2, Math.round(num($("ironFlowPoints").value) || 10));
+      $("ironFlowList").value = linspace(num($("ironFlowMin").value) || 10, num($("ironFlowMax").value) || 100, n).map(v => Math.round(v)).join(", ");
+    }
+  }
+
+  // Recomputes the auto lists (unless the user's typed their own), replans the grid against the
+  // selected printer's real bed, and persists — called from every relevant field's input handler.
+  function refreshIroning() {
+    regenIroningAxes();
+    updateIroningPlan();
+    saveIroningSettings();
+  }
+
+  function updateIroningPlan() {
+    const out = $("ironingPlanOut"), btn = $("ironingDownloadBtn");
+    if (!out || !btn) return;
+    const p = getPrinter(data.lastPrinterId);
+    if (!p || !hasBed(p)) { out.textContent = ""; btn.disabled = true; return; }
+    const speeds = ironSpeeds(), flows = ironFlows();
+    if (speeds.length < 2 || flows.length < 2) {
+      out.innerHTML = '<span class="badge warn">incomplete</span> Enter at least 2 speed and 2 flow values.';
+      btn.disabled = true; return;
+    }
+    const grid = window.PAIroning.planGrid({
+      speeds, flows, bed: p.bed,
+      padDiameter: num($("ironPadDiameter").value) || undefined,
+      gap: num($("ironGap").value)
+    });
+    if (!grid.fits) {
+      out.innerHTML = `<span class="badge bad">doesn't fit</span> ${grid.cols}×${grid.rows} grid (${grid.gridW.toFixed(1)}×${grid.gridH.toFixed(1)}mm) is bigger than ${printerLabel(p)}'s usable bed (${grid.ux.toFixed(1)}×${grid.uy.toFixed(1)}mm). Reduce points, pad size, or gap — multi-plate isn't supported yet.`;
+      btn.disabled = true;
+    } else {
+      out.innerHTML = `<span class="badge ok">fits</span> ${grid.cols}×${grid.rows} = ${grid.cols * grid.rows} pads, ${grid.gridW.toFixed(1)}×${grid.gridH.toFixed(1)}mm on a ${grid.ux.toFixed(1)}×${grid.uy.toFixed(1)}mm usable bed.`;
+      btn.disabled = false;
+    }
+  }
+
+  function downloadIroning3mf() {
+    const p = getPrinter(data.lastPrinterId); if (!p || !hasBed(p)) return;
+    const speeds = ironSpeeds(), flows = ironFlows();
+    const res = window.PAIroning.build3mf({
+      speeds, flows, bed: p.bed,
+      padDiameter: num($("ironPadDiameter").value) || undefined,
+      gap: num($("ironGap").value) || undefined
+    });
+    if (!res.ok) { alert(res.error); return; }
+    const blob = window.PAIroning.toBlob(res.bytes);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `ironing-test_${speeds.length}x${flows.length}.3mf`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function saveIroningSettings() {
+    data.ironingSettings = {
+      speedMin: num($("ironSpeedMin").value), speedMax: num($("ironSpeedMax").value), speedPoints: num($("ironSpeedPoints").value),
+      speedList: ironSpeedListAuto ? "" : $("ironSpeedList").value,
+      flowMin: num($("ironFlowMin").value), flowMax: num($("ironFlowMax").value), flowPoints: num($("ironFlowPoints").value),
+      flowList: ironFlowListAuto ? "" : $("ironFlowList").value,
+      padDiameter: num($("ironPadDiameter").value), gap: num($("ironGap").value)
+    };
+    scheduleSave();
+  }
+  function loadIroningSettings() {
+    const s = data.ironingSettings; if (!s) return;
+    if (s.speedMin != null) $("ironSpeedMin").value = s.speedMin;
+    if (s.speedMax != null) $("ironSpeedMax").value = s.speedMax;
+    if (s.speedPoints != null) $("ironSpeedPoints").value = s.speedPoints;
+    if (s.speedList) { $("ironSpeedList").value = s.speedList; ironSpeedListAuto = false; }
+    if (s.flowMin != null) $("ironFlowMin").value = s.flowMin;
+    if (s.flowMax != null) $("ironFlowMax").value = s.flowMax;
+    if (s.flowPoints != null) $("ironFlowPoints").value = s.flowPoints;
+    if (s.flowList) { $("ironFlowList").value = s.flowList; ironFlowListAuto = false; }
+    if (s.padDiameter != null) $("ironPadDiameter").value = s.padDiameter;
+    if (s.gap != null) $("ironGap").value = s.gap;
   }
 
   function rebuildForms() {
@@ -1678,7 +1792,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     persist(); rebuildForms(); reloadAll();
     $("debugModal").hidden = true;
   }
-  function reloadAll() { renderPrinters(); renderNozzles(); renderFilaments(); renderInProgress(); renderFilamentPrinterPicker(); deriveGeometryFromNozzle(); updateTestContext(); setStatus(); updateTabLabels(); $("themeSel").value = data.theme || "system"; applyTheme(data.theme); }
+  function reloadAll() { renderPrinters(); renderNozzles(); renderFilaments(); renderInProgress(); renderFilamentPrinterPicker(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); setStatus(); updateTabLabels(); $("themeSel").value = data.theme || "system"; applyTheme(data.theme); }
 
   function init() {
     applyTheme(data.theme);
@@ -1690,6 +1804,9 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("basicMethod").value = P.basicDefault;
     $("flowPoints").value = 5; $("accelPoints").value = 5;   // deterministic defaults (defeat browser form-restore)
     $("unitMode").value = "speed";                            // default display = nozzle velocity (how Orca's PA dialog is configured)
+    $("ironSpeedMin").value = 10; $("ironSpeedMax").value = 100; $("ironSpeedPoints").value = 10;
+    $("ironFlowMin").value = 10; $("ironFlowMax").value = 100; $("ironFlowPoints").value = 10;
+    $("ironPadDiameter").value = window.PAIroning.CONST.padDiameter; $("ironGap").value = window.PAIroning.CONST.gap;
     document.querySelectorAll("input, select").forEach(e => e.setAttribute("autocomplete", "off"));
     updateUnitUI(); reloadAll(); resetMaxFlowForCombo();   // prefill+gate max flow for any pre-selected combo
     $("printerForm").addEventListener("change", (e) => {
@@ -1704,6 +1821,16 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
 
     document.querySelectorAll(".tab-btn").forEach(b => b.addEventListener("click", () => switchTab(b.dataset.tab)));
     switchTab("printers");
+
+    // Ironing Test tab: min/max/points regenerate the list ONLY while it's still auto (same idiom
+    // as PA Test's accel/speed lists) — once you type your own list, tweaking min/max/points here
+    // no longer clobbers it.
+    ["ironSpeedMin", "ironSpeedMax", "ironSpeedPoints"].forEach(id => $(id).addEventListener("input", refreshIroning));
+    ["ironFlowMin", "ironFlowMax", "ironFlowPoints"].forEach(id => $(id).addEventListener("input", refreshIroning));
+    $("ironSpeedList").addEventListener("input", () => { ironSpeedListAuto = false; updateIroningPlan(); saveIroningSettings(); });
+    $("ironFlowList").addEventListener("input", () => { ironFlowListAuto = false; updateIroningPlan(); saveIroningSettings(); });
+    ["ironPadDiameter", "ironGap"].forEach(id => $(id).addEventListener("input", () => refreshIroning()));
+    $("ironingDownloadBtn").addEventListener("click", downloadIroning3mf);
 
     $("themeSel").addEventListener("change", () => { data.theme = $("themeSel").value; applyTheme(data.theme); persist(); });
     $("printerMulti").addEventListener("change", () => { $("instancesWrap").hidden = !$("printerMulti").checked; });
@@ -1796,7 +1923,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("nozzleSeedOk").addEventListener("click", () => { $("nozzleSeedModal").hidden = true; });
     $("nozzleSeedReplace").addEventListener("click", () => {
       const p = getPrinter(data.lastPrinterId);
-      if (p) { p.nozzles = []; data.lastNozzleId = null; persist(); renderNozzles(); deriveGeometryFromNozzle(); updateTestContext(); }
+      if (p) { p.nozzles = []; data.lastNozzleId = null; persist(); renderNozzles(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); }
       $("nozzleSeedModal").hidden = true; $("nozzleAdd").open = true;
       if ($("nozzleAdd").scrollIntoView) $("nozzleAdd").scrollIntoView({ behavior: "smooth", block: "nearest" });
     });

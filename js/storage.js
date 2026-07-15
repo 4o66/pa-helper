@@ -36,8 +36,10 @@ window.PAStore = (function () {
       lastInstanceId: null,
       lastNozzleId: null,           // selected nozzle within the selected printer
       lastFilamentId: null,
-      gcodeCache: {}                // runId -> parsed pattern-block geometry, so the picker
+      gcodeCache: {},                // runId -> parsed pattern-block geometry, so the picker
                                     // still renders the real pattern after a reload/resume
+      ironingSettings: null          // last-used Ironing Test tab settings (speed/flow sweep,
+                                      // pad geometry) — see updateIroningContext() in app.js
     };
   }
 
