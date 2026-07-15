@@ -15,6 +15,16 @@
   const num = (v) => { const n = parseFloat(v); return isNaN(n) ? null : n; };
   const parseList = (s) => (s || "").split(",").map(x => num(x)).filter(x => x != null);
   const today = () => new Date().toISOString().slice(0, 10);
+  // Local date + time, compact and sortable-looking, for telling same-day runs apart (e.g. the
+  // ironing run picker). Falls back gracefully to just a date string for older records that
+  // predate the `created` timestamp field.
+  const fmtDateTime = (iso) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso);
+    const p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  };
   function linspace(a, b, n) { if (n < 2) return [a]; const out = []; for (let i = 0; i < n; i++) out.push(a + (b - a) * i / (n - 1)); return out; }
   const PALETTE = ["#4aa8ff", "#37c98b", "#ffb84a", "#c98bff", "#5de0e6", "#ff8f5d", "#8bff9e"];
 
@@ -553,7 +563,19 @@
     const rm = removeButton(() => removeFilament(f.id));
     actions.append(selBtn, edit, clone);
     const rc = data.runs.filter(r => r.filamentId === f.id && r.status === "complete").length;
-    if (rc) { const res = el("button"); res.textContent = "Results" + (rc > 1 ? " (" + rc + ")" : ""); res.addEventListener("click", () => openResults(f.id)); actions.append(res); }
+    if (rc) { const res = el("button"); res.textContent = "PA" + (rc > 1 ? " (" + rc + ")" : ""); res.addEventListener("click", () => openResults(f.id)); actions.append(res); }
+    const ironRuns = completedIroningRunsFor(f.id);
+    if (ironRuns.length) {
+      const incomplete = ironRuns.find(r => !(r.namedResults && r.namedResults.length));   // no named results yet == still waiting on print results
+      const iron = el("button", incomplete ? "warn" : null); iron.textContent = "Iron" + (ironRuns.length > 1 ? " (" + ironRuns.length + ")" : "");
+      iron.addEventListener("click", () => {
+        // An in-progress run takes priority over the history view — jump straight to it instead
+        // of the results modal, since that's what needs finishing before anything else can happen.
+        if (incomplete) { openIroningRun(incomplete.id); $("ironInProgressModal").hidden = false; }
+        else openIronResults(f.id);
+      });
+      actions.append(iron);
+    }
     actions.append(rm); return actions;
   }
   function pinIcon() { const s = el("span", "pin-ic"); s.textContent = "📌"; s.title = "Restricted to specific printer(s)"; return s; }
@@ -1557,11 +1579,11 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const settings = [
       ["Mode", (run.mode || "advanced") + (run.basicMethod ? " (" + run.basicMethod + ")" : "")],
       ["Date", run.date],
-      ["Max volumetric speed", run.maxFlow != null ? run.maxFlow + " mm³/s" : "", run.maxFlow],
+      ["Max volumetric speed", run.maxFlow != null ? run.maxFlow + " mm³/s" : ""],
       ["Layer × line width", (run.layerH != null && run.lineW != null) ? (run.layerH + " × " + run.lineW + " mm") : ""],
-      ["Start PA", s.paStart, s.paStart], ["End PA", s.paEnd, s.paEnd], ["PA step", s.paStep, s.paStep],
-      ["Accelerations", (s.accels || []).join(", "), (s.accels || []).join(",")],
-      ["Speeds (mm/s)", (s.speeds || []).join(", "), (s.speeds || []).join(",")]
+      ["Start PA", s.paStart], ["End PA", s.paEnd], ["PA step", s.paStep],
+      ["Accelerations", (s.accels || []).join(", ")],
+      ["Speeds (mm/s)", (s.speeds || []).join(", ")]
     ];
     let orca = "";
     if (run.modelText) orca += `<label class="blocklabel">Adaptive PA model — paste into Orca${copy(run.modelText)}</label><pre class="resultblock">${esc(run.modelText)}</pre>`;
@@ -1770,13 +1792,19 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   }
 
   // ---- saved ironing tests (data.ironingRuns[]) ----
-  // No "planned" state (yet — there's no results-entry step to wait on): saving a test IS its
-  // complete record, capturing exactly the printer/nozzle/filament/settings used.
-  function collectIroningRun() {
+  // "Complete" = has named results (see completedIroningRunsFor's in-progress check elsewhere).
+  // Multiple complete runs are allowed per printer+filament (they're history); only one
+  // incomplete (unnamed) run may exist per combo at a time — saving again while one's still in
+  // progress updates it in place instead of piling up duplicates.
+  function collectIroningRun(existing) {
     return {
-      id: Store.uid(), status: "complete", date: today(),
+      id: existing ? existing.id : Store.uid(),
+      status: "complete",
+      created: existing ? existing.created : new Date().toISOString(),
+      date: today(),
       printerId: data.lastPrinterId, instanceId: data.lastInstanceId || null,
       nozzleId: data.lastNozzleId, filamentId: data.lastFilamentId,
+      namedResults: existing ? existing.namedResults : undefined,
       settings: {
         speedMin: num($("ironSpeedMin").value), speedMax: num($("ironSpeedMax").value), speedPoints: num($("ironSpeedPoints").value),
         speedList: $("ironSpeedList").value,
@@ -1791,26 +1819,25 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const speeds = ironSpeeds(), flows = ironFlows();
     if (speeds.length < 2 || flows.length < 2) { alert("Enter at least 2 speed and 2 flow values first."); return; }
     data.ironingRuns = data.ironingRuns || [];
-    data.ironingRuns.unshift(collectIroningRun());
-    persist(); renderIroningRuns();
-    alert("Saved.");
+    const existing = data.ironingRuns.find(r => r.printerId === data.lastPrinterId && r.filamentId === data.lastFilamentId && !(r.namedResults && r.namedResults.length));
+    const fresh = collectIroningRun(existing);
+    if (existing) data.ironingRuns[data.ironingRuns.indexOf(existing)] = fresh;
+    else data.ironingRuns.unshift(fresh);
+    persist(); renderFilaments();
+    switchTab("filaments");
+    openIronResults(data.lastFilamentId);
   }
   function deleteIroningRun(id) {
-    if (!confirm("Delete this saved ironing test? This cannot be undone.")) return;
-    data.ironingRuns = (data.ironingRuns || []).filter(r => r.id !== id);
-    persist(); renderIroningRuns();
-  }
-  // Reopening loads the run's printer/nozzle/filament + settings back into the Ironing tab (fully
-  // editable — there's no read-only view-lock for this tab, unlike PA Test's saved-run view).
-  // Re-saving after opening one always creates a NEW record; it doesn't edit this one in place.
-  function openIroningRun(id) {
     const r = (data.ironingRuns || []).find(x => x.id === id); if (!r) return;
-    if (r.printerId && getPrinter(r.printerId)) selectPrinter(r.printerId);
-    const pr = getPrinter(r.printerId);
-    if (pr && r.nozzleId && pr.nozzles && pr.nozzles.some(nz => nz.id === r.nozzleId)) selectNozzle(r.nozzleId);
-    if (r.instanceId) { data.lastInstanceId = r.instanceId; persist(); }
-    if (r.filamentId && getFilament(r.filamentId)) selectFilament(r.filamentId);
-
+    if (!confirm("Delete this saved ironing test? This cannot be undone.")) return;
+    const fid = r.filamentId;
+    data.ironingRuns = (data.ironingRuns || []).filter(x => x.id !== id);
+    persist(); renderFilaments();
+    if (completedIroningRunsFor(fid).length) openIronResults(fid); else closeIronResults();
+  }
+  // Loads a saved run's sweep/geometry settings into the Ironing tab fields (shared by the
+  // explicit "resume/rerun" flow below and the auto-resume-on-tab-open hook).
+  function loadIroningRunFields(r) {
     const s = r.settings || {};
     if (s.speedMin != null) $("ironSpeedMin").value = s.speedMin;
     if (s.speedMax != null) $("ironSpeedMax").value = s.speedMax;
@@ -1822,28 +1849,254 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     ironFlowListAuto = !s.flowList; if (s.flowList) $("ironFlowList").value = s.flowList;
     if (s.padDiameter != null) $("ironPadDiameter").value = s.padDiameter;
     if (s.gap != null) $("ironGap").value = s.gap;
-
-    switchTab("ironing");
     refreshIroning();
   }
-  function renderIroningRuns() {
-    const wrap = $("ironingRunsWrap"), list = $("ironingRunsList");
-    if (!wrap || !list) return;
-    const runs = data.ironingRuns || [];
-    wrap.hidden = runs.length === 0; list.innerHTML = "";
-    runs.slice(0, 30).forEach(r => {
-      const f = getFilament(r.filamentId), p = getPrinter(r.printerId);
-      const s = r.settings || {};
-      const speedN = parseList(s.speedList).length, flowN = parseList(s.flowList).length;
-      const card = el("div", "card");
-      const title = el("div", "title"); title.innerHTML = '<span class="badge info">ironing</span>' + (f ? filamentLabel(f) : "(deleted filament)"); card.append(title);
-      const meta = el("div", "meta"); meta.textContent = `${p ? printerLabel(p) : "(deleted printer)"} · ${speedN}×${flowN} grid · ${r.date}`; card.append(meta);
-      const actions = el("div", "actions");
-      const op = el("button"); op.textContent = "Open"; op.addEventListener("click", () => openIroningRun(r.id));
-      const rm = el("button", "danger"); rm.textContent = "Delete"; rm.addEventListener("click", () => deleteIroningRun(r.id));
-      actions.append(op, rm); card.append(actions);
-      list.append(card);
+  // Reopening loads the run's printer/nozzle/filament + settings back into the Ironing tab (fully
+  // editable — there's no read-only view-lock for this tab, unlike PA Test's saved-run view).
+  // Re-saving only creates a NEW record if the matching printer+filament's current run is already
+  // complete (named) — otherwise it updates the in-progress one in place, see saveIroningRun().
+  function openIroningRun(id) {
+    const r = (data.ironingRuns || []).find(x => x.id === id); if (!r) return;
+    if (r.printerId && getPrinter(r.printerId)) selectPrinter(r.printerId);
+    const pr = getPrinter(r.printerId);
+    if (pr && r.nozzleId && pr.nozzles && pr.nozzles.some(nz => nz.id === r.nozzleId)) selectNozzle(r.nozzleId);
+    if (r.instanceId) { data.lastInstanceId = r.instanceId; persist(); }
+    if (r.filamentId && getFilament(r.filamentId)) selectFilament(r.filamentId);
+    switchTab("ironing");
+    loadIroningRunFields(r);
+  }
+  // Auto-resume: since only one incomplete run may exist per printer+filament, opening the
+  // Ironing tab with that combo already selected loads it automatically instead of leaving you
+  // to stumble into creating (what would look like) a duplicate.
+  function autoloadIncompleteIroningRun() {
+    const pid = data.lastPrinterId, fid = data.lastFilamentId;
+    if (!pid || !fid) return;
+    const run = (data.ironingRuns || []).find(r => r.printerId === pid && r.filamentId === fid && !(r.namedResults && r.namedResults.length));
+    if (run) loadIroningRunFields(run);
+  }
+  /* ---- Saved-results modal (per filament) — Ironing ---- */
+  let ironResultsRunId = null;
+  const completedIroningRunsFor = (fid) => (data.ironingRuns || [])
+    .filter(r => r.filamentId === fid)
+    .sort((a, b) => String(b.created || b.date || "").localeCompare(String(a.created || a.date || "")));   // newest first
+  function openIronResults(fid) {
+    const runs = completedIroningRunsFor(fid); if (!runs.length) return;
+    const fil = getFilament(fid);
+    $("ironResultsTitle").textContent = filamentLabel(fil);
+    const sw = $("ironResultsSwatch"); const fill = fil ? colorFill(fil) : null;   // colour swatch in the title bar
+    if (sw) { sw.style.background = fill || ""; sw.classList.toggle("nocolor", !fill); }
+    const pick = $("ironResultsPick"); pick.innerHTML = "";
+    runs.forEach(r => { const o = el("option"); o.value = r.id; o.textContent = printerLabel(getPrinter(r.printerId)) + " · " + fmtDateTime(r.created || r.date); pick.append(o); });
+    $("ironResultsPickWrap").hidden = runs.length < 2;
+    pick.value = runs[0].id;
+    renderIronResultsRun(runs[0]);
+    $("ironResultsModal").hidden = false;
+  }
+  function renderIronResultsRun(run) {
+    ironResultsRunId = run.id;
+    const p = getPrinter(run.printerId), f = getFilament(run.filamentId), s = run.settings || {};
+    const nz = p && p.nozzles ? p.nozzles.find(n => n.id === run.nozzleId) : null;
+    const esc = (v) => String(v == null ? "" : v).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const copy = (val) => (val != null && String(val) !== "") ? ` <button class="copybtn" data-copy="${esc(val)}" title="Copy to clipboard" aria-label="Copy">⧉</button>` : "";
+    const dl = (rows) => '<dl class="results-dl">' + rows.filter(r => r[1] != null && String(r[1]) !== "").map(([k, v, c]) => `<dt>${esc(k)}</dt><dd>${esc(v)}${c != null ? copy(c) : ""}</dd>`).join("") + "</dl>";
+    const bed = p && p.bed ? (p.bed.shape === "round" ? (p.bed.diameter + " mm ø") : (p.bed.x + "×" + p.bed.y + " mm")) : "";
+    const printer = p ? [["Maker", p.maker], ["Model", p.model], ["Toolhead", p.toolhead], ["Extruder", (p.extruder || "") + (p.drive ? " (" + p.drive + ")" : "")], ["Hotend", p.hotend], ["Nozzle", nz ? nozzleLabel(nz) : ""], ["Bed", bed]] : [["Status", "(deleted)"]];
+    const fil = f ? [["Maker", f.maker], ["Material", f.material], ["Formulation", formText(f)], ["Color", f.color], ["Diameter", f.diameter ? f.diameter + " mm" : ""], ["Fiber", fiberTag(f)], ["Hardness", f.hardness]] : [["Status", "(deleted)"]];
+    const settings = [
+      ["Date", fmtDateTime(run.created || run.date)],
+      ["Speed range", (s.speedMin != null && s.speedMax != null) ? (s.speedMin + "–" + s.speedMax + " mm/s (" + (s.speedPoints || "") + " pts)") : ""],
+      ["Speed list", s.speedList],
+      ["Flow range", (s.flowMin != null && s.flowMax != null) ? (s.flowMin + "–" + s.flowMax + "% (" + (s.flowPoints || "") + " pts)") : ""],
+      ["Flow list", s.flowList],
+      ["Pad diameter", s.padDiameter != null ? s.padDiameter + " mm" : ""],
+      ["Gap", s.gap != null ? s.gap + " mm" : ""]
+    ];
+    const sec = (title, body) => `<details class="rsec"><summary>${esc(title)}</summary>${body}</details>`;
+    const named = run.namedResults || [];
+    const resultsBody = named.length
+      ? '<table><thead><tr><th>Sample</th><th>Speed</th><th>Flow</th></tr></thead><tbody>' +
+          named.map(n => `<tr><td>${esc(n.name)}</td><td>${esc(n.speed)} mm/s</td><td>${esc(n.flow)}%</td></tr>`).join("") +
+        '</tbody></table><div class="actions"><button class="secondary" data-iron-picker-open="' + esc(run.id) + '">Change results</button></div>'
+      : '<p class="hint">No named results yet.</p><div class="actions"><button data-iron-picker-open="' + esc(run.id) + '">Name samples</button></div>';
+    $("ironResultsBodyView").innerHTML =
+      sec("Printer - " + (p ? printerLabel(p) : "(deleted)"), dl(printer)) +
+      sec("Filament - " + (f ? filamentLabel(f) : "(deleted)"), dl(fil)) +
+      sec("Test settings", dl(settings)) +
+      `<h3 class="rsec-static">Results</h3>${resultsBody}`;
+  }
+  function closeIronResults() { $("ironResultsModal").hidden = true; ironResultsRunId = null; }
+  function cloneFromIroningRun(id) {   // load a saved ironing test's settings back into the tab for a re-run
+    closeIronResults();
+    openIroningRun(id);
+  }
+
+  /* ---- Results picker: name individual pads on a saved ironing test's grid ---- */
+  // Working copy only — nothing touches data.ironingRuns until "Save settings" is clicked.
+  // cells is keyed "row,col" -> {name}. row/col match ironing.js's planGrid() (row=flow, col=speed),
+  // so "row 3, column 7" here is the same pad the user can count off the physical print.
+  let ironPickerState = null, ironPickerResizeHandler = null;
+  function openIronPicker(runId) {
+    const run = (data.ironingRuns || []).find(r => r.id === runId); if (!run) return;
+    const s = run.settings || {};
+    const speeds = parseList(s.speedList), flows = parseList(s.flowList);
+    if (speeds.length < 2 || flows.length < 2) { alert("This saved test doesn't have a full speed/flow grid to name."); return; }
+    const cells = {};
+    (run.namedResults || []).forEach(n => { cells[n.row + "," + n.col] = { name: n.name }; });
+    const C = window.PAIroning.CONST;
+    ironPickerState = {
+      runId, speeds, flows, cells,
+      padDiameter: s.padDiameter != null ? s.padDiameter : C.padDiameter,
+      gap: s.gap != null ? s.gap : C.gap
+    };
+    $("ironPickerSub").textContent = `${speeds.length}×${flows.length} grid — ${run.date}`;
+    hideIronNamePanel();
+    $("ironPickerModal").hidden = false;   // must be visible before renderIronPickerGrid measures it to size the SVG
+    renderIronPickerGrid();
+    if (!ironPickerResizeHandler) { ironPickerResizeHandler = () => renderIronPickerGrid(); window.addEventListener("resize", ironPickerResizeHandler); }
+  }
+  // Shrinks (or grows) the SVG to whatever space is actually available in the modal — viewport
+  // height minus this modal's own header/footer — so the grid never needs its own scrollbar.
+  // Not a literal mm-to-px mapping: it fills whatever box it's given, preserving the grid's
+  // internal proportions (pad size vs. gap), which is what actually matters here.
+  function fitIronPickerSvg(svgEl, totalW, totalH) {
+    const modal = $("ironPickerModal");
+    const head = modal.querySelector(".results-head"), foot = modal.querySelector(".results-foot"), body = modal.querySelector(".ironpicker-body");
+    const winH = (typeof window !== "undefined" && window.innerHeight) || 800;
+    const winW = (typeof window !== "undefined" && window.innerWidth) || 1200;
+    const headH = (head && head.offsetHeight) || 64, footH = (foot && foot.offsetHeight) || 60;
+    const availH = Math.max(100, winH * 0.86 - headH - footH - 24);
+    const bodyW = (body && body.clientWidth) || Math.min(winW * 0.9, 700);
+    const availW = Math.max(100, bodyW - 8);
+    const scale = Math.min(availW / totalW, availH / totalH);
+    svgEl.style.width = (totalW * scale).toFixed(1) + "px";
+    svgEl.style.height = (totalH * scale).toFixed(1) + "px";
+  }
+  // Draws the grid to scale from the run's real pad diameter + gap (same spacing formula as
+  // ironing.js's planGrid()) so circle size and spacing on screen match the physical print —
+  // row=flow, col=speed, same convention as planGrid()'s items.
+  function renderIronPickerGrid() {
+    const st = ironPickerState; if (!st) return;
+    const pad = st.padDiameter, gap = st.gap;
+    const cols = st.speeds.length, rows = st.flows.length;
+    const gridW = cols * pad + (cols - 1) * gap, gridH = rows * pad + (rows - 1) * gap;
+    const mLeft = pad * 1.1, mTop = pad * 0.75;   // just enough room for the axis labels, no extra padding
+    const edgeBuf = Math.max(pad * 0.05, 1);   // last row/col's circle stroke sits exactly on the viewBox edge otherwise — clipped
+    const totalW = gridW + mLeft + edgeBuf, totalH = gridH + mTop + edgeBuf;
+    const fs = Math.max(pad * 0.3, 2.5);
+    const esc2 = (v) => String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+
+    let svg = `<svg viewBox="0 0 ${totalW.toFixed(2)} ${totalH.toFixed(2)}" class="ironpicker-svg" role="img" aria-label="Ironing test pad grid">`;
+    st.speeds.forEach((sp, c) => {
+      const cx = mLeft + c * (pad + gap) + pad / 2;
+      svg += `<text x="${cx.toFixed(2)}" y="${(mTop * 0.65).toFixed(2)}" font-size="${fs.toFixed(2)}" text-anchor="middle" class="ironaxis">${sp}</text>`;
     });
+    st.flows.forEach((fl, r) => {
+      const cy = mTop + r * (pad + gap) + pad / 2;
+      svg += `<text x="${(mLeft * 0.75).toFixed(2)}" y="${cy.toFixed(2)}" font-size="${fs.toFixed(2)}" text-anchor="end" dominant-baseline="central" class="ironaxis">${fl}%</text>`;
+    });
+    st.flows.forEach((fl, r) => {
+      st.speeds.forEach((sp, c) => {
+        const cx = mLeft + c * (pad + gap) + pad / 2, cy = mTop + r * (pad + gap) + pad / 2;
+        const cell = st.cells[r + "," + c];
+        const label = cell ? cell.name.slice(0, 1).toUpperCase() : "";
+        const title = `Row ${r + 1}, Col ${c + 1} — ${sp} mm/s, ${fl}% flow` + (cell ? (" — " + cell.name) : "");
+        svg += `<g class="ironcell${cell ? " named" : ""}" data-r="${r}" data-c="${c}">` +
+          `<title>${esc2(title)}</title>` +
+          `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${(pad / 2).toFixed(2)}"/>` +
+          (label ? `<text x="${cx.toFixed(2)}" y="${cy.toFixed(2)}" font-size="${fs.toFixed(2)}" text-anchor="middle" dominant-baseline="central" class="ironcell-label">${label}</text>` : "") +
+          `</g>`;
+      });
+    });
+    svg += `</svg>`;
+    $("ironPickerGrid").innerHTML = svg;
+    const svgEl = $("ironPickerGrid").querySelector("svg");
+    fitIronPickerSvg(svgEl, totalW, totalH);
+    // renderIronPickerGrid() rebuilds every cell node from scratch, so if a naming popover is
+    // open (e.g. this run was triggered by a window resize mid-edit), reapply the "active"
+    // highlight and re-anchor the popover to the freshly-built cell.
+    if (st.activeCell) {
+      const activeEl = $("ironPickerGrid").querySelector(`.ironcell[data-r="${st.activeCell.r}"][data-c="${st.activeCell.c}"]`);
+      if (activeEl) { activeEl.classList.add("active"); if (!$("ironNamePanel").hidden) positionIronNamePanel(activeEl); }
+    }
+  }
+  // Positions the floating naming popover on the opposite half of the grid (both axes) from the
+  // clicked pad, so the pad you're naming stays visible instead of getting covered by the popover.
+  function positionIronNamePanel(cellEl) {
+    const panel = $("ironNamePanel"), gridWrap = $("ironPickerGridWrap");
+    if (!cellEl || !cellEl.getBoundingClientRect || typeof window === "undefined" || !window.innerWidth) return;   // no layout engine (e.g. unit tests) — skip
+    const cellRect = cellEl.getBoundingClientRect(), gridRect = gridWrap.getBoundingClientRect();
+    panel.style.visibility = "hidden";   // measure its natural (content-fit) size without a visible flash
+    const pw = panel.offsetWidth, ph = panel.offsetHeight;
+    const gcx = gridRect.left + gridRect.width / 2, gcy = gridRect.top + gridRect.height / 2;
+    const cellCx = cellRect.left + cellRect.width / 2, cellCy = cellRect.top + cellRect.height / 2;
+    let left = (cellCx < gcx) ? (gcx + 10) : (gcx - pw - 10);
+    let top = (cellCy < gcy) ? (gcy + 10) : (gcy - ph - 10);
+    left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
+    top = Math.max(8, Math.min(top, window.innerHeight - ph - 8));
+    panel.style.left = left + "px"; panel.style.top = top + "px";
+    panel.style.visibility = "";
+  }
+  function onIronCellClick(r, c, cellEl) {
+    const st = ironPickerState; if (!st) return;
+    st.activeCell = { r, c };
+    const sp = st.speeds[c], fl = st.flows[r], cell = st.cells[r + "," + c];
+    const isPreset = cell && (cell.name === "Glossy" || cell.name === "Matte");
+    $("ironNameCellInfo").textContent = `Row ${r + 1}, Col ${c + 1} — Speed ${sp} mm/s, Flow ${fl}%`;
+    [...document.getElementsByName("ironNameChoice")].forEach(rb => { rb.checked = cell ? (isPreset ? rb.value === cell.name : rb.value === "Other") : false; });
+    const otherText = $("ironNameOtherText");
+    otherText.disabled = !(cell && !isPreset);
+    otherText.value = (cell && !isPreset) ? cell.name : "";
+    $("ironNameRemove").hidden = !cell;
+    $("ironNamePanel").hidden = false;
+    positionIronNamePanel(cellEl);
+    const prevActive = $("ironPickerGrid").querySelector(".ironcell.active"); if (prevActive) prevActive.classList.remove("active");
+    if (cellEl) cellEl.classList.add("active");
+  }
+  function hideIronNamePanel() {
+    $("ironNamePanel").hidden = true;
+    [...document.getElementsByName("ironNameChoice")].forEach(rb => rb.checked = false);
+    $("ironNameOtherText").disabled = true; $("ironNameOtherText").value = "";
+    if (ironPickerState) ironPickerState.activeCell = null;
+    const activeEl = $("ironPickerGrid").querySelector(".ironcell.active"); if (activeEl) activeEl.classList.remove("active");
+  }
+  function commitIronCellName() {
+    const st = ironPickerState; if (!st || !st.activeCell) return;
+    const choice = document.querySelector('input[name="ironNameChoice"]:checked');
+    if (!choice) { alert("Pick Glossy, Matte, or Other first."); return; }
+    let name = choice.value;
+    if (name === "Other") {
+      const desc = $("ironNameOtherText").value.trim();
+      if (!desc) { alert('Enter a short description for "Other".'); return; }
+      name = desc;
+    }
+    st.cells[st.activeCell.r + "," + st.activeCell.c] = { name };
+    hideIronNamePanel();
+    renderIronPickerGrid();
+  }
+  function removeIronCellName() {
+    const st = ironPickerState; if (!st || !st.activeCell) return;
+    delete st.cells[st.activeCell.r + "," + st.activeCell.c];
+    hideIronNamePanel();
+    renderIronPickerGrid();
+  }
+  function saveIronPickerSettings() {
+    const st = ironPickerState; if (!st) return;
+    const run = (data.ironingRuns || []).find(r => r.id === st.runId);
+    if (run) {
+      run.namedResults = Object.keys(st.cells).map(key => {
+        const [r, c] = key.split(",").map(Number);
+        return { row: r, col: c, speed: st.speeds[c], flow: st.flows[r], name: st.cells[key].name };
+      });
+      persist(); renderFilaments();   // "Iron" button's in-progress (orange) state depends on namedResults
+    }
+    closeIronPicker();
+    if (run && !$("ironResultsModal").hidden) renderIronResultsRun(run);
+  }
+  function closeIronPicker() {
+    $("ironPickerModal").hidden = true;
+    hideIronNamePanel();
+    ironPickerState = null;
+    if (ironPickerResizeHandler) { window.removeEventListener("resize", ironPickerResizeHandler); ironPickerResizeHandler = null; }
   }
 
   function saveIroningSettings() {
@@ -1893,7 +2146,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     persist(); rebuildForms(); reloadAll();
     $("debugModal").hidden = true;
   }
-  function reloadAll() { renderPrinters(); renderNozzles(); renderFilaments(); renderInProgress(); renderIroningRuns(); renderFilamentPrinterPicker(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); setStatus(); updateTabLabels(); $("themeSel").value = data.theme || "system"; applyTheme(data.theme); }
+  function reloadAll() { renderPrinters(); renderNozzles(); renderFilaments(); renderInProgress(); renderFilamentPrinterPicker(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); setStatus(); updateTabLabels(); $("themeSel").value = data.theme || "system"; applyTheme(data.theme); }
 
   function init() {
     applyTheme(data.theme);
@@ -1920,7 +2173,10 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("filamentRestrict").addEventListener("change", () => { const on = $("filamentRestrict").checked; if (on) renderFilamentPrinterPicker(); $("filamentPrinters").hidden = !on; });
     $("filamentViewToggle").addEventListener("click", (e) => { const b = e.target.closest("button[data-view]"); if (!b) return; data.filamentView = b.dataset.view; persist(); renderFilaments(); });
 
-    document.querySelectorAll(".tab-btn").forEach(b => b.addEventListener("click", () => switchTab(b.dataset.tab)));
+    document.querySelectorAll(".tab-btn").forEach(b => b.addEventListener("click", () => {
+      switchTab(b.dataset.tab);
+      if (b.dataset.tab === "ironing") autoloadIncompleteIroningRun();   // only on organic tab clicks — not the resume/rerun flows, which already loaded their specific run
+    }));
     switchTab("printers");
 
     // Ironing Test tab: min/max/points regenerate the list ONLY while it's still auto (same idiom
@@ -1998,6 +2254,27 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("resultsDelete").addEventListener("click", () => { if (resultsRunId) deleteRunById(resultsRunId); });
     $("resultsClose").addEventListener("click", closeResults);
     $("resultsPick").addEventListener("change", (e) => { const r = data.runs.find(x => x.id === e.target.value); if (r) renderResultsRun(r); });
+    $("ironResultsClone").addEventListener("click", () => { if (ironResultsRunId) cloneFromIroningRun(ironResultsRunId); });
+    $("ironResultsDelete").addEventListener("click", () => { if (ironResultsRunId) deleteIroningRun(ironResultsRunId); });
+    $("ironResultsClose").addEventListener("click", closeIronResults);
+    $("ironResultsPick").addEventListener("change", (e) => { const r = (data.ironingRuns || []).find(x => x.id === e.target.value); if (r) renderIronResultsRun(r); });
+    $("ironResultsBodyView").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-iron-picker-open]"); if (!b) return;
+      openIronPicker(b.getAttribute("data-iron-picker-open"));
+    });
+    $("ironPickerGrid").addEventListener("click", (e) => {
+      const b = e.target.closest(".ironcell"); if (!b) return;
+      onIronCellClick(Number(b.getAttribute("data-r")), Number(b.getAttribute("data-c")), b);
+    });
+    $("ironNameSave").addEventListener("click", commitIronCellName);
+    $("ironNameRemove").addEventListener("click", removeIronCellName);
+    $("ironNameCancel").addEventListener("click", hideIronNamePanel);
+    [...document.getElementsByName("ironNameChoice")].forEach(rb => rb.addEventListener("change", () => {
+      const other = document.querySelector('input[name="ironNameChoice"][value="Other"]');
+      $("ironNameOtherText").disabled = !(other && other.checked);
+    }));
+    $("ironPickerSave").addEventListener("click", saveIronPickerSettings);
+    $("ironPickerClose").addEventListener("click", closeIronPicker);
     $("resultsBodyView").addEventListener("click", (e) => {
       const b = e.target.closest("[data-copy]"); if (!b) return;
       if (navigator.clipboard) navigator.clipboard.writeText(b.getAttribute("data-copy"));
@@ -2023,6 +2300,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     });
     // Auto-seeded default nozzle prompt (after saving a new printer)
     $("nozzleSeedOk").addEventListener("click", () => { $("nozzleSeedModal").hidden = true; });
+    $("ironInProgressOk").addEventListener("click", () => { $("ironInProgressModal").hidden = true; });
     $("nozzleSeedReplace").addEventListener("click", () => {
       const p = getPrinter(data.lastPrinterId);
       if (p) { p.nozzles = []; data.lastNozzleId = null; persist(); renderNozzles(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); }

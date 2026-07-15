@@ -86,6 +86,8 @@ nav.subtabs{display:flex;gap:.3rem;margin:1rem 0 0}
 .subsec:first-of-type{border-top:0;margin-top:.4rem;padding-top:0}
 
 .hint{color:var(--muted);font-size:.85rem;margin:.2rem 0 .8rem}
+.legend-note{display:flex;align-items:center;flex-wrap:wrap;gap:.4rem}
+.legend-btn{pointer-events:none;cursor:default;padding:.15rem .55rem;font-size:.78rem}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:.7rem}
 .field{display:flex;flex-direction:column;gap:.2rem}
 .field.newrow{grid-column-start:1}
@@ -131,10 +133,12 @@ details[open] summary{margin-bottom:.7rem}
 /* icon-only buttons (e.g. the trashcan Remove) — square-ish, glyph centred */
 .iconbtn{padding:.3rem .45rem;display:inline-flex;align-items:center;justify-content:center;line-height:0}
 .card .actions button.iconbtn{padding:.3rem .45rem}
-/* card grids: uniform width so the action row (Select/Edit/Clone[/Results]/trash) fits on one line */
+/* card grids: uniform width. Printer action row (Select/Edit/trash) fits on one line; filament
+   action row (Select/Edit/Clone[/PA][/Iron]/trash) can now run to 6 buttons, so it wraps instead
+   of forcing one line and overflowing the card. */
 #printerList{grid-template-columns:repeat(auto-fill,310px);justify-content:start}
 #filamentList.cards{grid-template-columns:repeat(auto-fill,350px);justify-content:start}
-#printerList .actions,#filamentList.cards .actions{flex-wrap:nowrap}
+#printerList .actions{flex-wrap:nowrap}
 #printerList .actions button,#filamentList.cards .actions button{white-space:nowrap}
 .card{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:.7rem .8rem;
   display:flex;flex-direction:column;gap:.35rem}
@@ -195,7 +199,7 @@ footer a{color:var(--accent)}
 .results-box{max-width:min(720px,95vw);width:100%;max-height:88vh;text-align:left;padding:0;overflow:hidden;display:flex;flex-direction:column}
 .results-head{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;flex-wrap:wrap;
   flex:0 0 auto;padding:1rem 1.3rem .7rem;border-bottom:1px solid var(--line);background:var(--panel)}
-.results-title{display:flex;align-items:center;gap:.6rem;min-width:0}
+.results-title{display:flex;align-items:flex-start;gap:.6rem;min-width:0}
 .results-title>div{display:flex;flex-direction:column;justify-content:center}
 .results-title h2{margin:0;line-height:1.2}
 #resultsSub:empty{display:none}
@@ -222,6 +226,40 @@ details.rsec>*:not(summary){padding:0 0 .7rem}
 .results-box .resultblock{background:none;border:0;border-radius:0;padding:.1rem 0 .3rem;margin:.15rem 0 .4rem;
   font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8rem;line-height:1.45;
   white-space:pre-wrap;word-break:break-word;overflow:visible;color:var(--ink)}
+/* ironing results picker: a schematic row(flow) x column(speed) grid of clickable pads, drawn
+   to scale from the run's actual pad diameter + gap so on-screen spacing matches the real print */
+.ironpicker-box{width:100%;max-width:min(92vw,760px)}
+.ironpicker-body{padding:.5rem .8rem}
+/* The picker should never scroll — JS (fitIronPickerSvg) sizes the SVG down to whatever space
+   is actually available (viewport height minus this modal's own header/footer), so there's
+   nothing left to overflow. overflow:visible here means even a rounding error spills over
+   quietly instead of popping a scrollbar. */
+.ironpicker-box .results-body{overflow:visible}
+.ironpicker-gridwrap{overflow:visible}
+.ironpicker-grid{display:block}
+.ironpicker-svg{display:block}
+.ironcell{cursor:pointer}
+.ironcell circle{fill:var(--panel2);stroke:var(--line);stroke-width:.6;transition:fill .08s}
+.ironcell:hover circle{fill:var(--accent2);stroke:var(--accent2)}
+.ironcell.named circle{fill:var(--accent);stroke:var(--accent)}
+.ironcell.named:hover circle{filter:brightness(1.12)}
+/* stays lit while its naming popover is open, even once the mouse moves away to use the popover */
+.ironcell.active circle{fill:var(--accent2);stroke:var(--accent2)}
+.ironcell-label{fill:#04101f;font-weight:700;pointer-events:none}
+.ironaxis{fill:var(--muted)}
+/* floating naming popover: JS positions it on the opposite half of the grid from the clicked
+   pad (so the pad stays visible while naming), sized to its own content, and free to render
+   outside the picker modal's box — it isn't a child of it */
+.ironname-panel{position:fixed;z-index:60;width:max-content;max-width:340px;
+  background:var(--panel);border:1px solid var(--accent);border-radius:10px;
+  box-shadow:0 8px 28px rgba(0,0,0,.55);padding:.7rem .8rem}
+.ironname-panel .row{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-bottom:.5rem}
+/* Other's radio + textbox are grouped so they wrap together as one unit if the row runs out of
+   room — the textbox never lands on its own line disconnected from the option it belongs to */
+.ironname-panel .otherwrap{display:flex;align-items:center;gap:.35rem}
+.ironname-panel input[type=text]{width:130px}
+.ironname-panel input[type=text]:disabled{opacity:.45;cursor:not-allowed}
+.ironname-panel .actions{margin-top:.3rem}
 .pmhead{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start}
 #patternSvgWrap{overflow:hidden;background:var(--bg);border:1px solid var(--line);border-radius:8px;margin:.5rem 0}
 #patternSvg{width:100%;height:auto;max-height:58vh;display:block}

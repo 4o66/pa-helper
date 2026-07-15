@@ -100,11 +100,6 @@
       <div id="inProgressList" class="cards"></div>
     </div>
 
-    <details id="ironingRunsWrap" hidden>
-      <summary>Saved ironing tests — reopen to view</summary>
-      <div id="ironingRunsList" class="cards"></div>
-    </details>
-
     <p class="hint">Pick the filament you're calibrating, or add a new one. Filaments work on any printer unless you restrict them. Runs you've started but not finished appear pinned above.</p>
     <div class="filbar">
       <div id="filamentFilters" class="filters"></div>
@@ -123,6 +118,11 @@
       <div id="filamentPrinters" hidden></div>
       <div class="row"><button id="saveFilamentBtn">Save filament</button><button id="cancelFilamentBtn" class="secondary">Cancel</button></div>
     </details>
+    <p class="hint legend-note">
+      <button type="button" class="warn legend-btn">PA</button>
+      <button type="button" class="warn legend-btn">Iron</button>
+      — orange means that test's results are still in progress; once results are entered, the button turns blue.
+    </p>
   </section>
 
   <!-- ============ TAB 3: PA TEST ============ -->
@@ -351,6 +351,16 @@
   </div>
 </div>
 
+<div id="ironInProgressModal" class="modal" hidden>
+  <div class="modal-box plain">
+    <h2>Run in progress</h2>
+    <p class="hint">You have a run in progress. To start a new run, name samples on the open run and save, or delete the in progress run.</p>
+    <div class="actions">
+      <button id="ironInProgressOk">OK</button>
+    </div>
+  </div>
+</div>
+
 <div id="jobGuardModal" class="modal" hidden>
   <div class="modal-box plain">
     <h2>Unsaved PA test</h2>
@@ -381,6 +391,66 @@
       <button id="resultsClose" class="secondary">Close</button>
       <button id="resultsDelete" class="danger iconbtn" title="Delete this run" aria-label="Delete this run"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
     </div>
+  </div>
+</div>
+
+<div id="ironResultsModal" class="modal" hidden>
+  <div class="modal-box plain results-box">
+    <div class="results-head">
+      <div class="results-title">
+        <span id="ironResultsSwatch" class="colorsq tabsw"></span>
+        <div>
+          <h2 id="ironResultsTitle">Saved ironing tests</h2>
+          <p class="hint" id="ironResultsSub"></p>
+        </div>
+      </div>
+      <label id="ironResultsPickWrap" hidden>Run <select id="ironResultsPick"></select></label>
+    </div>
+    <div id="ironResultsBodyView" class="results-body"></div>
+    <div class="actions results-foot">
+      <button id="ironResultsClone">Rerun with these settings</button>
+      <button id="ironResultsClose" class="secondary">Close</button>
+      <button id="ironResultsDelete" class="danger iconbtn" title="Delete this run" aria-label="Delete this run"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<div id="ironPickerModal" class="modal" hidden>
+  <div class="modal-box plain results-box ironpicker-box">
+    <div class="results-head">
+      <div class="results-title">
+        <div>
+          <h2>Name your samples</h2>
+          <p class="hint" id="ironPickerSub"></p>
+        </div>
+      </div>
+    </div>
+    <div class="results-body ironpicker-body">
+      <div id="ironPickerGridWrap" class="ironpicker-gridwrap">
+        <div id="ironPickerGrid" class="ironpicker-grid"></div>
+      </div>
+    </div>
+    <div class="actions results-foot">
+      <button id="ironPickerSave">Save settings</button>
+      <button id="ironPickerClose" class="secondary">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="ironNamePanel" class="ironname-panel" hidden>
+  <p class="hint" id="ironNameCellInfo"></p>
+  <div class="row">
+    <label class="checkline"><input type="radio" name="ironNameChoice" value="Glossy"> Glossy</label>
+    <label class="checkline"><input type="radio" name="ironNameChoice" value="Matte"> Matte</label>
+    <span class="otherwrap">
+      <label class="checkline"><input type="radio" name="ironNameChoice" value="Other"> Other</label>
+      <input type="text" id="ironNameOtherText" maxlength="60" disabled>
+    </span>
+  </div>
+  <div class="actions">
+    <button id="ironNameSave">Save</button>
+    <button id="ironNameRemove" class="secondary" hidden>Remove</button>
+    <button id="ironNameCancel" class="secondary">Cancel</button>
   </div>
 </div>
 
