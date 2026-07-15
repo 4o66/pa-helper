@@ -132,6 +132,7 @@
     { key: "material", label: "Material", kind: "select", options: P.nozzleMaterials, customKey: "nozzleMaterial" }
   ];
   const FILAMENT_FIELDS = [
+    { key: "name", label: "Filament name (optional)", kind: "text", newRow: true, help: "A nickname shown as the card title. Leave blank to use maker + material + colour." },
     { key: "maker", label: "Filament maker", kind: "select", options: P.filamentMakers, customKey: "filamentMaker" },
     { key: "material", label: "Material", kind: "select", options: P.filamentMaterials, customKey: "filamentMaterial" },
     { key: "formulation", label: "Formulation", kind: "select", groups: P.filamentFormulations, customKey: "filamentFormulation", optional: true, default: "Basic", help: "Optional sub-type or product line that isn't its own material — e.g. Matte, Silk, Odorless, High Speed. It's what turns \"ABS\" into \"QIDI Odorless ABS\". Basic = a standard formulation." },
@@ -249,7 +250,7 @@
   // multi-select later is just a UI change — storage/label/filter already cope.
   const formList = (f) => { const v = f && f.formulation; return Array.isArray(v) ? v.filter(Boolean) : (v ? [v] : []); };
   const formText = (f) => formList(f).join(" ");
-  const filamentLabel = (f) => f ? [f.maker, f.material, fiberTag(f), f.hardness, formText(f), f.color].filter(Boolean).join(" ") || "(unnamed filament)" : "?";
+  const filamentLabel = (f) => f ? (f.name || [f.maker, f.material, fiberTag(f), f.hardness, formText(f), f.color].filter(Boolean).join(" ")) || "(unnamed filament)" : "?";
   function updateFilamentConditionals() {
     if (!filamentForm) return;
     const mat = filamentForm.material ? filamentForm.material.get() : "";
@@ -332,6 +333,12 @@
     fav.src = icon;
     return fav;
   }
+  // Icon-only red "Remove" button (trashcan). Meaning is clear from the glyph; keeps card rows compact.
+  const TRASH_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+  function removeButton(onClick) {
+    const b = el("button", "danger iconbtn"); b.type = "button"; b.title = "Remove"; b.setAttribute("aria-label", "Remove");
+    b.innerHTML = TRASH_SVG; b.addEventListener("click", onClick); return b;
+  }
   function renderPrinters() {
     const wrap = $("printerList"); wrap.innerHTML = "";
     if (!data.printers.length) { wrap.innerHTML = '<p class="hint">No printers yet — add one below.</p>'; return; }
@@ -356,8 +363,7 @@
       selBtn.addEventListener("click", () => selectPrinter(p.id));
       const edit = el("button", "secondary"); edit.textContent = "Edit"; edit.addEventListener("click", () => editPrinter(p.id));
       const clone = el("button", "secondary"); clone.textContent = "Clone"; clone.addEventListener("click", () => clonePrinter(p.id));
-      const rm = el("button", "danger"); rm.textContent = "Remove";
-      rm.addEventListener("click", () => removePrinter(p.id));
+      const rm = removeButton(() => removePrinter(p.id));
       actions.append(selBtn, edit, clone, rm); card.append(actions);
       wrap.append(card);
     });
@@ -543,8 +549,7 @@
     selBtn.addEventListener("click", () => selectFilament(f.id));
     const edit = el("button", "secondary"); edit.textContent = "Edit"; edit.addEventListener("click", () => editFilament(f.id));
     const clone = el("button", "secondary"); clone.textContent = "Clone"; clone.addEventListener("click", () => cloneFilament(f.id));
-    const rm = el("button", "danger"); rm.textContent = "Remove";
-    rm.addEventListener("click", () => removeFilament(f.id));
+    const rm = removeButton(() => removeFilament(f.id));
     actions.append(selBtn, edit, clone);
     const rc = data.runs.filter(r => r.filamentId === f.id && r.status === "complete").length;
     if (rc) { const res = el("button"); res.textContent = "Results" + (rc > 1 ? " (" + rc + ")" : ""); res.addEventListener("click", () => openResults(f.id)); actions.append(res); }
@@ -645,6 +650,7 @@
     const f = getFilament(id); if (!f) return;
     const copy = Object.assign({}, f, {
       id: Store.uid(),
+      name: f.name ? f.name + " (copy)" : "",
       color: f.color ? f.color + " (copy)" : "(copy)",
       printers: (f.printers || []).slice(),
       created: new Date().toISOString()
@@ -1509,7 +1515,10 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     .sort((a, b) => String(b.created || b.date || "").localeCompare(String(a.created || a.date || "")));   // newest first
   function openResults(fid) {
     const runs = completedRunsFor(fid); if (!runs.length) return;
-    $("resultsTitle").textContent = "Results — " + filamentLabel(getFilament(fid));
+    const fil = getFilament(fid);
+    $("resultsTitle").textContent = filamentLabel(fil);
+    const sw = $("resultsSwatch"); const fill = fil ? colorFill(fil) : null;   // colour swatch in the title bar
+    if (sw) { sw.style.background = fill || ""; sw.classList.toggle("nocolor", !fill); }
     const pick = $("resultsPick"); pick.innerHTML = "";
     runs.forEach(r => { const o = el("option"); o.value = r.id; o.textContent = printerLabel(getPrinter(r.printerId)) + " · " + r.date; pick.append(o); });
     $("resultsPickWrap").hidden = runs.length < 2;
@@ -1525,8 +1534,8 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const dl = (rows) => '<dl class="results-dl">' + rows.filter(r => r[1] != null && String(r[1]) !== "").map(([k, v, c]) => `<dt>${esc(k)}</dt><dd>${esc(v)}${c != null ? copy(c) : ""}</dd>`).join("") + "</dl>";
     const nz = run.nozzle || (data.lastRunNozzle);
     const bed = p && p.bed ? (p.bed.shape === "round" ? (p.bed.diameter + " mm ø") : (p.bed.x + "×" + p.bed.y + " mm")) : "";
-    const printer = p ? [["Printer", printerLabel(p)], ["Toolhead", p.toolhead], ["Extruder", (p.extruder || "") + (p.drive ? " (" + p.drive + ")" : "")], ["Hotend", p.hotend], ["Nozzle", nz ? nozzleLabel(nz) : ""], ["Bed", bed]] : [["Printer", "(deleted)"]];
-    const fil = f ? [["Filament", filamentLabel(f)], ["Maker", f.maker], ["Material", f.material], ["Formulation", formText(f)], ["Color", f.color], ["Diameter", f.diameter ? f.diameter + " mm" : ""], ["Fiber", fiberTag(f)], ["Hardness", f.hardness]] : [["Filament", "(deleted)"]];
+    const printer = p ? [["Maker", p.maker], ["Model", p.model], ["Toolhead", p.toolhead], ["Extruder", (p.extruder || "") + (p.drive ? " (" + p.drive + ")" : "")], ["Hotend", p.hotend], ["Nozzle", nz ? nozzleLabel(nz) : ""], ["Bed", bed]] : [["Status", "(deleted)"]];
+    const fil = f ? [["Maker", f.maker], ["Material", f.material], ["Formulation", formText(f)], ["Color", f.color], ["Diameter", f.diameter ? f.diameter + " mm" : ""], ["Fiber", fiberTag(f)], ["Hardness", f.hardness]] : [["Status", "(deleted)"]];
     const settings = [
       ["Mode", (run.mode || "advanced") + (run.basicMethod ? " (" + run.basicMethod + ")" : "")],
       ["Date", run.date],
@@ -1540,8 +1549,13 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     if (run.modelText) orca += `<label class="blocklabel">Adaptive PA model — paste into Orca${copy(run.modelText)}</label><pre class="resultblock">${esc(run.modelText)}</pre>`;
     if (run.singlePaText) orca += `<div class="out">${run.singlePaText}</div>`;
     if (!orca) orca = '<p class="hint">No exported values were saved for this run.</p>';
+    // Printer / Filament / Test settings collapse (collapsed by default); Results stays open/static.
+    const sec = (title, body) => `<details class="rsec"><summary>${esc(title)}</summary>${body}</details>`;
     $("resultsBodyView").innerHTML =
-      `<h3>Printer</h3>${dl(printer)}<h3>Filament</h3>${dl(fil)}<h3>Test settings</h3>${dl(settings)}<h3>Results</h3>${orca}`;
+      sec("Printer - " + (p ? printerLabel(p) : "(deleted)"), dl(printer)) +
+      sec("Filament - " + (f ? filamentLabel(f) : "(deleted)"), dl(fil)) +
+      sec("Test settings", dl(settings)) +
+      `<h3 class="rsec-static">Results</h3>${orca}`;
   }
   function closeResults() { $("resultsModal").hidden = true; resultsRunId = null; }
   function cloneFromRun(id) {   // load a saved run's settings into a fresh editable run (a re-run)

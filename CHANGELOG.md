@@ -9,7 +9,19 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
 
 ## [Unreleased]
 
+### Added
+- **Optional filament name** (nickname), like the printer name — shown as the card title / label when set.
+
 ### Changed
+- **Results modal reworked.** Fixed title bar at the top (filament name + colour swatch; the "Results —"
+  prefix is gone) and a fixed button bar at the bottom that stays put while the body scrolls. Printer,
+  Filament and Test-settings are now collapsible sections (collapsed by default, right-side ▶/▼ triangle);
+  the Results section is always open. Section titles read "Printer - [name]" / "Filament - [name]", and the
+  lists now show maker + model / maker + material instead of repeating the name. The run-clone button is
+  "Rerun with these settings"; Close is right-justified. The adaptive-PA export shows as a plain text block
+  (with a copy icon), not an input-style box.
+- **Remove is a red trashcan icon** on printer and filament cards, and **filament cards now have a uniform
+  width** (like printer cards) sized so Select / Edit / Clone / Results / Remove sit on one row.
 - **Results modal tidy-up.** Section heading is now just "Results" (the "paste into Orca" cue already
   sits on the block label right below it), and the adaptive PA model shows as a wrapping text block
   with a copy icon instead of a `<textarea>` — so it no longer gets its own inner scrollbar.
