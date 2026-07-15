@@ -74,6 +74,11 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   regardless of the order you import them.
 
 ### Fixed
+- **Generated picker thumbnail now matches Orca's plate layout.** Orca arranges the pattern objects
+  from the top-right of the bed; our plate-fit grid filled from the top-left, so the little thumbnail
+  was horizontally mirrored versus the real plate (the first block showed top-left instead of
+  top-right). The generated thumbnail now mirrors its columns to match. (Imported-g-code thumbnails
+  were already correct — they use the real positions from the file.)
 - **Pattern number labels now match Orca's rounding.** The picker rendered flow labels with a fixed
   3-decimal format (e.g. `12.86`), but Orca formats them by *significant figures* via
   `convert_number_to_string` — with 4-digit accels the flow prints at 3 sig figs, so `12.86` prints as

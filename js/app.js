@@ -1232,8 +1232,11 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       else { const b = svgEl("rect"); b.setAttribute("x", ox.toFixed(1)); b.setAttribute("y", pad); b.setAttribute("width", bx); b.setAttribute("height", by); b.setAttribute("fill", "none"); b.setAttribute("stroke", pstroke); b.setAttribute("stroke-width", psw); thumb.append(b); }
       plan.items.filter(it => it.plate === p).forEach(it => {
         const on = cur && it === cur;
-        if (!rep) { const r = svgEl("rect"); r.setAttribute("x", (ox + it.x).toFixed(1)); r.setAttribute("y", (pad + it.y).toFixed(1)); r.setAttribute("width", plan.objW.toFixed(1)); r.setAttribute("height", plan.objH.toFixed(1)); r.setAttribute("fill", on ? "var(--accent)" : "#8b97a7"); r.setAttribute("opacity", on ? "1" : "0.3"); thumb.append(r); return; }
-        const X = (x) => (ox + it.x + x - r0x).toFixed(1), Y = (y) => (pad + it.y + y - r0y).toFixed(1);
+        // Orca arranges the pattern objects from the TOP-RIGHT of the bed; our plate-fit grid fills
+        // from the top-left, so mirror the column position horizontally to match the real plate.
+        const mxpos = bx - it.x - plan.objW;
+        if (!rep) { const r = svgEl("rect"); r.setAttribute("x", (ox + mxpos).toFixed(1)); r.setAttribute("y", (pad + it.y).toFixed(1)); r.setAttribute("width", plan.objW.toFixed(1)); r.setAttribute("height", plan.objH.toFixed(1)); r.setAttribute("fill", on ? "var(--accent)" : "#8b97a7"); r.setAttribute("opacity", on ? "1" : "0.3"); thumb.append(r); return; }
+        const X = (x) => (ox + mxpos + x - r0x).toFixed(1), Y = (y) => (pad + it.y + y - r0y).toFixed(1);
         rep.fills.forEach(poly => { const pg = svgEl("polygon"); pg.setAttribute("points", poly.map(pt => X(pt.x) + "," + Y(pt.y)).join(" ")); pg.setAttribute("fill", on ? "var(--accent)" : "#3a4653"); pg.setAttribute("opacity", on ? "0.45" : "0.3"); thumb.append(pg); });
         const draw = (s, col, w) => { const l = svgEl("line"); l.setAttribute("x1", X(s.x1)); l.setAttribute("y1", Y(s.y1)); l.setAttribute("x2", X(s.x2)); l.setAttribute("y2", Y(s.y2)); l.setAttribute("stroke", col); l.setAttribute("stroke-width", w); l.setAttribute("stroke-linecap", "round"); thumb.append(l); };
         (rep.bg || []).forEach(s => draw(s, on ? "var(--accent)" : "#4a5766", on ? 1.1 : 0.7));

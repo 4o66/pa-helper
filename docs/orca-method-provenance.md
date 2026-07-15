@@ -74,3 +74,10 @@ Monthly tripwire: confirm `auto_extrusion_width` still returns `1.125×` for the
 - **Per-block registration square** (~3.4 mm, left-center of the frame): prints in reality but is
   *not* produced by `CalibPressureAdvancePattern`. Its size/offset were **measured** from real Orca
   output. If Orca ever formalizes it, replace the measured value with the real formula.
+- **Multi-object plate arrangement (top-right fill).** When a job spans multiple speed×accel objects,
+  Orca arranges them on the plate itself (its bed-arrange, not the pattern generator). Observed: it
+  fills from the **top-right**. Our plate-fit grid fills top-left, so the *generated* picker thumbnail
+  mirrors columns to match (`renderPlanThumb`, `mxpos = bx − it.x − objW`). This is a **best-effort
+  prediction** of Orca's arrange, not a ported formula. ⚠ Monthly tripwire: if Orca's arrange order/
+  corner changes, the generated thumbnail's block positions stop matching the real plate. (Imported
+  g-code is unaffected — it uses the real positions parsed from the file.)
