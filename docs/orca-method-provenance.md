@@ -74,10 +74,20 @@ Monthly tripwire: confirm `auto_extrusion_width` still returns `1.125×` for the
 - **Per-block registration square** (~3.4 mm, left-center of the frame): prints in reality but is
   *not* produced by `CalibPressureAdvancePattern`. Its size/offset were **measured** from real Orca
   output. If Orca ever formalizes it, replace the measured value with the real formula.
-- **Multi-object plate arrangement (top-right fill).** When a job spans multiple speed×accel objects,
-  Orca arranges them on the plate itself (its bed-arrange, not the pattern generator). Observed: it
-  fills from the **top-right**. Our plate-fit grid fills top-left, so the *generated* picker thumbnail
-  mirrors columns to match (`renderPlanThumb`, `mxpos = bx − it.x − objW`). This is a **best-effort
-  prediction** of Orca's arrange, not a ported formula. ⚠ Monthly tripwire: if Orca's arrange order/
-  corner changes, the generated thumbnail's block positions stop matching the real plate. (Imported
-  g-code is unaffected — it uses the real positions parsed from the file.)
+- **Multi-object plate arrangement = bin-packing, NOT a grid (authoritative).** Source:
+  `src/slic3r/GUI/Plater.cpp` → `Plater::calib_pa` (case `Calib_PA_Pattern`) → `Plater::_calib_pa_pattern`.
+  Orca builds N identical reference rectangles (one cube scaled to `pa_pattern.print_size_x()+4` ×
+  `print_size_y()+4`) and calls **`arrangement::arrange(arranged_items, bedpts, ap)`** — its standard
+  nesting/bin-packing arranger, the same one used by plate auto-arrange. Each object's final position is
+  `cur_plate->get_origin() + {ai.translation(X), ai.translation(Y)} + pa_pattern.handle_pos_offset()`.
+  There is **no starting corner, no row/col spacing constant, and no fill-direction math** — positions
+  are whatever the nester assigns to polygon index `test_idx`.
+  - Combo → index order: `tspd = speeds[test_idx % speeds.size()]`, `tacc = accels[test_idx / speeds.size()]`
+    → **speed is the inner (fast) axis, accel the outer (slow) axis**; the first combo is `speeds[0]×accels[0]`.
+  - Tiles are named `pa_pattern_<int speed>_<int accel>` and carry per-object `outer_wall_speed` /
+    `outer_wall_acceleration` overrides. **Orca identifies a tile by this name/label, not by position.**
+  - ⟹ **We cannot reliably predict exact plate positions for a generated (not-yet-sliced) job** — that
+    would require re-implementing Orca's arranger. The picker must therefore identify blocks by their
+    **printed flow/accel/PA labels** (which we render), not by a synthetic plate map. Imported g-code is
+    fine — it carries the real positions. ⚠ Monthly tripwire: if `_calib_pa_pattern` stops using
+    `arrangement::arrange`, or the `test_idx` speed/accel decomposition flips, revisit this.
