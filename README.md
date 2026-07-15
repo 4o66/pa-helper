@@ -60,6 +60,21 @@ options, your last-used profile, and the full history of runs. You can hand-edit
 version it, or delete it.
 
 ## Roadmap
+- **View / reuse a completed run's data.** From a filament that's done, be able to reopen a past run to
+  see its settings and results — to re-run the same job, or to recover the PA value(s) and re-enter them
+  in Orca after wiping the slicer config. (Read-only history + "clone this run's settings".)
+- **`paRanges` are heuristic, not sourced.** The per-material PA sweep ranges in `js/presets.js`
+  (`paRanges`, e.g. PLA `0.010–0.070`) were hand-picked to bracket typical direct-drive optima, not
+  taken from a dataset. Real run data (e.g. the PLA run: true optima ~0.045–0.065) confirms they're
+  roughly right but should eventually be sourced from OrcaSlicer's own filament-profile default
+  `pressure_advance` values and/or the Phase-B community dataset, then bracketed around those.
+- **Export robustness.** Manual JSON export is easy to get stale/confused: add cross-tab sync (a
+  `storage` event listener so a second tab can't export an old in-memory copy), stamp `exportedAt` in
+  the file, warn in-app when the latest run is newer than the last export, and date the download
+  filename (`pa_data_YYYY-MM-DD.json`). Nudge "Connect file" as the durable option.
+- **Low-accel row is low-value** (from real data): at ~1000 mm/s² the PA test barely discriminates and
+  pins to a range edge. Default sweep should drop or raise the lowest accel, and any result cell that
+  lands on the range start/end should be flagged ("hit the edge — extend the range").
 - **g-code ingest** — first pass done: "Settings I already printed" has an Import .gcode
   button that best-effort-parses PA range, accelerations and speeds from the file's
   commands (heuristic; not a stable Orca format — needs tuning against real files).
