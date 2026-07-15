@@ -739,14 +739,16 @@
   function gateMaxFlow() {
     const gated = $("gatedBody"), btn = $("maxFlowConfirm");
     const mf = num($("maxFlow").value), valid = mf != null && mf > 0;
-    if (viewMode || isBasic()) { if (gated) gated.inert = false; if (btn) btn.hidden = true; return; }
+    if (viewMode || isBasic()) { if (gated) gated.hidden = false; if (btn) btn.hidden = true; return; }
     if (btn) {
       btn.hidden = false;
       btn.disabled = !valid || maxFlowConfirmed;
       btn.textContent = maxFlowConfirmed ? "✓ Confirmed" : "Confirm";
       btn.classList.toggle("confirmed", maxFlowConfirmed);
     }
-    if (gated) gated.inert = !maxFlowConfirmed;
+    // Until the max flow is confirmed, HIDE the rest of the form entirely (not just dim it) so it's
+    // obvious the only thing to do is enter + confirm the volumetric rate.
+    if (gated) gated.hidden = !maxFlowConfirmed;
   }
   // On a fresh printer/nozzle/filament selection: prefill max flow from a prior run for that exact
   // combo (blank if none), and require a fresh Confirm before anything else can be entered.
@@ -1526,11 +1528,9 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("flowPoints").value = 5; $("accelPoints").value = 5;
     accelListAuto = speedListAuto = accelPtsAuto = speedPtsAuto = true;
     switchSubtab("recommend");
-    // Leave the reset tab EDITABLE — don't gate a blank tab (that reads as "everything disabled").
-    // The max-flow gate re-engages when the user enters a max flow or selects a filament for a new test.
-    maxFlowConfirmed = false;
-    if ($("gatedBody")) $("gatedBody").inert = false;
-    const cb = $("maxFlowConfirm"); if (cb) { cb.hidden = false; cb.disabled = true; cb.textContent = "Confirm"; cb.classList.remove("confirmed"); }
+    // Prefill max flow from a prior run for this combo (blank if none); the gate then hides the rest of
+    // the form until it's confirmed. (The whole form being HIDDEN — not disabled — is the clear signal.)
+    resetMaxFlowForCombo();
     clearJobDirty();
   }
   function cloneRun() {   // same settings/grid, fresh blank results, editable — a re-run

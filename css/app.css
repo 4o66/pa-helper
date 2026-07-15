@@ -134,7 +134,6 @@ details[open] summary{margin-bottom:.7rem}
 .viewbar{display:flex;gap:1rem;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--panel2);border:1px solid var(--accent2);border-radius:8px;padding:.5rem .8rem;margin-top:.5rem;font-size:.9rem}
 .viewbar[hidden]{display:none}   /* the display:flex above otherwise overrides the hidden attribute */
 .viewbar .actions{display:flex;gap:.4rem}
-#gatedBody[inert]{opacity:.5}
 #testBody.viewlocked{opacity:.8}
 #maxFlowConfirm.confirmed{background:var(--accent2);border-color:var(--accent2);color:#fff}
 

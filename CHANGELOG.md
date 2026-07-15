@@ -93,8 +93,10 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
 ### Added
 - **Max volumetric speed is now gated (advanced mode).** Max flow is treated as a property of the exact
   printer+nozzle+filament combo: selecting a combo **prefills** it from a prior run for that combo (or
-  **blanks** it if there's none), and the whole test config below stays **locked** until you press
-  **Confirm**. Editing the value re-locks until you re-confirm. Since max flow drives the entire
+  **blanks** it if there's none), and the whole test form below is **hidden** until you press
+  **Confirm** — so it's obvious the only thing to do is enter/confirm the volumetric rate (rather than a
+  dimmed, "why is everything disabled?" state). Editing the value hides it again until you re-confirm.
+  Closing a saved-run view also re-prefills the max flow for the combo. Since max flow drives the entire
   speed↔flow conversion, this stops a stale or blank value from silently poisoning the recommendation.
   Basic mode (which needs no flow) and the read-only run view are never gated.
 - **Read-only view for completed runs.** Opening a saved run from the Completed list now shows it
