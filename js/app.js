@@ -1509,12 +1509,23 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   }
   function exitView() {
     if (!viewMode) return;
-    viewMode = false; setTestReadOnly(false); maxFlowConfirmed = false;
-    currentRunId = null; currentSettings = null; lastFit = null;
-    // fully blank the PA tab so it doesn't reappear as the saved run when reopened
+    viewMode = false; setTestReadOnly(false);
+    resetTestTab();
+  }
+  // Blank the ENTIRE PA-test tab back to a fresh state — results, plot, analysis, the Orca export
+  // boxes, max flow, the basic fields, AND the recommend/provide config (accel/speed lists, point
+  // counts, provided values) plus any imported g-code. Used when leaving a saved-run view so the tab
+  // never reappears as that run.
+  function resetTestTab() {
+    maxFlowConfirmed = false; currentRunId = null; currentSettings = null; lastFit = null;
+    if (gcodeImported) resetGcode();
     loadGrid([]); drawPlot([], null, []); $("analysisOut").innerHTML = ""; $("recommendOut").textContent = "";
     $("modelOut").value = ""; $("singlePaOut").innerHTML = "";
     $("maxFlow").value = ""; $("basicBestPA").value = ""; $("basicNotes").value = "";
+    ["accelList", "speedList", "axisMax", "pvFlows", "pvAccels"].forEach(id => { if ($(id)) $(id).value = ""; });
+    $("flowPoints").value = 5; $("accelPoints").value = 5;
+    accelListAuto = speedListAuto = accelPtsAuto = speedPtsAuto = true;
+    switchSubtab("recommend");
     gateMaxFlow();   // blank max flow ⇒ re-lock the config until it's entered + confirmed
     clearJobDirty();
   }
