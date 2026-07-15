@@ -121,6 +121,11 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   mistaken for the answer. The tooltip says which end to extend and re-test.
 
 ### Fixed
+- **Read-only view bar stayed on screen after closing a run (CSS bug).** The `.viewbar` rule set
+  `display:flex`, which overrode the `hidden` attribute (author styles beat the UA `[hidden]` rule), so
+  the view bar was effectively always visible on the PA tab — making a fresh tab look like the read-only
+  view. Added `.viewbar[hidden]{display:none}` (the same guard `.modal` already had). jsdom doesn't
+  compute CSS display, which is why the smoke tests missed it.
 - **Closing a saved-run view left stale data on the PA tab.** After viewing a run and clicking Close,
   reopening the PA tab still showed that run's data/config. Close now does a **full reset** of the PA
   tab — results, plot, analysis, Orca export box, max flow, basic fields, AND the recommend/provide
