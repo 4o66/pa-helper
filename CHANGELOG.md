@@ -73,13 +73,14 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   chevrons, numbers), and plates are ordered **low → high acceleration** (as Orca lays them out)
   regardless of the order you import them.
 
-### Fixed
-- **Generated picker thumbnail: corrected to "approximate".** An earlier build guessed Orca filled
-  the plate top-right and mirrored the thumbnail to match — that was wrong. OrcaSlicer positions the
-  pattern objects with its **bin-packing arranger** (`arrangement::arrange`, confirmed in
-  `Plater::_calib_pa_pattern`), so exact cell positions can't be predicted for a not-yet-sliced job.
-  The generated thumbnail is now labelled as an approximate plate-count/size aid; blocks are identified
-  by their printed flow/accel labels. (Imported-g-code thumbnails use the real positions and are exact.)
+### Changed
+- **Picker plate thumbnails removed.** OrcaSlicer positions the pattern objects with its **bin-packing
+  arranger** (`arrangement::arrange`, confirmed in `Plater::_calib_pa_pattern` — not a grid), so a
+  block's cell can't be predicted for a not-yet-sliced job, and a position map you can't trust is worse
+  than none. The picker now identifies a block the way Orca intends — by the **flow and acceleration
+  printed on it** — and the header text says so. Multi-plate imports still get a "plate N of M" note in
+  the title (that mapping is reliable, read from the file). This also removes a recurring source of
+  layout bugs.
 - **Pattern number labels now match Orca's rounding.** The picker rendered flow labels with a fixed
   3-decimal format (e.g. `12.86`), but Orca formats them by *significant figures* via
   `convert_number_to_string` — with 4-digit accels the flow prints at 3 sig figs, so `12.86` prints as

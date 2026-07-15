@@ -1153,7 +1153,6 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const accel = +tr.querySelector('input[data-key="accel"]').value;
     const speed = tr.dataset.speed != null ? +tr.dataset.speed : NaN;
     const block = (gcodeBlocks && gcodeBlocks.byKey && isFinite(accel) && isFinite(speed)) ? gcodeBlocks.byKey[accel + "|" + speed] : null;
-    $("patternThumb").innerHTML = "";
     if (block) { renderRealPattern(tr, block, accel, speed); }
     else {
       const synth = synthPatternBlock(tr);
@@ -1162,96 +1161,22 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     }
     $("patternModal").hidden = false;
   }
-  // Imported-plate thumbnail: every imported plate side by side, the current block + its plate
-  // highlighted (Y-flipped so it reads like the bed top-down).
-  function renderThumb(curKey) {
-    const thumb = $("patternThumb"); if (!thumb) return;
-    while (thumb.firstChild) thumb.removeChild(thumb.firstChild);
+  // Which imported plate holds this block (plates ordered low → high accel, as Orca prints them).
+  // Used only to annotate the picker title for a multi-plate import — no plate thumbnail is drawn,
+  // because Orca positions the tiles with its bin-packing arranger and we can't predict exact cells.
+  function importedPlateLabel(curKey) {
     const raw = gcodeBlocks && gcodeBlocks.plates;
-    thumb.style.display = (raw && raw.length) ? "" : "none";
-    if (!raw || !raw.length) return;
-    // Order plates low → high accel (as Orca lays them out), regardless of import order.
+    if (!raw || raw.length < 2) return "";
     const minAcc = (pl) => Math.min.apply(null, pl.items.map(it => +it.key.split("|")[0]));
     const plates = raw.slice().sort((a, b) => minAcc(a) - minAcc(b));
-    let curPlate = -1; plates.forEach((pl, i) => { if (pl.items.some(it => it.key === curKey)) curPlate = i; });
-    // Draw the FULL bed (with objects at their real bed positions) when the bed is known; else fall
-    // back to the printed extents.
-    const printer = getPrinter(data.lastPrinterId), bed = printer && printer.bed;
-    const round = bed && bed.shape === "round";
-    const bx = bed ? (round ? bed.diameter : bed.x) : 0, by = bed ? (round ? bed.diameter : bed.y) : 0;
-    const fullBed = !!(bed && bx > 0 && by > 0);
-    const oxOff = (bed && bed.origin === "center") ? bx / 2 : 0, oyOff = (bed && bed.origin === "center") ? by / 2 : 0;
-    const dims = plates.map(pl => { if (fullBed) return { w: bx, h: by }; const [mnx, mny, mxx, mxy] = pl.box; return { w: mxx - mnx, h: mxy - mny, mnx, mny, mxy }; });
-    const maxH = Math.max.apply(null, dims.map(d => d.h)), pad = 3, gapP = Math.max(6, (fullBed ? bx : dims[0].w) * 0.08);
-    let x = pad; const px = dims.map(d => { const at = x; x += d.w + gapP; return at; });
-    thumb.setAttribute("viewBox", `0 0 ${(x - gapP + pad).toFixed(1)} ${(maxH + 2 * pad).toFixed(1)}`);
-    plates.forEach((pl, i) => {
-      const d = dims[i], ox = px[i], on = i === curPlate, stroke = on ? "var(--accent2)" : "#8b97a7", sw = on ? 2 : 1.2;
-      if (fullBed && round) { const c = svgEl("circle"); c.setAttribute("cx", (ox + bx / 2).toFixed(1)); c.setAttribute("cy", (pad + by / 2).toFixed(1)); c.setAttribute("r", (bx / 2).toFixed(1)); c.setAttribute("fill", "none"); c.setAttribute("stroke", stroke); c.setAttribute("stroke-width", sw); thumb.append(c); }
-      else { const bg = svgEl("rect"); bg.setAttribute("x", ox.toFixed(1)); bg.setAttribute("y", pad); bg.setAttribute("width", d.w.toFixed(1)); bg.setAttribute("height", d.h.toFixed(1)); bg.setAttribute("fill", "none"); bg.setAttribute("stroke", stroke); bg.setAttribute("stroke-width", sw); thumb.append(bg); }
-      // draw each object's actual first-layer toolpath (frame + tab, chevrons, digits)
-      const tx = (x) => (fullBed ? (ox + x + oxOff) : (ox + x - d.mnx)).toFixed(1);
-      const ty = (y) => (fullBed ? (pad + by - (y + oyOff)) : (pad + d.mxy - y)).toFixed(1);
-      pl.items.forEach(it => {
-        const blk = gcodeBlocks.byKey[it.key]; if (!blk) return;
-        const cur = it.key === curKey;
-        const draw = (seg, col, w) => { const l = svgEl("line"); l.setAttribute("x1", tx(seg.x1)); l.setAttribute("y1", ty(seg.y1)); l.setAttribute("x2", tx(seg.x2)); l.setAttribute("y2", ty(seg.y2)); l.setAttribute("stroke", col); l.setAttribute("stroke-width", w); l.setAttribute("stroke-linecap", "round"); thumb.append(l); };
-        (blk.bg || []).forEach(s => draw(s, cur ? "var(--accent)" : "#4a5766", cur ? 1.1 : 0.7));
-        for (const pa in blk.byPa) blk.byPa[pa].forEach(s => draw(s, cur ? "var(--accent)" : "#9aa0a6", cur ? 0.9 : 0.55));
-        (blk.text || []).forEach(s => draw(s, cur ? "var(--ink)" : "#7a8695", 0.5));
-      });
-    });
-    if (curPlate >= 0 && plates.length > 1) $("patternTitle").textContent += `  ·  plate ${curPlate + 1} of ${plates.length}`;
-  }
-  // Plate thumbnail for a GENERATED test (no imported plate): from the plate-fit plan, draw the
-  // objects on the current row's plate, current one highlighted, and label "plate N of M".
-  function renderPlanThumb(tr) {
-    const thumb = $("patternThumb"); if (!thumb) return;
-    while (thumb.firstChild) thumb.removeChild(thumb.firstChild);
-    const plan = currentSettings && currentSettings.plan;
-    const printer = getPrinter(data.lastPrinterId), bed = printer && printer.bed;
-    if (!plan || !plan.fits || !bed) { thumb.style.display = "none"; return; }
-    thumb.style.display = "";
-    const flow = num(tr.querySelector('input[data-key="flow"]').value);
-    const accel = num(tr.querySelector('input[data-key="accel"]').value);
-    const cur = plan.items.find(it => it.combo.accel === accel && (flow == null || Math.abs(it.combo.flow - flow) < 0.6));
-    const curPlate = cur ? cur.plate : 0;
-    const round = bed.shape === "round";
-    const bx = round ? (bed.diameter || 0) : (bed.x || 0);
-    const by = round ? (bed.diameter || 0) : (bed.y || 0);
-    const nP = Math.max(1, plan.plates), pad = 4, gapP = Math.max(6, bx * 0.1);
-    const totalW = nP * bx + (nP - 1) * gapP;
-    thumb.setAttribute("viewBox", `0 0 ${(totalW + 2 * pad).toFixed(1)} ${(by + 2 * pad).toFixed(1)}`);
-    // One representative generated block — the chevron geometry is identical across combos, so we
-    // build it once and stamp it at each object's position (cheap), drawn as the real pattern.
-    const rep = (window.PAPattern && currentSettings) ? window.PAPattern.synthBlock({ paStart: currentSettings.paStart, paEnd: currentSettings.paEnd, paStep: currentSettings.paStep, lineWidth: num(currentSettings.lineW), layerHeight: num(currentSettings.layerH), wallLoops: 3 }) : null;
-    const r0x = rep ? rep.rbox[0] : 0, r0y = rep ? rep.rbox[1] : 0;
-    for (let p = 0; p < nP; p++) {
-      const ox = pad + p * (bx + gapP), pstroke = p === curPlate ? "var(--accent2)" : "#8b97a7", psw = p === curPlate ? 2.5 : 1.5;
-      if (round) { const c = svgEl("circle"); c.setAttribute("cx", (ox + bx / 2).toFixed(1)); c.setAttribute("cy", (pad + by / 2).toFixed(1)); c.setAttribute("r", (bx / 2).toFixed(1)); c.setAttribute("fill", "none"); c.setAttribute("stroke", pstroke); c.setAttribute("stroke-width", psw); thumb.append(c); }
-      else { const b = svgEl("rect"); b.setAttribute("x", ox.toFixed(1)); b.setAttribute("y", pad); b.setAttribute("width", bx); b.setAttribute("height", by); b.setAttribute("fill", "none"); b.setAttribute("stroke", pstroke); b.setAttribute("stroke-width", psw); thumb.append(b); }
-      plan.items.filter(it => it.plate === p).forEach(it => {
-        const on = cur && it === cur;
-        // NOTE: Orca positions these objects with its bin-packing arranger (arrangement::arrange),
-        // not a grid — so an exact cell can't be predicted for a not-yet-sliced job. This layout is
-        // an APPROXIMATE plate-count/size aid; blocks are identified by their printed flow/accel labels.
-        if (!rep) { const r = svgEl("rect"); r.setAttribute("x", (ox + it.x).toFixed(1)); r.setAttribute("y", (pad + it.y).toFixed(1)); r.setAttribute("width", plan.objW.toFixed(1)); r.setAttribute("height", plan.objH.toFixed(1)); r.setAttribute("fill", on ? "var(--accent)" : "#8b97a7"); r.setAttribute("opacity", on ? "1" : "0.3"); thumb.append(r); return; }
-        const X = (x) => (ox + it.x + x - r0x).toFixed(1), Y = (y) => (pad + it.y + y - r0y).toFixed(1);
-        rep.fills.forEach(poly => { const pg = svgEl("polygon"); pg.setAttribute("points", poly.map(pt => X(pt.x) + "," + Y(pt.y)).join(" ")); pg.setAttribute("fill", on ? "var(--accent)" : "#3a4653"); pg.setAttribute("opacity", on ? "0.45" : "0.3"); thumb.append(pg); });
-        const draw = (s, col, w) => { const l = svgEl("line"); l.setAttribute("x1", X(s.x1)); l.setAttribute("y1", Y(s.y1)); l.setAttribute("x2", X(s.x2)); l.setAttribute("y2", Y(s.y2)); l.setAttribute("stroke", col); l.setAttribute("stroke-width", w); l.setAttribute("stroke-linecap", "round"); thumb.append(l); };
-        (rep.bg || []).forEach(s => draw(s, on ? "var(--accent)" : "#4a5766", on ? 1.1 : 0.7));
-        for (const pa in rep.byPa) rep.byPa[pa].forEach(s => draw(s, on ? "var(--accent)" : "#9aa0a6", on ? 0.9 : 0.55));
-        (rep.text || []).forEach(s => draw(s, on ? "var(--ink)" : "#6a7684", 0.5));
-      });
-    }
-    if (plan.plates > 0) $("patternTitle").textContent += `  ·  plate ${curPlate + 1} of ${plan.plates}`;
+    let idx = -1; plates.forEach((pl, i) => { if (pl.items.some(it => it.key === curKey)) idx = i; });
+    return idx >= 0 ? `  ·  plate ${idx + 1} of ${plates.length}` : "";
   }
   function renderRealPattern(tr, block, accel, speed) {
     const flow = tr.querySelector('input[data-key="flow"]').value;
     const cur = num(tr.querySelector('input[data-key="bestPA"]').value);
     $("patternTitle").textContent = `Pick the best line — flow ${flow || "?"} mm³/s @ ${accel} mm/s² (${speed} mm/s)`;
-    if (gcodeBlocks && gcodeBlocks.plates) renderThumb(accel + "|" + speed);   // imported plate(s)
-    else renderPlanThumb(tr);                                                  // generated test → plate-fit plan
+    if (gcodeBlocks && gcodeBlocks.plates) $("patternTitle").textContent += importedPlateLabel(accel + "|" + speed);
     const svg = $("patternSvg"); while (svg.firstChild) svg.removeChild(svg.firstChild);
     const [minx, miny, maxx, maxy] = block.rbox, pad = 2, UW = maxx - minx, VH = maxy - miny;
     svg.setAttribute("viewBox", `0 0 ${(VH + 2 * pad).toFixed(1)} ${(UW + 2 * pad).toFixed(1)}`);
@@ -1288,7 +1213,6 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const accel = tr.querySelector('input[data-key="accel"]').value, flow = tr.querySelector('input[data-key="flow"]').value;
     const cur = num(tr.querySelector('input[data-key="bestPA"]').value);
     $("patternTitle").textContent = `Pick the best line — flow ${flow || "?"} mm³/s @ ${accel || "?"} mm/s²  (approximate pattern — import the printed g-code for the exact one)`;
-    $("patternThumb").innerHTML = "";
     const svg = $("patternSvg"); while (svg.firstChild) svg.removeChild(svg.firstChild);
     const N = vals.length, pad = 10, chW = 300, barW = 92, rowStep = 20, amp = 30, topCh = pad + amp + 8, footH = 40;
     const H = topCh + (N - 1) * rowStep + amp + pad + footH;

@@ -169,7 +169,6 @@ footer a{color:var(--accent)}
 .modal-box.plain h3{color:var(--accent)}
 .modal-box.wide{max-width:min(900px,95vw);width:100%}
 .pmhead{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start}
-#patternThumb{flex:0 0 auto;width:130px;height:auto;max-height:110px;background:var(--bg);border:1px solid var(--line);border-radius:6px}
 #patternSvgWrap{overflow:hidden;background:var(--bg);border:1px solid var(--line);border-radius:8px;margin:.5rem 0}
 #patternSvg{width:100%;height:auto;max-height:58vh;display:block}
 .paline{cursor:pointer}
