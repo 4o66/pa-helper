@@ -653,6 +653,7 @@
   const isBasic = () => $("testMode").value === "basic";
   const unitIsSpeed = () => $("unitMode").value === "speed";
   const accelPtsN = () => Math.max(1, Math.round(num($("accelPoints").value) || 5));
+  const accelFloor = () => (P.adaptive && P.adaptive.accelFloor) || 1000;   // lowest accel worth auto-testing
   const speedPtsN = () => Math.max(2, Math.round(num($("flowPoints").value) || 5));
   // Smart default point counts: sample density tracks the span each axis sweeps, because a
   // narrower range holds less curve to characterize. Heuristic, not hard data; floored at 2.
@@ -697,7 +698,7 @@
     // Smart default: fewer accel points for a narrow accel range (unless the user set the count).
     if (accelPtsAuto) $("accelPoints").value = suggestAccelPts(mx);
     // Re-scale the suggested accel sweep to THIS printer's max (unless the user typed their own).
-    if (accelListAuto) $("accelList").value = logAccels(1000, mx, accelPtsN()).join(", ");
+    if (accelListAuto) $("accelList").value = logAccels(accelFloor(),mx, accelPtsN()).join(", ");
     ctx.innerHTML = `<b>${printerLabel(p)}</b>${inst}<br><span class="muted">${p.toolhead || "—"} · ${p.extruder || "—"} (${p.drive || "?"}) · ${p.hotend || "—"} · max accel ${mx} mm/s²</span><br>Nozzle: <b>${nozzleLabel(n)}</b><br>Filament: <b>${filamentLabel(f)}</b>`;
     $("testBody").hidden = false;
     // Max volumetric speed comes from a separate flow-rate calibration; pre-fill from the
@@ -770,7 +771,7 @@ Run Orca's Pressure Advance ${method} test with that range, then read the single
     let accelMax = num($("accelLimit").value);
     if (!accelMax || accelMax < 500) { accelMax = 12000; $("accelLimit").value = accelMax; }   // guard: accel, not PA
     let accels = parseList($("accelList").value).filter(a => a >= 100);                          // drop stray PA-scale values
-    if (!accels.length) accels = logAccels(1000, accelMax, accelPtsN());
+    if (!accels.length) accels = logAccels(accelFloor(),accelMax, accelPtsN());
     $("accelList").value = accels.join(", ");
     const cf = convFactor();
     // Speed axis: use the (editable) value list if present, else auto-space min → max flow.
@@ -1102,6 +1103,20 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const patBtn = el("button", "secondary iconbtn"); patBtn.type = "button"; patBtn.textContent = "▤";
     patBtn.title = "Pick best PA from the printed pattern"; patBtn.addEventListener("click", () => openPattern(tr));
     cells[2].append(patBtn);
+    // range-edge warning: if the chosen PA sits on the tested range's floor/ceiling, the true
+    // optimum probably lies beyond the range — flag it so an edge value isn't mistaken for an answer.
+    const edge = el("span", "edgewarn"); edge.textContent = "⚠"; edge.hidden = true; cells[2].append(edge);
+    const checkEdge = () => {
+      const v = num(inputs.bestPA.value), s = currentSettings || {};
+      const lo = num(s.paStart), hi = num(s.paEnd), tol = (num(s.paStep) || 0.005) / 2;
+      const atHi = v != null && hi != null && Math.abs(v - hi) <= tol;
+      const atLo = v != null && lo != null && Math.abs(v - lo) <= tol;
+      edge.hidden = !(atHi || atLo);
+      edge.title = atHi
+        ? `Best PA is at the top of the tested range (${hi}). The real optimum may be higher — raise End PA and re-test.`
+        : `Best PA is at the bottom of the tested range (${lo}). The real optimum may be lower — lower Start PA and re-test.`;
+    };
+    inputs.bestPA.addEventListener("input", checkEdge); checkEdge();
     const tdDel = el("td"); const del = el("button", "secondary"); del.textContent = "✕"; del.style.padding = ".2rem .5rem";
     del.addEventListener("click", () => tr.remove()); tdDel.append(del);
     tr.append(tdOv, ...cells, tdDel); $("resultsBody").append(tr);
@@ -1433,7 +1448,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     if (!$("pvStart").value) $("pvStart").value = +start.toFixed(3);
     if (!$("pvEnd").value) $("pvEnd").value = +end.toFixed(3);
     if (!$("pvStep").value) $("pvStep").value = +step.toFixed(3);
-    if (!$("pvAccels").value) $("pvAccels").value = ($("accelList").value || logAccels(1000, num($("accelLimit").value) || 12000, 5).join(", "));
+    if (!$("pvAccels").value) $("pvAccels").value = ($("accelList").value || logAccels(accelFloor(),num($("accelLimit").value) || 12000, 5).join(", "));
   }
 
   function rebuildForms() {
@@ -1521,7 +1536,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     });
     // "Accel points" drives how many accel values we auto-space from 1000 → printer max.
     // Regenerate live (input) as you bump the field, and clamp on change/blur.
-    const regenAccels = () => { accelListAuto = true; $("accelList").value = logAccels(1000, num($("accelLimit").value) || 12000, accelPtsN()).join(", "); };
+    const regenAccels = () => { accelListAuto = true; $("accelList").value = logAccels(accelFloor(),num($("accelLimit").value) || 12000, accelPtsN()).join(", "); };
     $("accelPoints").addEventListener("input", () => { accelPtsAuto = false; regenAccels(); });   // user owns the count now
     $("accelPoints").addEventListener("change", () => { accelPtsAuto = false; $("accelPoints").value = accelPtsN(); regenAccels(); });
     $("recommendOut").addEventListener("click", (e) => {
@@ -1585,7 +1600,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("copyModelBtn").addEventListener("click", () => { navigator.clipboard && navigator.clipboard.writeText($("modelOut").value); });
     $("saveRunBtn").addEventListener("click", saveRun);
 
-    $("patternOk").addEventListener("click", () => { if (patternTr && patternSel != null) { const inp = patternTr.querySelector('input[data-key="bestPA"]'); inp.value = patternSel; } $("patternModal").hidden = true; });
+    $("patternOk").addEventListener("click", () => { if (patternTr && patternSel != null) { const inp = patternTr.querySelector('input[data-key="bestPA"]'); inp.value = patternSel; inp.dispatchEvent(new window.Event("input", { bubbles: true })); } $("patternModal").hidden = true; });
     $("patternCancel").addEventListener("click", () => { $("patternModal").hidden = true; });
     $("patternModal").addEventListener("click", (e) => { if (e.target === $("patternModal")) $("patternModal").hidden = true; });
     $("debugClearBtn").addEventListener("click", () => { $("debugModal").hidden = false; });

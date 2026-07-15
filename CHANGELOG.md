@@ -73,6 +73,17 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   chevrons, numbers), and plates are ordered **low → high acceleration** (as Orca lays them out)
   regardless of the order you import them.
 
+### Changed
+- **Default accel sweep now floors at ~2000, not 1000.** Real PLA runs showed the ~1000 mm/s² row
+  barely discriminates — the corner velocity change is too gentle to build pressure, so every PA looks
+  clean and the "best" just pins to a range edge. The auto sweep starts at `adaptive.accelFloor` (2000)
+  instead, saving plastic and time. Low values are still allowed if you type them into the accel list.
+
+### Added
+- **Range-edge warning on results.** If a row's Best PA lands on the tested range's floor or ceiling, a
+  ⚠ appears in the cell — the true optimum probably lies beyond the range, so an edge value shouldn't be
+  mistaken for the answer. The tooltip says which end to extend and re-test.
+
 ### Fixed
 - **Saving a second planned job could delete the first (data loss).** After you saved a job for later,
   `currentRunId` still pointed at it; setting up a *different* printer/filament job and saving reused that

@@ -103,7 +103,12 @@ window.PA_PRESETS = {
   adaptive: {
     minFlow: 3,          // mm^3/s — lowest test flow
     flowPoints: 5,       // number of flow steps from minFlow up to the printer's max
-    accelFractions: [0.4, 1.0]   // test accels = these fractions of the accel ceiling
+    accelFractions: [0.4, 1.0],  // test accels = these fractions of the accel ceiling
+    // Lowest acceleration worth testing. Below this the PA pattern barely discriminates — the
+    // velocity change through corners is too gentle to build much pressure, so every PA value looks
+    // clean and the "best" just pins to a range edge (observed on real PLA runs). Start the auto
+    // sweep here instead of 1000. Editable in the accel list if a user really wants a low value.
+    accelFloor: 2000
   },
 
   // Orca's own suggested acceleration sweep for adaptive PA
