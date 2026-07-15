@@ -321,10 +321,16 @@
     if (!data.printers.length) { wrap.innerHTML = '<p class="hint">No printers yet — add one below.</p>'; return; }
     data.printers.forEach(p => {
       const card = el("div", "card" + (p.id === data.lastPrinterId ? " selected" : ""));
-      const title = el("div", "title");
-      const fav = makerFavicon(p.maker); if (fav) title.append(fav);
-      title.append(document.createTextNode(printerLabel(p)));
-      card.append(title);
+      // Header: maker icon on the left (vertically centred across the two text lines),
+      // printer name on top, its default/selected nozzle underneath.
+      const head = el("div", "phead");
+      const fav = makerFavicon(p.maker); if (fav) head.append(fav);
+      const htext = el("div", "headtext");
+      const title = el("div", "title"); title.textContent = printerLabel(p); htext.append(title);
+      const nz = primaryNozzle(p);
+      const nzline = el("div", "subline"); nzline.textContent = nz ? nozzleLabel(nz) : "No nozzle";
+      htext.append(nzline);
+      head.append(htext); card.append(head);
       const meta = el("div", "meta");
       meta.innerHTML = `${p.toolhead || "—"} · ${p.extruder || "—"} (${p.drive || "?"}) · ${p.hotend || "—"}`;
       card.append(meta);
@@ -416,6 +422,12 @@
   // ---- nozzles (per printer) ----
   const nozzleLabel = (n) => n ? [n.maker, n.model, (n.diameter != null && n.diameter !== "" ? n.diameter + "mm" : ""), n.material].filter(Boolean).join(" ") || "(nozzle)" : "?";
   const getSelectedNozzle = () => { const p = getPrinter(data.lastPrinterId); if (!p || !p.nozzles) return null; return p.nozzles.find(n => n.id === data.lastNozzleId) || p.nozzles[0] || null; };
+  // Nozzle to show on a printer card: the selected one for the selected printer, else its first (default).
+  function primaryNozzle(p) {
+    if (!p || !p.nozzles || !p.nozzles.length) return null;
+    if (p.id === data.lastPrinterId) { const sel = p.nozzles.find(n => n.id === data.lastNozzleId); if (sel) return sel; }
+    return p.nozzles[0];
+  }
   // Every new printer auto-seeds ONE default nozzle so there's something to select — a universal
   // Generic 0.4 mm Brass. After save the user is prompted to keep it or replace it (savePrinter).
   function seedNozzle() {
@@ -537,10 +549,23 @@
   function pinIcon() { const s = el("span", "pin-ic"); s.textContent = "📌"; s.title = "Restricted to specific printer(s)"; return s; }
   function filMeta(f) { const done = data.runs.filter(r => r.filamentId === f.id && r.status === "complete").length; return `${f.diameter || "?"} mm · ${done} completed run${done === 1 ? "" : "s"}`; }
 
+  // Card label split over two lines: maker + material on top, characteristics + colour beneath.
+  const filLine1 = (f) => [f.maker, f.material].filter(Boolean).join(" ") || "(unnamed filament)";
+  const filLine2 = (f) => [fiberTag(f), f.hardness, formText(f), f.color].filter(Boolean).join(" ");
+  function colorSquare(f) {
+    const sq = el("div", "colorsq"); const fill = colorFill(f);
+    if (fill) sq.style.background = fill; else sq.classList.add("nocolor");
+    return sq;
+  }
   function filamentCard(f) {
     const card = el("div", "card fcard" + (f.id === data.lastFilamentId ? " selected" : ""));
-    const band = el("div", "colorband"); const fill = colorFill(f); if (fill) band.style.background = fill; else band.classList.add("nocolor"); card.append(band);
-    const title = el("div", "title"); title.textContent = filamentLabel(f); if (isRestricted(f)) title.prepend(pinIcon()); card.append(title);
+    // Header: square colour swatch on the left (solid or gradient, same as the old band),
+    // vertically centred across the two text lines.
+    const head = el("div", "phead"); head.append(colorSquare(f));
+    const htext = el("div", "headtext");
+    const title = el("div", "title"); title.textContent = filLine1(f); if (isRestricted(f)) title.prepend(pinIcon()); htext.append(title);
+    const l2 = filLine2(f); const sub = el("div", "subline"); sub.textContent = l2 || "—"; htext.append(sub);
+    head.append(htext); card.append(head);
     const meta = el("div", "meta"); meta.textContent = filMeta(f); card.append(meta);
     card.append(filActions(f)); return card;
   }

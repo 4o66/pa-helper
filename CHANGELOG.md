@@ -10,6 +10,11 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
 ## [Unreleased]
 
 ### Changed
+- **Printer & filament cards restacked with a leading icon.** Printer cards now show the maker
+  favicon on the left, vertically centred, with the printer name on top and its default/selected
+  nozzle on the line below. Filament cards mirror this: a square colour swatch on the left (solid or
+  gradient, same fill as the old top band), maker + material on the first line, and characteristics
+  + colour on the second.
 - **Saved runs are now a per-filament "Results" modal** (replaces the global "Completed runs" list and
   the read-only PA-tab view). Each filament card/row with completed runs gets a **Results** button
   (count badge when >1). It opens a large modal over a dimmed backdrop showing the full **printer** and
