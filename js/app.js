@@ -1511,8 +1511,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   function savePlanned() {
     if (!data.lastPrinterId || !getSelectedNozzle() || !data.lastFilamentId) { alert("Select a printer, nozzle and filament first."); return; }
     const run = collectRun("planned"); currentRunId = run.id; upsertRun(run); cacheBlocksFor(run.id); persist(); renderInProgress(); renderFilaments(); clearJobDirty();
-    alert("Saved as a planned run. Print it, then reopen PA-Helper → Filament tab → Resume to enter results.");
-    switchTab("filaments");   // back to the filament page…
+    switchTab("filaments");   // back to the filament page (the run shows pinned there — no popup needed)…
     resetTestTab();           // …and leave the PA tab fresh for the next run
   }
   function saveRun() {

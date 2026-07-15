@@ -15,7 +15,8 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   switches back to the Filament tab (where the run now appears under its filament).
 - **Saving a planned run returns to the Filament page and resets the PA tab** — after "Save as
   planned run" the app goes back to the Filament tab and blanks the PA test tab (empty grid,
-  cleared analysis/export, re-gated max flow) so the next run starts fresh.
+  cleared analysis/export, re-gated max flow) so the next run starts fresh — no confirmation popup
+  (the run is visible pinned under its filament).
 
 ## [0.2.27] "Grimoire" — 2026-07-15
 First tagged release. Everything up to this point, headlined by saved runs & the Results view.
