@@ -1452,15 +1452,19 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     if (accelSet.length > 1) accelSet.forEach((a, i) => { const ly = m.t + 4 + i * 15; const sw = svgEl("rect"); sw.setAttribute("x", W - m.r - 96); sw.setAttribute("y", ly - 8); sw.setAttribute("width", 10); sw.setAttribute("height", 10); sw.setAttribute("fill", colorOf(a)); svg.append(sw); text(W - m.r - 82, ly + 1, a + " mm/s²", "start"); });
   }
 
+  // The Adaptive-PA model box (label + textarea + copy) only appears once there's something to show,
+  // so an un-generated Export section is just the Generate button.
+  function syncModelBlock() { const mb = $("modelBlock"); if (mb) mb.hidden = !($("modelOut").value || "").trim(); }
   function exportModel() {
     if (isBasic()) {
       const pa = num($("basicBestPA").value);
       $("singlePaOut").innerHTML = pa != null ? 'Set this PA value in Orca: <b>' + pa + '</b>' : "Enter your best PA above.";
-      $("modelOut").value = ""; return;
+      $("modelOut").value = ""; syncModelBlock(); return;
     }
     const rows = readResults().filter(r => r.x != null && r.bestPA != null).sort((a, b) => (a.x - b.x) || ((a.accel || 0) - (b.accel || 0)));
-    if (!rows.length) { $("modelOut").value = ""; $("singlePaOut").textContent = "Enter some results first."; return; }
+    if (!rows.length) { $("modelOut").value = ""; syncModelBlock(); $("singlePaOut").textContent = "Enter some results first."; return; }
     $("modelOut").value = rows.map(r => `${r.bestPA}, ${r.x.toFixed(2)}, ${r.accel != null ? r.accel : ""}`).join("\n");
+    syncModelBlock();
     const ys = rows.map(r => r.bestPA).slice().sort((a, b) => a - b), median = ys[Math.floor(ys.length / 2)];
     let single = median;
     if (lastFit) { const midX = (Math.min(...rows.map(r => r.x)) + Math.max(...rows.map(r => r.x))) / 2; const accs = rows.map(r => r.accel).filter(a => a != null).sort((a, b) => a - b); const midA = accs.length ? accs[Math.floor(accs.length / 2)] : 0; single = lastFit.type === "mlr" ? lastFit.predict(midX, midA) : lastFit.predict(midX); }
@@ -1565,9 +1569,13 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     [...$("resultsBody").querySelectorAll("tr")].forEach(tr => {
       const b = tr.querySelector('input[data-key="bestPA"]'); if (b) b.value = "";
       const n = tr.querySelector('input[data-key="notes"]'); if (n) n.value = "";
+      // blanking a value doesn't fire the input handlers, so clear the stale flags by hand
+      tr.classList.remove("outlier");
+      const ew = tr.querySelector(".edgewarn"); if (ew) ew.hidden = true;
+      const ow = tr.querySelector(".outlierwarn"); if (ow) ow.hidden = true;
     });
     if ($("basicBestPA")) { $("basicBestPA").value = ""; $("basicNotes").value = ""; }
-    drawPlot([], null, []); $("analysisOut").innerHTML = ""; $("modelOut").value = ""; $("singlePaOut").innerHTML = ""; lastFit = null;
+    drawPlot([], null, []); $("analysisOut").innerHTML = ""; $("modelOut").value = ""; $("singlePaOut").innerHTML = ""; lastFit = null; syncModelBlock();
     $("recommendOut").textContent = "Cloned from a saved run — same settings, blank results. Re-print, enter the best PA per row, then Save.";
     markJobDirty();
   }
@@ -1595,7 +1603,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     if (r.layerH != null) $("layerH").value = r.layerH;
     if (r.lineW != null) $("lineW").value = r.lineW;
     if (r.maxFlow != null) $("maxFlow").value = r.maxFlow;
-    $("modelOut").value = r.modelText || "";                      // restore the stored Orca export text
+    $("modelOut").value = r.modelText || ""; syncModelBlock();     // restore the stored Orca export text
     $("singlePaOut").innerHTML = r.singlePaText || "";
     currentSettings = r.settings || null;
     updateUnitUI();

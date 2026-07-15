@@ -158,6 +158,8 @@ tr.group-start td{border-top:2px solid var(--accent)}
   font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.82rem;white-space:pre-wrap;margin:.5rem 0}
 pre.out{margin:.5rem 0}
 #plot{width:100%;height:auto;background:var(--panel2);border:1px solid var(--line);border-radius:8px;margin:.6rem 0}
+/* before any work is done, don't show empty output boxes — just the button */
+.out:empty,#plot:empty{display:none}
 .copybtn{background:transparent;border:0;cursor:pointer;color:var(--accent);font-size:1rem;padding:0 .2rem;position:relative;font-family:inherit}
 .copybtn:hover{filter:brightness(1.25)}
 .copybtn.copied::after{content:"copied to clipboard";position:absolute;left:100%;top:50%;transform:translateY(-50%);
@@ -190,7 +192,9 @@ footer a{color:var(--accent)}
 .results-head{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;flex-wrap:wrap;
   flex:0 0 auto;padding:1rem 1.3rem .7rem;border-bottom:1px solid var(--line);background:var(--panel)}
 .results-title{display:flex;align-items:center;gap:.6rem;min-width:0}
-.results-title h2{margin:0}
+.results-title>div{display:flex;flex-direction:column;justify-content:center}
+.results-title h2{margin:0;line-height:1.2}
+#resultsSub:empty{display:none}
 .results-head .colorsq{width:26px;height:26px;border-radius:5px;border:1px solid var(--line);flex:0 0 auto}
 .results-body{flex:1 1 auto;overflow:auto;padding:.4rem 1.3rem .8rem}
 .results-foot{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;
@@ -198,7 +202,7 @@ footer a{color:var(--accent)}
 .results-foot #resultsClose{margin-left:auto}
 /* collapsible sections: heading + right-side disclosure triangle (▶ collapsed, ▼ open) */
 details.rsec{border-bottom:1px solid var(--line)}
-details.rsec>summary{list-style:none;cursor:pointer;color:var(--accent2);font-size:.92rem;font-weight:600;
+details.rsec>summary{list-style:none;cursor:pointer;color:var(--accent);font-size:.92rem;font-weight:600;
   padding:.55rem 0;display:flex;align-items:center;justify-content:space-between;gap:.5rem}
 details.rsec>summary::-webkit-details-marker{display:none}
 details.rsec>summary::after{content:"";flex:0 0 auto;width:0;height:0;
@@ -206,7 +210,7 @@ details.rsec>summary::after{content:"";flex:0 0 auto;width:0;height:0;
 details.rsec[open]>summary::after{transform:rotate(90deg)}
 details.rsec>*:not(summary){padding:0 0 .7rem}
 .results-box h3.rsec-static{margin-top:1rem}
-.results-box h3{color:var(--accent2);font-size:.92rem;margin:1rem 0 .3rem;border-bottom:1px solid var(--line);padding-bottom:.2rem}
+.results-box h3{color:var(--accent);font-size:.92rem;margin:1rem 0 .3rem;border-bottom:1px solid var(--line);padding-bottom:.2rem}
 .results-dl{display:grid;grid-template-columns:auto 1fr;gap:.15rem .8rem;margin:0;font-size:.85rem}
 .results-dl dt{color:var(--muted)}
 .results-dl dd{margin:0}

@@ -13,6 +13,10 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
 - **Optional filament name** (nickname), like the printer name — shown as the card title / label when set.
 
 ### Changed
+- **Modal + Export polish.** The run-delete control is now a red trashcan icon placed to the right of Close.
+  Rerunning a saved run clears the stale per-row warning flags (blank grid = no warnings). The Analyze and
+  Export sections show only their button until there's output — no more empty boxes. Modal section headings
+  are blue again, and the title-bar colour swatch is vertically centred with the filament name.
 - **Results modal reworked.** Fixed title bar at the top (filament name + colour swatch; the "Results —"
   prefix is gone) and a fixed button bar at the bottom that stays put while the body scrolls. Printer,
   Filament and Test-settings are now collapsible sections (collapsed by default, right-side ▶/▼ triangle);
