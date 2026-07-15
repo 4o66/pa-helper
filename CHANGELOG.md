@@ -13,11 +13,12 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
 - **Results modal tidy-up.** Section heading is now just "Results" (the "paste into Orca" cue already
   sits on the block label right below it), and the adaptive PA model shows as a wrapping text block
   with a copy icon instead of a `<textarea>` — so it no longer gets its own inner scrollbar.
-- **Printer & filament cards restacked with a leading icon.** Printer cards now show the maker
-  favicon on the left, vertically centred, with the printer name on top and its default/selected
-  nozzle on the line below. Filament cards mirror this: a square colour swatch on the left (solid or
-  gradient, same fill as the old top band), maker + material on the first line, and characteristics
-  + colour on the second.
+- **Selected-item tab subtitles restacked with a leading icon.** The Printer tab now shows the maker
+  favicon on the left (vertically centred), the printer name on the first line and the selected nozzle
+  on the second. The Filament tab mirrors it: a square colour swatch on the left (solid or gradient,
+  same fill as the card band), maker + material on the first line, characteristics + colour on the second.
+- **Printer cards are a uniform width**, sized so Select / Edit / Clone / Remove sit on one row without
+  wrapping.
 - **Saved runs are now a per-filament "Results" modal** (replaces the global "Completed runs" list and
   the read-only PA-tab view). Each filament card/row with completed runs gets a **Results** button
   (count badge when >1). It opens a large modal over a dimmed backdrop showing the full **printer** and
