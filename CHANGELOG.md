@@ -2,10 +2,12 @@
 
 All notable changes to PA-Helper are recorded here.
 
-**Versioning:** `v0.1.<build>`. During beta the major.minor is fixed at `0.1`; the build number
-increments on each stamped build (`node tools/stamp.js`) and resets to `1` when the minor version
-rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v1.0** will mark the first
-"fully usable" release and a tagged GitHub release.
+**Versioning:** `v<major.minor>.<build>` (currently `0.2`). The build number increments on each
+stamped build (`node tools/stamp.js`) and resets to `1` when the minor version rolls; a minor bump
+marks a milestone. Commits are made **locally**; when a feature reaches a stable state we **push and
+release** — `git push origin main`, then `bash tools/release.sh` builds a `dist/pa-helper-v<version>.zip`
+(everything needed to run locally, plus a reminder link to the hosted build) to attach to a GitHub
+release. See [`RELEASING.md`](RELEASING.md). **v1.0** will mark the first "fully usable" release.
 
 ## [Unreleased]
 
