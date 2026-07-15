@@ -7,9 +7,13 @@ stamped build (`node tools/stamp.js`) and resets to `1` when the minor version r
 marks a milestone. Commits are made **locally**; when a feature reaches a stable state we **push and
 release** — `git push origin main`, then `bash tools/release.sh` builds a `dist/pa-helper-v<version>.zip`
 (everything needed to run locally, plus a reminder link to the hosted build) to attach to a GitHub
-release. See [`RELEASING.md`](RELEASING.md). **v1.0** will mark the first "fully usable" release.
+release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
+[`RELEASES.md`](RELEASES.md). **v1.0** will mark the first "fully usable" release.
 
 ## [Unreleased]
+
+## [0.2.27] "Grimoire" — 2026-07-15
+First tagged release. Everything up to this point, headlined by saved runs & the Results view.
 
 ### Added
 - **Optional filament name** (nickname), like the printer name — shown as the card title / label when set.
