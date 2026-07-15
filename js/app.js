@@ -1537,11 +1537,11 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       ["Speeds (mm/s)", (s.speeds || []).join(", "), (s.speeds || []).join(",")]
     ];
     let orca = "";
-    if (run.modelText) orca += `<label class="blocklabel">Adaptive PA model — paste into Orca${copy(run.modelText)}</label><textarea class="out" rows="6" readonly>${esc(run.modelText)}</textarea>`;
+    if (run.modelText) orca += `<label class="blocklabel">Adaptive PA model — paste into Orca${copy(run.modelText)}</label><pre class="resultblock">${esc(run.modelText)}</pre>`;
     if (run.singlePaText) orca += `<div class="out">${run.singlePaText}</div>`;
     if (!orca) orca = '<p class="hint">No exported values were saved for this run.</p>';
     $("resultsBodyView").innerHTML =
-      `<h3>Printer</h3>${dl(printer)}<h3>Filament</h3>${dl(fil)}<h3>Test settings</h3>${dl(settings)}<h3>Results — copy into Orca</h3>${orca}`;
+      `<h3>Printer</h3>${dl(printer)}<h3>Filament</h3>${dl(fil)}<h3>Test settings</h3>${dl(settings)}<h3>Results</h3>${orca}`;
   }
   function closeResults() { $("resultsModal").hidden = true; resultsRunId = null; }
   function cloneFromRun(id) {   // load a saved run's settings into a fresh editable run (a re-run)

@@ -181,7 +181,9 @@ footer a{color:var(--accent)}
 .results-dl{display:grid;grid-template-columns:auto 1fr;gap:.15rem .8rem;margin:0;font-size:.85rem}
 .results-dl dt{color:var(--muted)}
 .results-dl dd{margin:0}
-.results-box textarea.out{width:100%;font-size:.8rem}
+.results-box .resultblock{background:var(--panel2);border:1px solid var(--line);border-radius:6px;
+  padding:.6rem .7rem;margin:.3rem 0 .5rem;font-family:ui-monospace,Menlo,Consolas,monospace;
+  font-size:.8rem;white-space:pre-wrap;word-break:break-word;overflow:visible}
 .pmhead{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start}
 #patternSvgWrap{overflow:hidden;background:var(--bg);border:1px solid var(--line);border-radius:8px;margin:.5rem 0}
 #patternSvg{width:100%;height:auto;max-height:58vh;display:block}

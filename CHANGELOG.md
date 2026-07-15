@@ -10,6 +10,9 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
 ## [Unreleased]
 
 ### Changed
+- **Results modal tidy-up.** Section heading is now just "Results" (the "paste into Orca" cue already
+  sits on the block label right below it), and the adaptive PA model shows as a wrapping text block
+  with a copy icon instead of a `<textarea>` — so it no longer gets its own inner scrollbar.
 - **Printer & filament cards restacked with a leading icon.** Printer cards now show the maker
   favicon on the left, vertically centred, with the printer name on top and its default/selected
   nozzle on the line below. Filament cards mirror this: a square colour swatch on the left (solid or
