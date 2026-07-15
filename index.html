@@ -127,6 +127,14 @@
   <section class="tab" id="tab-test">
     <h2>PA Test</h2>
     <div id="testContext" class="context"></div>
+    <div id="runViewBar" class="viewbar" hidden>
+      <span><b>Viewing a saved run — read-only.</b> Clone it to run again, or delete it.</span>
+      <div class="actions">
+        <button id="viewCloneBtn">Clone to a new run</button>
+        <button id="viewDeleteBtn" class="danger">Delete run</button>
+        <button id="viewCloseBtn" class="secondary">Close</button>
+      </div>
+    </div>
 
     <div id="testBody" hidden>
       <!-- shared: max volumetric speed (from a prior flow calibration) -->

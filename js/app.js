@@ -19,7 +19,7 @@
   const PALETTE = ["#4aa8ff", "#37c98b", "#ffb84a", "#c98bff", "#5de0e6", "#ff8f5d", "#8bff9e"];
 
   // ---- session state ----
-  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, pendingTab = null, importPlates = [], coverageMissing = [], accelListAuto = true, speedListAuto = true, accelPtsAuto = true, speedPtsAuto = true;
+  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, pendingTab = null, importPlates = [], coverageMissing = [], accelListAuto = true, speedListAuto = true, accelPtsAuto = true, speedPtsAuto = true, viewMode = false;
   const PA_FACTORS = ["toolhead", "extruder", "drive", "hotend"];
   const FILAMENT_PA_FACTORS = ["material", "formulation", "fiber", "fiberName", "fiberPct", "hardness", "diameter"];
 
@@ -272,6 +272,7 @@
     document.querySelectorAll(".tab").forEach(s => s.classList.toggle("active", s.id === "tab-" + name));
   }
   function switchTab(name) {
+    if (viewMode && name !== "test") exitView();   // leaving a read-only run view resets the test tab
     // Gate: the selected printer must have a bed size before leaving the Printers tab (it's
     // needed to work out how many test plates a job takes). Bounce back and open its editor.
     if (name !== "printers") {
@@ -560,7 +561,7 @@
       const card = el("div", "card");
       const title = el("div", "title"); title.textContent = filamentLabel(f); card.append(title);
       const meta = el("div", "meta"); meta.textContent = `${printerLabel(p)} · ${r.date} · ${r.results.length} pts`; card.append(meta);
-      const actions = el("div", "actions"); const op = el("button"); op.textContent = "Open"; op.addEventListener("click", () => resumeRun(r.id)); actions.append(op); card.append(actions);
+      const actions = el("div", "actions"); const op = el("button"); op.textContent = "Open"; op.addEventListener("click", () => viewRun(r.id)); actions.append(op); card.append(actions);
       list.append(card);
     });
   }
@@ -1440,8 +1441,44 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     persist(); renderInProgress(); renderCompletedRuns(); clearJobDirty();
     alert("Run saved.");
   }
-  function resumeRun(id) {
+  const resumeRun = (id) => openRun(id, false);   // planned run → editable
+  const viewRun = (id) => openRun(id, true);      // completed run → read-only view
+  function setTestReadOnly(on) {
+    const body = $("testBody"); if (body) body.inert = on;   // locks + defocuses the whole editable body
+    const bar = $("runViewBar"); if (bar) bar.hidden = !on;
+  }
+  function exitView() {
+    if (!viewMode) return;
+    viewMode = false; setTestReadOnly(false);
+    currentRunId = null; currentSettings = null; lastFit = null;
+    loadGrid([]); drawPlot([], null, []); $("analysisOut").innerHTML = ""; $("recommendOut").textContent = "";
+    clearJobDirty();
+  }
+  function cloneRun() {   // same settings/grid, fresh blank results, editable — a re-run
+    viewMode = false; setTestReadOnly(false); currentRunId = null;   // new run: won't overwrite the original
+    [...$("resultsBody").querySelectorAll("tr")].forEach(tr => {
+      const b = tr.querySelector('input[data-key="bestPA"]'); if (b) { b.value = ""; b.dispatchEvent(new window.Event("input", { bubbles: true })); }
+      const n = tr.querySelector('input[data-key="notes"]'); if (n) n.value = "";
+    });
+    if (isBasic() && $("basicBestPA")) { $("basicBestPA").value = ""; $("basicNotes").value = ""; }
+    drawPlot([], null, []); $("analysisOut").innerHTML = ""; lastFit = null;
+    $("recommendOut").textContent = "Cloned to a new run — same settings, blank results. Re-print, enter the best PA per row, then Save.";
+    markJobDirty();
+  }
+  function deleteRun() {
+    const r = data.runs.find(x => x.id === currentRunId); if (!r) return;
+    if (!confirm("Delete this saved run permanently? This can't be undone.")) return;
+    const i = data.runs.findIndex(x => x.id === currentRunId);
+    if (i >= 0) data.runs.splice(i, 1);
+    if (data.gcodeCache) delete data.gcodeCache[currentRunId];
+    viewMode = false; setTestReadOnly(false); currentRunId = null; currentSettings = null;
+    loadGrid([]); drawPlot([], null, []); $("analysisOut").innerHTML = ""; $("recommendOut").textContent = "";
+    clearJobDirty(); persist(); renderCompletedRuns(); renderInProgress(); renderFilaments();
+    switchTab("filaments");
+  }
+  function openRun(id, viewOnly) {
     const r = data.runs.find(x => x.id === id); if (!r) return;
+    setTestReadOnly(false);   // start unlocked; re-lock below if viewing
     currentRunId = id;
     gcodeBlocks = (data.gcodeCache && data.gcodeCache[id]) ? data.gcodeCache[id] : null;   // restore real pattern geometry
     data.lastPrinterId = r.printerId; data.lastInstanceId = r.instanceId || null; data.lastFilamentId = r.filamentId;
@@ -1459,15 +1496,22 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const s = r.settings || {};
     if (r.mode === "basic") {
       if (r.results && r.results[0]) { $("basicBestPA").value = r.results[0].bestPA != null ? r.results[0].bestPA : ""; $("basicNotes").value = r.results[0].notes || ""; }
-      $("recommendOut").textContent = `Resumed planned basic ${r.basicMethod || "tower"} run. PA range ${s.paStart}–${s.paEnd} step ${s.paStep}. Enter the best PA below.`;
+      $("recommendOut").textContent = viewOnly
+        ? `Saved basic ${r.basicMethod || "tower"} run — read-only. PA range ${s.paStart}–${s.paEnd} step ${s.paStep}.`
+        : `Resumed planned basic ${r.basicMethod || "tower"} run. PA range ${s.paStart}–${s.paEnd} step ${s.paStep}. Enter the best PA below.`;
     } else {
       if (r.results && r.results.length) loadGrid(r.results.map(x => ({ flow: x.x, accel: x.accel, bestPA: x.bestPA, notes: x.notes, override: x.override, speed: x.speed })));
       else if (s.points && s.accels) loadGrid(buildGridRows(s.points, s.accels));
       sortResults();
-      $("recommendOut").textContent = `Resumed planned run. PA range ${s.paStart}–${s.paEnd} step ${s.paStep}. Fill in the best PA per row.`;
+      $("recommendOut").textContent = viewOnly
+        ? `Saved run — read-only. PA range ${s.paStart}–${s.paEnd} step ${s.paStep}. Clone it to run again.`
+        : `Resumed planned run. PA range ${s.paStart}–${s.paEnd} step ${s.paStep}. Fill in the best PA per row.`;
     }
-    persist(); renderPrinters(); renderNozzles(); renderFilaments(); updateTestContext(); markJobDirty();
+    renderPrinters(); renderNozzles(); renderFilaments(); updateTestContext();
     switchTab("test");
+    viewMode = !!viewOnly;
+    if (viewOnly) { setTestReadOnly(true); if (r.mode !== "basic") analyze(); clearJobDirty(); }
+    else { persist(); markJobDirty(); }
   }
 
   function setStatus() {
@@ -1599,6 +1643,9 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("loadPointsBtn").addEventListener("click", (e) => { loadGrid(e.target._points || []); sortResults(); markJobDirty(); });
     $("resultSort").addEventListener("change", sortResults);
     $("savePlannedBtn").addEventListener("click", savePlanned);
+    $("viewCloneBtn").addEventListener("click", cloneRun);
+    $("viewDeleteBtn").addEventListener("click", deleteRun);
+    $("viewCloseBtn").addEventListener("click", () => switchTab("filaments"));
     // Unsaved-PA-job guard: mark the job dirty on edits, prompt on navigation / tab close.
     $("resultsBody").addEventListener("input", markJobDirty);
     if ($("basicBestPA")) $("basicBestPA").addEventListener("input", markJobDirty);

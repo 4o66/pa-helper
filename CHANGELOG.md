@@ -83,6 +83,11 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   instead, saving plastic and time. Low values are still allowed if you type them into the accel list.
 
 ### Added
+- **Read-only view for completed runs.** Opening a saved run from the Completed list now shows it
+  **locked** (whole test body is `inert`) with the **plot auto-drawn** — no accidental edits. A view bar
+  gives you **Clone** (start a fresh editable run with the same settings and blank results — a re-run)
+  and **Delete** (with a confirm, from inside the view). Fixes the old behaviour where opening a
+  completed run treated it as the current editable job, and "Abandon" silently deleted it from history.
 - **Outlier flag on results.** A Best-PA cell that's out of line with its neighbours (same accel row or
   same flow column) — not just globally — gets a red ◆ marker; the tooltip suggests re-checking that
   block. Because the PA surface has a real trend, this uses a neighbour median + MAD with a ~2-step
