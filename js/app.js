@@ -1511,7 +1511,11 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     if (!viewMode) return;
     viewMode = false; setTestReadOnly(false); maxFlowConfirmed = false;
     currentRunId = null; currentSettings = null; lastFit = null;
+    // fully blank the PA tab so it doesn't reappear as the saved run when reopened
     loadGrid([]); drawPlot([], null, []); $("analysisOut").innerHTML = ""; $("recommendOut").textContent = "";
+    $("modelOut").value = ""; $("singlePaOut").innerHTML = "";
+    $("maxFlow").value = ""; $("basicBestPA").value = ""; $("basicNotes").value = "";
+    gateMaxFlow();   // blank max flow ⇒ re-lock the config until it's entered + confirmed
     clearJobDirty();
   }
   function cloneRun() {   // same settings/grid, fresh blank results, editable — a re-run
@@ -1708,7 +1712,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("savePlannedBtn").addEventListener("click", savePlanned);
     $("viewCloneBtn").addEventListener("click", cloneRun);
     $("viewDeleteBtn").addEventListener("click", deleteRun);
-    $("viewCloseBtn").addEventListener("click", () => switchTab("filaments"));
+    $("viewCloseBtn").addEventListener("click", () => { exitView(); switchTab("filaments"); });
     // Unsaved-PA-job guard: mark the job dirty on edits, prompt on navigation / tab close.
     $("resultsBody").addEventListener("input", markJobDirty);
     if ($("basicBestPA")) $("basicBestPA").addEventListener("input", markJobDirty);

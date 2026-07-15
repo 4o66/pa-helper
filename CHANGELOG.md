@@ -121,6 +121,10 @@ rolls. A minor bump (`0.1` → `0.2` → …) marks a milestone improvement. **v
   mistaken for the answer. The tooltip says which end to extend and re-test.
 
 ### Fixed
+- **Closing a saved-run view left stale data on the PA tab.** After viewing a run and clicking Close,
+  reopening the PA tab still showed that run (its max flow, Orca export text and basic fields lingered).
+  Close now fully blanks the PA-tab state — results, plot, model/export box, max flow, basic fields — and
+  returns to the Filament tab, so the next run starts clean.
 - **Saving a second planned job could delete the first (data loss).** After you saved a job for later,
   `currentRunId` still pointed at it; setting up a *different* printer/filament job and saving reused that
   id and overwrote the first saved run instead of creating a new one. `collectRun` now detects when the
