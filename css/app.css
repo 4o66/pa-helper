@@ -69,7 +69,7 @@ nav.tabs{display:flex;gap:.4rem;max-width:960px;margin:0 auto;padding:.8rem 1.2r
 .frow.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .frow .colorsq{width:18px;height:18px;border-radius:4px;border:1px solid var(--line);flex:0 0 auto}
 .frow .fname{flex:1;font-size:.9rem}
-.frow .actions{margin-top:0}
+.frow .actions{display:flex;gap:.4rem;align-items:stretch;margin-top:0}
 main{max-width:960px;margin:0 auto;padding:0 1.2rem 3rem}
 .tab{display:none;background:var(--panel);border:1px solid var(--line);border-radius:0 10px 10px 10px;
   padding:1rem 1.1rem;margin-top:0}
