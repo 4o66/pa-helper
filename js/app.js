@@ -762,6 +762,13 @@
       const runCount = data.runs.filter(r => r.filamentId === f.id).length;
       if (changed && runCount > 0 && !confirm(`You changed a PA-affecting property (material / formulation / fiber / hardness / diameter). The ${runCount} saved run${runCount > 1 ? "s" : ""} for "${filamentLabel(f)}" were calibrated on the old filament and are no longer valid. Save anyway?`)) return;
       Object.assign(f, fields);
+      // Restricting the currently-selected filament away from the currently-selected printer hides
+      // its card (see renderFilaments' pin filter) — but leaving it as data.lastFilamentId would
+      // silently keep driving the PA/Ironing test context for a filament the user can no longer see
+      // or reach. Clear the selection so it falls back to the "no filament selected" state instead.
+      if (data.lastFilamentId === f.id && data.lastPrinterId && isRestricted(f) && !f.printers.includes(data.lastPrinterId)) {
+        data.lastFilamentId = null;
+      }
       rememberCustoms(filamentForm); persist();
       resetFilamentForm(); renderFilaments(); updateTestContext(); updateIroningContext(); updateTabLabels();
       return;

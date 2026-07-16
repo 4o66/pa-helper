@@ -586,6 +586,52 @@ d = readData();
 ok(d.filaments.find(f => f.material === "PLA").color === "Charcoal", "filament edit saved");
 ok($("saveFilamentBtn").textContent === "Save filament", "filament form reset after edit");
 
+// editing the CURRENTLY SELECTED filament to restrict it away from the currently selected
+// printer hides its card (renderFilaments' pin filter) — the selection needs to clear along with
+// it, otherwise it keeps silently driving the PA/Ironing test context for a filament the user can
+// no longer see or reach
+{
+  // "My Trident" is the renamed Voron from the earlier printer-edit test — a stable, distinctly
+  // named target to restrict to (a plain "any printer that isn't the current one" pick would also
+  // catch the untouched Voron *clone* left over from the "clone + edit printer" test earlier, which
+  // isn't a printer this test can navigate back to by name)
+  const otherPrinterId = readData().printers.find(p => p.name === "My Trident").id;
+  const plaCardSel = [...$("filamentList").querySelectorAll(".card,.frow")].find(c => c.textContent.includes("PLA") && !c.textContent.includes("(copy)"));
+  plaCardSel.dispatchEvent(new window.Event("click", { bubbles: true }));   // select it
+  const plaId = readData().filaments.find(f => f.material === "PLA").id;
+  ok(readData().lastFilamentId === plaId, "PLA filament is selected before the edit");
+  const curPrinterId = readData().lastPrinterId;
+  ok(curPrinterId !== otherPrinterId, "the currently selected printer isn't the one we're about to restrict to");
+  [...plaCardSel.querySelectorAll(".actions button")].find(b => b.textContent === "Edit").dispatchEvent(new window.Event("click", { bubbles: true }));
+  $("filamentRestrict").checked = true; ev($("filamentRestrict"), "change");
+  const otherPrinterCb = [...$("filamentPrinters").querySelectorAll("input")].find(cb => cb.value === otherPrinterId);
+  ok(!!otherPrinterCb, "'My Trident' is available to restrict to");
+  otherPrinterCb.checked = true;
+  click("saveFilamentBtn");
+  d = readData();
+  const plaNow = d.filaments.find(f => f.id === plaId);
+  ok(plaNow.printers.length === 1 && plaNow.printers[0] === otherPrinterId, "PLA filament now restricted to a printer OTHER than the currently selected one");
+  ok(d.lastFilamentId == null, "restricting the selected filament away from the current printer clears the selection");
+  ok(![...$("filamentList").querySelectorAll(".card,.frow")].some(c => c.textContent.includes("PLA")), "the now-restricted PLA filament is hidden from the current printer's list");
+  ok($("filamentPinNotice").hidden === false, "pin notice shown for the newly-hidden filament");
+  ok(/No filament selected/.test($("testContext").textContent), "PA test context reflects no filament selected, not the hidden one");
+  ok(/No filament selected/.test($("ironingContext").textContent), "Ironing test context reflects no filament selected, not the hidden one");
+
+  // cleanup: undo the restriction so downstream tests (clone, saved-results modal, etc.) can find
+  // PLA again — switch to "My Trident" (making it visible), remove the restriction, then switch
+  // back to the printer that was selected before this block
+  const otherPrinterCard = [...$("printerList").querySelectorAll(".card")].find(c => c.textContent.includes("My Trident"));
+  otherPrinterCard.dispatchEvent(new window.Event("click", { bubbles: true }));
+  const plaCardVisibleAgain = [...$("filamentList").querySelectorAll(".card,.frow")].find(c => c.textContent.includes("PLA"));
+  ok(!!plaCardVisibleAgain, "PLA visible again once its pinned printer is selected");
+  [...plaCardVisibleAgain.querySelectorAll(".actions button")].find(b => b.textContent === "Edit").dispatchEvent(new window.Event("click", { bubbles: true }));
+  $("filamentRestrict").checked = false; ev($("filamentRestrict"), "change");
+  click("saveFilamentBtn");
+  ok(readData().filaments.find(f => f.id === plaId).printers.length === 0, "cleanup: PLA restriction removed");
+  const origPrinterCard = [...$("printerList").querySelectorAll(".card")].find(c => c.textContent.includes("Bambu Lab A1"));
+  origPrinterCard.dispatchEvent(new window.Event("click", { bubbles: true }));
+}
+
 // clone a filament
 const fbefore = readData().filaments.length;
 const pf2 = [...$("filamentList").querySelectorAll(".card,.frow")].find(c => c.textContent.includes("PLA"));

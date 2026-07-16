@@ -50,6 +50,10 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   modal is open.
 
 ### Fixed
+- **Restricting the currently-selected filament away from the currently-selected printer now
+  clears the selection.** Previously the filament's card would vanish from the list (correctly
+  hidden by the pin filter) but `lastFilamentId` stayed pointed at it, so the PA/Ironing test
+  context kept silently referencing a filament the user could no longer see or reach.
 - **The pattern picker no longer opens behind the PA Test modal.** Both are `.modal` elements at
   the same `z-index`, and with no nested stacking context the tie resolves by DOM order — the
   picker was declared near the top of `<body>` (from before PA Test was a modal at all), so it
