@@ -271,13 +271,16 @@
   <div class="modal" id="tab-ironing" hidden>
   <div class="modal-box plain results-box test-modal-box">
     <div class="results-head">
-      <div class="results-title"><h2>Ironing Test</h2></div>
-      <button id="ironModalClose" class="secondary">Close</button>
+      <div class="results-head-row">
+        <div class="results-title"><h2>Ironing Test</h2></div>
+        <button id="ironModalClose" class="secondary">Close</button>
+      </div>
+      <!-- printer/nozzle/filament card lives in the fixed header, same as the PA Test modal -->
+      <div id="ironingContext" class="context"></div>
     </div>
     <div class="results-body">
     <p class="hint">Generates a grid of flat pads — one per (ironing speed, ironing flow) combo — as an OrcaSlicer 3MF project, so Orca does the real slicing. Print it, then note which pad gave the best top-surface finish.</p>
     <p class="hint">Based on <a href="https://www.printables.com/model/1247198" target="_blank" rel="noopener">LeoganPro's Top Surface Ironing Test</a> (CC0).</p>
-    <div id="ironingContext" class="context"></div>
 
     <div id="ironingBody" hidden>
       <div class="subsec">

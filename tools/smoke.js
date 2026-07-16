@@ -244,6 +244,12 @@ ok($("tab-test").dataset.mode === "advanced", "default mode advanced");
 // stays visible while scrolled into the settings below
 ok($("testContext").closest(".results-head") != null, "PA test's context card lives in the modal's fixed header");
 ok($("testContext").closest(".results-body") == null, "PA test's context card is not inside the scrolling body");
+// Ironing modal gets the identical header treatment (same combo already selected above —
+// updateIroningContext() already populated it via selectFilament, regardless of visibility)
+$("tab-ironing").hidden = false;
+ok($("ironingContext").closest(".results-head") != null, "Ironing test's context card lives in the modal's fixed header, same as PA");
+ok($("ironingContext").closest(".results-body") == null, "Ironing test's context card is not inside the scrolling body");
+click("ironModalClose");
 ok($("basicMethod").disabled === true, "method control locked in advanced");
 ok($("basicMethod").value === "pattern", "advanced forces pattern method");
 ok(/max accel 12000/.test($("testContext").innerHTML), "printer max accel shown on test page");

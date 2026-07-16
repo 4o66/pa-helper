@@ -71,6 +71,8 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 - **PA Test modal: the printer/nozzle/filament card is now part of the fixed header**, not the
   first thing in the scrolling body — it used to scroll out of view once you got into the
   settings below, making it easy to lose track of which combo a test was actually running against.
+- **Ironing Test modal gets the same fixed-header context card as PA Test**, for the same reason
+  and the same fix.
 - **Export filename now includes the time** (`pa_data_YYYY-MM-DD_HHMM.json`, was date-only) —
   multiple exports on the same day no longer look identical in Downloads.
 - **`pa_data.json` no longer stores picker geometry (`formatVersion: "2.0"`).** `gcodeCache` was
