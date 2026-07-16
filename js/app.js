@@ -1660,7 +1660,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     // (advanced) / result fields (basic) sit below the setup sections, so resuming without this
     // leaves the user staring at "Recommend settings" with the thing they came to do off-screen.
     const entrySec = ((r.mode || "advanced") === "basic") ? $("basicResultSec") : $("resultsSec");
-    if (entrySec) entrySec.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (entrySec && entrySec.scrollIntoView) entrySec.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function setStatus() {
