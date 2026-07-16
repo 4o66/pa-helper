@@ -534,12 +534,10 @@
 
   function filActions(f) {
     const actions = el("div", "actions");
-    const selBtn = el("button"); selBtn.textContent = f.id === data.lastFilamentId ? "Selected ✓" : "Select";
-    selBtn.addEventListener("click", () => selectFilament(f.id));
     const edit = el("button", "secondary"); edit.textContent = "Edit"; edit.addEventListener("click", () => editFilament(f.id));
     const clone = el("button", "secondary"); clone.textContent = "Clone"; clone.addEventListener("click", () => cloneFilament(f.id));
     const rm = removeButton(() => removeFilament(f.id));
-    actions.append(selBtn, edit, clone);
+    actions.append(edit, clone);
     const paRuns = completedRunsFor(f.id);
     if (paRuns.length) {
       const paPlanned = paRuns.find(r => r.status === "planned");   // in progress: printed, waiting on results
@@ -578,18 +576,25 @@
     if (fill) sq.style.background = fill; else sq.classList.add("nocolor");
     return sq;
   }
+  // Clicking anywhere on a filament card/row selects it (no dedicated Select button) — except
+  // clicks on the action buttons (Edit/Clone/Remove/PA/Iron), which have their own handlers.
+  function selectFilamentOnCardClick(e, f) { if (e.target.closest(".actions")) return; selectFilament(f.id); }
   function filamentCard(f) {
     const card = el("div", "card fcard" + (f.id === data.lastFilamentId ? " selected" : ""));
     const band = el("div", "colorband"); const fill = colorFill(f); if (fill) band.style.background = fill; else band.classList.add("nocolor"); card.append(band);
     const title = el("div", "title"); title.textContent = filamentLabel(f); if (isRestricted(f)) title.prepend(pinIcon()); card.append(title);
     const meta = el("div", "meta"); meta.textContent = filMeta(f); card.append(meta);
-    card.append(filActions(f)); return card;
+    card.append(filActions(f));
+    card.addEventListener("click", (e) => selectFilamentOnCardClick(e, f));
+    return card;
   }
   function filamentRow(f) {
     const row = el("div", "frow" + (f.id === data.lastFilamentId ? " selected" : ""));
     const sq = el("span", "colorsq"); const fill = colorFill(f); if (fill) sq.style.background = fill; else sq.classList.add("nocolor"); row.append(sq);
     const name = el("span", "fname"); name.textContent = filamentLabel(f); if (isRestricted(f)) name.prepend(pinIcon()); row.append(name);
-    row.append(filActions(f)); return row;
+    row.append(filActions(f));
+    row.addEventListener("click", (e) => selectFilamentOnCardClick(e, f));
+    return row;
   }
   function renderFilamentFilters(base) {
     const bar = $("filamentFilters"); bar.innerHTML = "";

@@ -61,12 +61,14 @@ nav.tabs{display:flex;gap:.4rem;max-width:960px;margin:0 auto;padding:.8rem 1.2r
 .pin-ic{margin-right:.3rem;font-size:.85em}
 
 /* filament color swatches */
-.fcard{overflow:hidden}
+.fcard{overflow:hidden;cursor:pointer}
+.fcard .actions{cursor:default}
 .fcard .colorband{height:10px;margin:-.7rem -.8rem .55rem;border-bottom:1px solid var(--line)}
 .colorband.nocolor,.colorsq.nocolor{background:repeating-linear-gradient(45deg,var(--panel2),var(--panel2) 4px,var(--line) 4px,var(--line) 8px)}
 .flist{display:flex;flex-direction:column;gap:.3rem;margin:.5rem 0}
 .frow{display:flex;align-items:center;gap:.6rem;background:var(--panel2);border:1px solid var(--line);
-  border-radius:7px;padding:.4rem .6rem}
+  border-radius:7px;padding:.4rem .6rem;cursor:pointer}
+.frow .actions{cursor:default}
 .frow.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .frow .colorsq{width:18px;height:18px;border-radius:4px;border:1px solid var(--line);flex:0 0 auto}
 .frow .fname{flex:1;font-size:.9rem}
