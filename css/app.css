@@ -89,8 +89,9 @@ nav.subtabs{display:flex;gap:.3rem;margin:1rem 0 0}
 .subsec:first-of-type{border-top:0;margin-top:.4rem;padding-top:0}
 
 .hint{color:var(--muted);font-size:.85rem;margin:.2rem 0 .8rem}
-.legend-note{display:flex;align-items:center;flex-wrap:wrap;gap:.4rem}
-.legend-btn{pointer-events:none;cursor:default;padding:.15rem .55rem;font-size:.78rem}
+.legend-note{display:flex;flex-direction:column;gap:.35rem}
+.legend-row{display:flex;align-items:flex-start;gap:.5rem}
+.legend-btn{pointer-events:none;cursor:default;padding:.15rem .55rem;font-size:.78rem;flex:0 0 auto}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:.7rem}
 .field{display:flex;flex-direction:column;gap:.2rem}
 .field.newrow{grid-column-start:1}

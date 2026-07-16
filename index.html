@@ -104,14 +104,11 @@
       <div id="filamentPrinters" hidden></div>
       <div class="row"><button id="saveFilamentBtn">Save filament</button><button id="cancelFilamentBtn" class="secondary">Cancel</button></div>
     </details>
-    <p class="hint legend-note">
-      <button type="button" class="muted legend-btn">PA</button>
-      <button type="button" class="muted legend-btn">Iron</button>
-      grey = no tests yet at the current Scope;
-      <button type="button" class="warn legend-btn">PA</button>
-      <button type="button" class="warn legend-btn">Iron</button>
-      orange = results still in progress; once entered, the button turns blue. A number badge shows when more than one test exists at that Scope.
-    </p>
+    <div class="hint legend-note">
+      <div class="legend-row"><button type="button" class="muted legend-btn">Test</button> grey = no tests yet at the current Scope.</div>
+      <div class="legend-row"><button type="button" class="warn legend-btn">Test (2)</button> orange = a test is in progress at the current Scope. The number is how many tests exist there in total; clicking jumps straight to the in-progress one.</div>
+      <div class="legend-row"><button type="button" class="legend-btn">Test (2)</button> blue = every test at the current Scope is complete. The number is how many; with just one, it shows plain "Test" with no number.</div>
+    </div>
   </section>
 
   <!-- ============ PA TEST (modal, opened from a filament's PA button) ============ -->

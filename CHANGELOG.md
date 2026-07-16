@@ -13,6 +13,11 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 ## [Unreleased]
 
 ### Added
+- **Filament tab legend redesigned: one row per state, covering all three colors.** Previously
+  showed paired PA/Iron example buttons for grey and orange only (blue/done had no example, just
+  text), all crammed onto one wrapping line. Now a single "Test" example button per state — grey,
+  orange, blue — each on its own line, with orange's and blue's explanations covering what the
+  `(N)` count suffix means for that state.
 - **Scope dropdown auto-locks when a choice would be a no-op.** With exactly one printer that has
   exactly one nozzle, every Scope value behaves identically, so the whole dropdown locks to "This
   printer + nozzle" and the help tooltip says why. With two or more printers but none of them
