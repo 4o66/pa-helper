@@ -36,6 +36,10 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 - **Basic PA test mode's Mode dropdown option is now visible but disabled** ("Basic — Coming
   Soon™") instead of fully removed — signals it's on the roadmap without being reachable, as part
   of the filament-modal-rework branch. Still advanced-only until Basic mode's own rework lands.
+- **A printer must be selected before leaving the Printers tab.** Nozzle selection, filament
+  matching, and PA/Ironing test setup all assume a printer is active, so navigating anywhere else
+  without one now bounces back with an explanation. The Filament tab is disabled outright until
+  then, with its subtitle swapped for a red "no" symbol and "Select a Printer".
 
 ### Changed
 - **Export filename now includes the time** (`pa_data_YYYY-MM-DD_HHMM.json`, was date-only) —

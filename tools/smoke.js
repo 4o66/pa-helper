@@ -62,6 +62,21 @@ ok(document.documentElement.dataset.theme === "light", "theme switches to light"
 // filament-tab Scope defaults to the tightest option, before anything touches it
 ok($("filamentScope").value === "nozzle", "Scope defaults to 'This printer + nozzle'");
 
+// printer-tab gating: no printer selected yet -> Filament tab disabled with a "select a
+// printer" prompt, and navigating anywhere else bounces back to Printers with an explanation
+{
+  const filTabBtn = () => [...document.querySelectorAll(".tab-btn")].find(b => b.dataset.tab === "filaments");
+  ok(filTabBtn().disabled === true, "Filament tab is disabled before any printer is selected");
+  ok($("tabSelFilament").textContent.includes("Select a Printer"), "Filament tab subtitle prompts to select a printer");
+  let lastAlert = "";
+  const origAlert = window.alert;
+  window.alert = (msg) => { lastAlert = msg; };
+  [...document.querySelectorAll(".tab-btn")].find(b => b.dataset.tab === "test").dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok($("tab-printers").classList.contains("active"), "navigating to PA Test with no printer selected bounces back to Printers");
+  ok(/printer/i.test(lastAlert), "bounce-back explains why via an alert");
+  window.alert = origAlert;
+}
+
 // add printer
 setFieldKey($("printerForm"), "maker", "Voron");
 setFieldKey($("printerForm"), "model", "Trident 350");
@@ -75,6 +90,11 @@ click("savePrinterBtn");
 let d = readData();
 ok(d.printers.length === 1, "printer saved");
 ok(d.lastPrinterId === d.printers[0].id, "printer auto-selected");
+{
+  const filTabBtn = [...document.querySelectorAll(".tab-btn")].find(b => b.dataset.tab === "filaments");
+  ok(filTabBtn.disabled === false, "Filament tab re-enabled once a printer is selected");
+  ok(!$("tabSelFilament").textContent.includes("Select a Printer"), "Filament tab subtitle drops the prompt once a printer is selected");
+}
 ok(d.printers[0].hotend === "E3D Revo", "hotend recorded");
 ok(typeof d.printers[0].pubId === "string" && d.printers[0].pubId.length > 0, "printer has random pubId");
 ok(d.printers[0].nozzles && d.printers[0].nozzles[0].diameter === 0.4, "printer seeded with a 0.4 nozzle");
@@ -830,6 +850,13 @@ const Ptiny = window.PAPattern.planPlates({ bed: { shape: "rect", x: 60, y: 40 }
 ok(!Ptiny.fits && Ptiny.plates === Infinity, "plate-fit: object too big for a tiny bed does not fit");
 
 // unsaved-PA-job guard: navigating away while dirty prompts; abandon proceeds and clears
+// (DEBUG "clear ALL" above wiped every printer — the new printer-tab gate would otherwise bounce
+// any non-Printers navigation back before this section's own guard logic gets a chance to run)
+setFieldKey($("printerForm"), "maker", "GuardTestCo");
+setFieldKey($("printerForm"), "model", "RigZ");
+setFieldKey($("printerForm"), "bedX", "250");
+setFieldKey($("printerForm"), "bedY", "250");
+click("savePrinterBtn");
 const tabBtn = (t) => [...document.querySelectorAll(".tab-btn")].find(b => b.dataset.tab === t);
 ev($("resultsBody"), "input");   // marks a PA job dirty
 tabBtn("filaments").dispatchEvent(new window.Event("click", { bubbles: true }));

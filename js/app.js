@@ -284,6 +284,15 @@
     document.querySelectorAll(".tab").forEach(s => s.classList.toggle("active", s.id === "tab-" + name));
   }
   function switchTab(name) {
+    // Gate: a printer must be selected (or created) before leaving the Printers tab at all —
+    // nozzle selection, filament matching, and PA/Ironing test setup all assume one is active.
+    // Bounce back rather than letting the user wander into an undefined state. The Filament tab
+    // button is also disabled outright (see updateTabLabels), so this mainly guards direct
+    // navigation to PA Test / Ironing Test.
+    if (name !== "printers" && !getPrinter(data.lastPrinterId)) {
+      alert("Select or add a printer first.");
+      name = "printers";
+    }
     // Gate: the selected printer must have a bed size before leaving the Printers tab (it's
     // needed to work out how many test plates a job takes). Bounce back and open its editor.
     if (name !== "printers") {
@@ -321,9 +330,16 @@
       else { tp.innerHTML = ""; tp.textContent = "Not selected"; }
     }
     if (tf) {
-      if (f) tabSel(tf, colorSquare(f, "colorsq tabsw"), filLine1(f), filLine2(f));
+      if (!p) {
+        const no = el("span", "no-ic"); no.textContent = "🚫"; no.title = "Select a printer first";
+        tabSel(tf, no, "Select a Printer", "");
+      } else if (f) tabSel(tf, colorSquare(f, "colorsq tabsw"), filLine1(f), filLine2(f));
       else { tf.innerHTML = ""; tf.textContent = "Not selected"; }
     }
+    // Filament tab is unreachable until a printer is selected — enforced here (not just in
+    // switchTab) so the button itself looks and behaves inert, not just silently bounces.
+    const filTabBtn = document.querySelector('.tab-btn[data-tab="filaments"]');
+    if (filTabBtn) filTabBtn.disabled = !p;
   }
 
   /* =================== PRINTERS TAB =================== */
