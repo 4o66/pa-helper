@@ -1552,7 +1552,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const sw = $("resultsSwatch"); const fill = fil ? colorFill(fil) : null;   // colour swatch in the title bar
     if (sw) { sw.style.background = fill || ""; sw.classList.toggle("nocolor", !fill); }
     const pick = $("resultsPick"); pick.innerHTML = "";
-    runs.forEach(r => { const o = el("option"); o.value = r.id; o.textContent = printerLabel(getPrinter(r.printerId)) + " · " + r.date; pick.append(o); });
+    runs.forEach(r => { const o = el("option"); o.value = r.id; o.textContent = printerLabel(getPrinter(r.printerId)) + " · " + fmtDateTime(r.created || r.date); pick.append(o); });
     $("resultsPickWrap").hidden = runs.length < 2;
     pick.value = runs[0].id;
     renderResultsRun(runs[0]);
@@ -1570,7 +1570,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const fil = f ? [["Maker", f.maker], ["Material", f.material], ["Formulation", formText(f)], ["Color", f.color], ["Diameter", f.diameter ? f.diameter + " mm" : ""], ["Fiber", fiberTag(f)], ["Hardness", f.hardness]] : [["Status", "(deleted)"]];
     const settings = [
       ["Mode", (run.mode || "advanced") + (run.basicMethod ? " (" + run.basicMethod + ")" : "")],
-      ["Date", run.date],
+      ["Date", fmtDateTime(run.created || run.date)],
       ["Max volumetric speed", run.maxFlow != null ? run.maxFlow + " mm³/s" : ""],
       ["Layer × line width", (run.layerH != null && run.lineW != null) ? (run.layerH + " × " + run.lineW + " mm") : ""],
       ["Start PA", s.paStart], ["End PA", s.paEnd], ["PA step", s.paStep],
