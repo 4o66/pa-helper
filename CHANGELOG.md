@@ -12,6 +12,49 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 
 ## [Unreleased]
 
+## [0.2.32] "Put a hot rock on it" — 2026-07-15
+Ironing Test joins PA Test as a full calibration workflow, and filament cards get a shared,
+clearer in-progress/done pattern for both.
+
+### Added
+- **Ironing Test tab.** Generates a grid of flat pads (speed × flow sweep) as an OrcaSlicer 3MF
+  project — geometry only, Orca still does the real slicing (consistent with the "no g-code
+  generation" rule). Pad diameter/gap are configurable, the plan fits your printer's real bed, and
+  precise brim-width instructions are computed rather than embedding Orca's full 654-key
+  `project_settings.config` (which silently overwrites a tuned profile on an empty plate — a
+  known Orca footgun).
+- **Ironing results entry: a picker, not typing in cell coordinates.** A real-scale grid of
+  circles matching the physical print — click a sample to name it (Glossy/Matte/Other + your own
+  text). The naming popover appears on whichever half of the grid keeps your clicked sample
+  visible, sized to its own content, no scrollbars under any window size.
+- **Filament cards show separate PA and Iron buttons** (previously one combined "Results"
+  button). Each turns **orange** while that test is in-flight (printed, no results yet) and
+  clicking it jumps straight to the open run instead of a history view. A small legend under
+  "+ Add a filament" explains orange = in progress, blue = done.
+- **Abandon button on the Ironing tab** — previously there was no way to cancel an in-progress
+  ironing run once you'd saved its settings.
+- **Click anywhere on a filament, printer, or nozzle card to select it** (blue border) — the
+  dedicated Select button is gone.
+- Only one **incomplete** run is ever allowed per printer+filament combo (PA or Iron); multiple
+  **completed** runs are kept as history, each showing full date and time (not just date) since
+  more than one can share a day.
+
+### Changed
+- PA's pinned "in progress" section is gone — retired in favor of the same pattern Iron uses
+  (orange button, jump straight to the run, shared explainer modal).
+- **Abandoning a run now permanently deletes it** rather than soft-flagging `status: "abandoned"`
+  — an abandoned run was never recoverable anyway, so there was no reason to keep the record
+  around.
+- Resuming a run now scrolls straight to its actual data-entry section instead of leaving you at
+  the top of the tab. This also surfaced and fixed a real bug: a stray `hidden` attribute meant
+  basic-mode PA result entry was permanently unreachable.
+- The "Use it now, here" hosted-build link moved from the app's own header into README — it
+  never made sense to show inside the app you're already using.
+
+### Notes
+- Basic PA test mode is temporarily hidden (advanced-only) pending dedicated testing on a future
+  branch; the underlying code is untouched.
+
 ## [0.2.31] "Clean Slate" — 2026-07-15
 Saving a run now returns you to the Filament page and leaves a clean PA bench.
 
