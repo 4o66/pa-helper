@@ -149,9 +149,10 @@
       <div class="subsec">
         <h3>Test type</h3>
         <div class="row">
-          <!-- Basic mode temporarily disabled (2026-07-15) — advanced-only testing/dev focus for now.
-               To re-enable: add back <option value="basic">Basic — single PA value</option> here. -->
-          <label>Mode <select id="testMode"><option value="advanced">Advanced — adaptive PA (flow × accel)</option></select></label>
+          <!-- Basic mode is mid-rework on a separate branch — shown but unselectable here so it's
+               visible on the roadmap without being reachable. To re-enable: drop the `disabled`
+               attribute and restore its real label ("Basic — single PA value"). -->
+          <label>Mode <select id="testMode"><option value="advanced">Advanced — adaptive PA (flow × accel)</option><option value="basic" disabled>Basic — Coming Soon™</option></select></label>
           <label>Method <select id="basicMethod"><option value="tower">Tower (recommended)</option><option value="line">Line</option><option value="pattern">Pattern</option></select></label>
         </div>
         <p class="hint" id="modeHint"></p>

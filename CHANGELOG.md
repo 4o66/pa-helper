@@ -33,6 +33,9 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   show both buttons now — grey when nothing matches at the current Scope, orange while a matching
   run is in progress, blue with a count once done — instead of hiding the button entirely when
   there was nothing to show. Defaults to the tightest scope (this exact printer + nozzle).
+- **Basic PA test mode's Mode dropdown option is now visible but disabled** ("Basic — Coming
+  Soon™") instead of fully removed — signals it's on the roadmap without being reachable, as part
+  of the filament-modal-rework branch. Still advanced-only until Basic mode's own rework lands.
 
 ### Changed
 - **Export filename now includes the time** (`pa_data_YYYY-MM-DD_HHMM.json`, was date-only) —

@@ -287,7 +287,11 @@ $("maxFlowConfirm").dispatchEvent(new window.Event("click", { bubbles: true }));
 ok($("gatedBody").hidden === false && /Confirmed/.test($("maxFlowConfirm").textContent), "confirming max flow reveals the test form");
 $("maxFlow").value = "22"; $("maxFlow").dispatchEvent(new window.Event("input", { bubbles: true }));
 ok($("gatedBody").hidden === true, "editing max flow hides the form again until re-confirmed");
-ok(![...$("testMode").options].some(o => o.value === "basic"), "basic mode is temporarily removed from the Mode dropdown (advanced-only for now)");
+{
+  const basicOpt = [...$("testMode").options].find(o => o.value === "basic");
+  ok(!!basicOpt && basicOpt.disabled, "basic mode is visible but disabled in the Mode dropdown (advanced-only for now)");
+  ok(basicOpt.textContent === "Basic — Coming Soon™", "disabled basic option is labeled 'Basic — Coming Soon™'");
+}
 $("maxFlow").value = "20"; $("maxFlow").dispatchEvent(new window.Event("input", { bubbles: true }));
 $("maxFlowConfirm").dispatchEvent(new window.Event("click", { bubbles: true }));   // re-confirm for the recommend flow below
 $("speedList").value = "";   // the maxFlow inputs above auto-filled it; clear so recommend re-spaces from the count
@@ -486,8 +490,8 @@ ok($("dataStatus").classList.contains("stale") && /newer than/.test($("dataStatu
 }
 ok(typeof window.PAStore.key === "string" && window.PAStore.key.length > 0, "storage key exposed for cross-tab sync");
 
-// basic mode: currently unreachable from the UI (option removed from the Mode dropdown,
-// see the "advanced-only for now" assertion above) — no in-UI coverage until it's re-enabled.
+// basic mode: still unreachable from the UI (disabled option in the Mode dropdown, see the
+// "advanced-only for now" assertion above) — no in-UI coverage until it's actually re-enabled.
 
 // clone + edit printer (Voron now has runs)
 const beforeCount = readData().printers.length;
