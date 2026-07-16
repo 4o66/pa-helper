@@ -29,7 +29,7 @@
   const PALETTE = ["#4aa8ff", "#37c98b", "#ffb84a", "#c98bff", "#5de0e6", "#ff8f5d", "#8bff9e"];
 
   // ---- session state ----
-  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, pendingTab = null, importPlates = [], coverageMissing = [], accelListAuto = true, speedListAuto = true, accelPtsAuto = true, speedPtsAuto = true, maxFlowConfirmed = false;
+  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, ironDirty = false, pendingModal = null, importPlates = [], coverageMissing = [], accelListAuto = true, speedListAuto = true, accelPtsAuto = true, speedPtsAuto = true, maxFlowConfirmed = false;
   let ironSpeedListAuto = true, ironFlowListAuto = true, ironingLoaded = false;
   const PA_FACTORS = ["toolhead", "extruder", "drive", "hotend"];
   const FILAMENT_PA_FACTORS = ["material", "formulation", "fiber", "fiberName", "fiberPct", "hardness", "diameter"];
@@ -279,6 +279,8 @@
   // ---- tabs ----
   const markJobDirty = () => { jobDirty = true; };
   const clearJobDirty = () => { jobDirty = false; };
+  const markIronDirty = () => { ironDirty = true; };
+  const clearIronDirty = () => { ironDirty = false; };
   function applyTab(name) {
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
     document.querySelectorAll(".tab").forEach(s => s.classList.toggle("active", s.id === "tab-" + name));
@@ -287,8 +289,7 @@
     // Gate: a printer must be selected (or created) before leaving the Printers tab at all —
     // nozzle selection, filament matching, and PA/Ironing test setup all assume one is active.
     // Bounce back rather than letting the user wander into an undefined state. The Filament tab
-    // button is also disabled outright (see updateTabLabels), so this mainly guards direct
-    // navigation to PA Test / Ironing Test.
+    // button is also disabled outright (see updateTabLabels) as the main line of defense.
     if (name !== "printers" && !getPrinter(data.lastPrinterId)) {
       alert("Select or add a printer first.");
       name = "printers";
@@ -303,9 +304,34 @@
         editPrinter(p.id);
       }
     }
-    // Guard: an unsaved PA test in progress — prompt to save-in-progress or abandon before leaving.
-    if (jobDirty && name !== "test") { pendingTab = name; $("jobGuardModal").hidden = false; return; }
     applyTab(name);
+  }
+  // ---- PA / Ironing modals ----
+  // Both tests live in modals now (opened from a filament card's PA/Iron button) rather than nav
+  // tabs, so they float on top of whichever of Printers/Filaments is showing underneath. Closing
+  // guards on unsaved changes the same way the old tab-switch guard did, just per-modal instead of
+  // per-tab — see jobGuardSave/Abandon/Cancel below, which dispatch on pendingModal.
+  function openPaModal() { $("tab-test").hidden = false; }
+  function closePaModal() {
+    if (jobDirty) {
+      pendingModal = "pa";
+      $("jobGuardTitle").textContent = "Unsaved PA test";
+      $("jobGuardMsg").textContent = "You've started a PA test that isn't saved. Save it as an in-progress run to resume later, or abandon it?";
+      $("jobGuardModal").hidden = false;
+      return;
+    }
+    $("tab-test").hidden = true;
+  }
+  function openIronModal() { $("tab-ironing").hidden = false; }
+  function closeIronModal() {
+    if (ironDirty) {
+      pendingModal = "iron";
+      $("jobGuardTitle").textContent = "Unsaved Ironing test";
+      $("jobGuardMsg").textContent = "You've changed Ironing test settings that aren't saved. Save now, or discard the changes?";
+      $("jobGuardModal").hidden = false;
+      return;
+    }
+    $("tab-ironing").hidden = true;
   }
   function switchSubtab(name) {
     document.querySelectorAll(".subtab-btn").forEach(b => b.classList.toggle("active", b.dataset.subtab === name));
@@ -573,28 +599,29 @@
     const paPlanned = paRuns.find(r => r.status === "planned");   // in progress: printed, waiting on results
     const pa = el("button", paRuns.length ? (paPlanned ? "warn" : null) : "muted");
     pa.textContent = "PA" + (paRuns.length > 1 ? " (" + paRuns.length + ")" : "");
-    if (paRuns.length) {
-      pa.addEventListener("click", () => {
-        // An in-progress run takes priority over the history view — jump straight to it instead
-        // of the results modal, since that's what needs finishing before anything else can happen.
-        if (paPlanned) { resumeRun(paPlanned.id); showRunInProgressModal("You have a run in progress. To start a new run, enter results on the open run and save, or delete the in progress run."); }
-        else openResults(f.id);
-      });
-    } else pa.disabled = true;
+    pa.addEventListener("click", () => {
+      // An in-progress run takes priority over the history view — jump straight to it instead
+      // of the results modal, since that's what needs finishing before anything else can happen.
+      if (paPlanned) { resumeRun(paPlanned.id); showRunInProgressModal("You have a run in progress. To start a new run, enter results on the open run and save, or delete the in progress run."); }
+      else if (paRuns.length) openResults(f.id);
+      // No runs at the current Scope yet — the button opens the PA modal fresh so a first test
+      // can be started, rather than sitting inert forever.
+      else { selectFilament(f.id); resetTestTab(); openPaModal(); }
+    });
     actions.append(pa);
 
     const ironRuns = completedIroningRunsFor(f.id);
     const incomplete = ironRuns.find(r => !(r.namedResults && r.namedResults.length));   // no named results yet == still waiting on print results
     const iron = el("button", ironRuns.length ? (incomplete ? "warn" : null) : "muted");
     iron.textContent = "Iron" + (ironRuns.length > 1 ? " (" + ironRuns.length + ")" : "");
-    if (ironRuns.length) {
-      iron.addEventListener("click", () => {
-        // Land on the actual data-entry screen (the naming picker), not just the Ironing tab's
-        // settings — that's where "enter the datapoints" actually happens for an ironing run.
-        if (incomplete) { openIroningRun(incomplete.id); openIronPicker(incomplete.id); showRunInProgressModal("You have a run in progress. To start a new run, name samples on the open run and save, or delete the in progress run."); }
-        else openIronResults(f.id);
-      });
-    } else iron.disabled = true;
+    iron.addEventListener("click", () => {
+      // Land on the actual data-entry screen (the naming picker), not just the Ironing modal's
+      // settings — that's where "enter the datapoints" actually happens for an ironing run.
+      if (incomplete) { openIroningRun(incomplete.id); openIronPicker(incomplete.id); showRunInProgressModal("You have a run in progress. To start a new run, name samples on the open run and save, or delete the in progress run."); }
+      else if (ironRuns.length) openIronResults(f.id);
+      // No runs at the current Scope yet — open the Ironing modal fresh to start a first test.
+      else { selectFilament(f.id); openIronModal(); }
+    });
     actions.append(iron);
 
     actions.append(rm); return actions;
@@ -1569,7 +1596,8 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     adoptExistingPlannedRun();
     const run = collectRun("planned"); currentRunId = run.id; upsertRun(run); persist(); renderFilaments(); clearJobDirty();
     switchTab("filaments");   // back to the filament page (the run shows pinned there — no popup needed)…
-    resetTestTab();           // …and leave the PA tab fresh for the next run
+    $("tab-test").hidden = true;   // …close the PA modal…
+    resetTestTab();                // …and leave it fresh for the next run
   }
   function saveRun() {
     if (!data.lastPrinterId || !getSelectedNozzle() || !data.lastFilamentId) { alert("Select a printer, nozzle and filament first."); return; }
@@ -1578,7 +1606,8 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const run = collectRun("complete"); currentRunId = run.id; upsertRun(run);
     persist(); renderFilaments(); clearJobDirty();
     switchTab("filaments");   // completed → back to the filament page (run shows under its filament)…
-    resetTestTab();           // …and leave the PA tab fresh for the next run
+    $("tab-test").hidden = true;   // …close the PA modal…
+    resetTestTab();                // …and leave it fresh for the next run
   }
   const resumeRun = (id) => openRun(id);   // planned run → editable in the PA tab
 
@@ -1706,7 +1735,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     }
     maxFlowConfirmed = true;   // a saved run's max flow is trusted — don't re-gate it
     renderPrinters(); renderNozzles(); renderFilaments(); updateTestContext(); updateIroningContext();
-    switchTab("test");
+    openPaModal();
     persist(); markJobDirty();
     // Land on the actual data-entry screen, not just the top of the tab — the results table
     // (advanced) / result fields (basic) sit below the setup sections, so resuming without this
@@ -1745,7 +1774,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   }
 
   // The single incomplete (unnamed) ironing run for a printer+filament combo, if any — the same
-  // "one in-progress run" invariant saveIroningRun/autoloadIncompleteIroningRun rely on.
+  // "one in-progress run" invariant saveIroningRun relies on.
   function findIncompleteIroningRun(pid, nid, fid) {
     return (data.ironingRuns || []).find(r => r.printerId === pid && r.nozzleId === nid && r.filamentId === fid && !(r.namedResults && r.namedResults.length));
   }
@@ -1886,9 +1915,10 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const fresh = collectIroningRun(existing);
     if (existing) data.ironingRuns[data.ironingRuns.indexOf(existing)] = fresh;
     else data.ironingRuns.unshift(fresh);
-    persist(); renderFilaments();
+    persist(); renderFilaments(); clearIronDirty();
     switchTab("filaments");
-    openIronResults(data.lastFilamentId);
+    $("tab-ironing").hidden = true;   // close the Ironing modal…
+    openIronResults(data.lastFilamentId);   // …and land on the naming/results picker
   }
   function deleteIroningRun(id) {
     const r = (data.ironingRuns || []).find(x => x.id === id); if (!r) return;
@@ -1898,8 +1928,8 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     persist(); renderFilaments(); updateIroningContext();   // refresh the Abandon button too, in case this was the in-progress run
     if (completedIroningRunsFor(fid).length) openIronResults(fid); else closeIronResults();
   }
-  // Loads a saved run's sweep/geometry settings into the Ironing tab fields (shared by the
-  // explicit "resume/rerun" flow below and the auto-resume-on-tab-open hook).
+  // Loads a saved run's sweep/geometry settings into the Ironing modal's fields (shared by the
+  // explicit "resume" and "rerun with these settings" flows).
   function loadIroningRunFields(r) {
     const s = r.settings || {};
     if (s.speedMin != null) $("ironSpeedMin").value = s.speedMin;
@@ -1925,17 +1955,8 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     if (pr && r.nozzleId && pr.nozzles && pr.nozzles.some(nz => nz.id === r.nozzleId)) selectNozzle(r.nozzleId);
     if (r.instanceId) { data.lastInstanceId = r.instanceId; persist(); }
     if (r.filamentId && getFilament(r.filamentId)) selectFilament(r.filamentId);
-    switchTab("ironing");
+    openIronModal();
     loadIroningRunFields(r);
-  }
-  // Auto-resume: since only one incomplete run may exist per printer+nozzle+filament, opening the
-  // Ironing tab with that combo already selected loads it automatically instead of leaving you
-  // to stumble into creating (what would look like) a duplicate.
-  function autoloadIncompleteIroningRun() {
-    const pid = data.lastPrinterId, nid = data.lastNozzleId, fid = data.lastFilamentId;
-    if (!pid || !nid || !fid) return;
-    const run = findIncompleteIroningRun(pid, nid, fid);
-    if (run) loadIroningRunFields(run);
   }
   /* ---- Saved-results modal (per filament) — Ironing ---- */
   let ironResultsRunId = null;
@@ -2237,10 +2258,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("filamentViewToggle").addEventListener("click", (e) => { const b = e.target.closest("button[data-view]"); if (!b) return; data.filamentView = b.dataset.view; persist(); renderFilaments(); });
     $("filamentScope").addEventListener("change", () => { data.filamentScope = $("filamentScope").value; persist(); renderFilaments(); });
 
-    document.querySelectorAll(".tab-btn").forEach(b => b.addEventListener("click", () => {
-      switchTab(b.dataset.tab);
-      if (b.dataset.tab === "ironing") autoloadIncompleteIroningRun();   // only on organic tab clicks — not the resume/rerun flows, which already loaded their specific run
-    }));
+    document.querySelectorAll(".tab-btn").forEach(b => b.addEventListener("click", () => switchTab(b.dataset.tab)));
     switchTab("printers");
 
     // Ironing Test tab: min/max/points regenerate the list ONLY while it's still auto (same idiom
@@ -2348,26 +2366,42 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       if (navigator.clipboard) navigator.clipboard.writeText(b.getAttribute("data-copy"));
       b.classList.add("copied"); setTimeout(() => b.classList.remove("copied"), 1300);
     });
-    // Unsaved-PA-job guard: mark the job dirty on edits, prompt on navigation / tab close.
+    // Unsaved-job guards: mark dirty on edits, prompt on modal close. PA and Ironing each have
+    // their own dirty flag (jobDirty / ironDirty), but share one guard modal — jobGuardSave/
+    // Abandon/Cancel dispatch on pendingModal ("pa" | "iron") to resolve whichever is open.
     $("resultsBody").addEventListener("input", markJobDirty);
     if ($("basicBestPA")) $("basicBestPA").addEventListener("input", markJobDirty);
-    $("jobGuardSave").addEventListener("click", () => { savePlanned(); $("jobGuardModal").hidden = true; const t = pendingTab; pendingTab = null; if (t) applyTab(t); });
-    $("jobGuardAbandon").addEventListener("click", () => {
-      // Abandoned runs aren't recoverable, so there's no reason to keep them around — delete
-      // outright rather than soft-flagging (matches how ironing runs and the results modal work).
-      if (currentRunId) {
-        const i = data.runs.findIndex(x => x.id === currentRunId);
-        if (i >= 0) data.runs.splice(i, 1);
-      }
-      currentRunId = null; loadGrid([]); clearJobDirty(); persist(); renderFilaments();
-      $("jobGuardModal").hidden = true; const t = pendingTab; pendingTab = null; if (t) applyTab(t);
+    ["ironSpeedMin", "ironSpeedMax", "ironSpeedPoints", "ironSpeedList", "ironFlowMin", "ironFlowMax", "ironFlowPoints", "ironFlowList", "ironPadDiameter", "ironGap"].forEach(id => $(id).addEventListener("input", markIronDirty));
+    $("jobGuardSave").addEventListener("click", () => {
+      const m = pendingModal; pendingModal = null;
+      if (m === "iron") saveIroningRun(); else savePlanned();
+      $("jobGuardModal").hidden = true;
     });
-    $("jobGuardCancel").addEventListener("click", () => { $("jobGuardModal").hidden = true; pendingTab = null; });
-    window.addEventListener("beforeunload", (e) => { if (jobDirty) { e.preventDefault(); e.returnValue = ""; } });
+    $("jobGuardAbandon").addEventListener("click", () => {
+      const m = pendingModal; pendingModal = null;
+      if (m === "iron") {
+        // Same "not recoverable, delete outright" treatment as PA's abandon, below.
+        const r = findIncompleteIroningRun(data.lastPrinterId, data.lastNozzleId, data.lastFilamentId);
+        if (r) { data.ironingRuns = (data.ironingRuns || []).filter(x => x.id !== r.id); }
+        clearIronDirty(); persist(); renderFilaments(); updateIroningContext();
+        $("jobGuardModal").hidden = true; $("tab-ironing").hidden = true;
+      } else {
+        // Abandoned runs aren't recoverable, so there's no reason to keep them around — delete
+        // outright rather than soft-flagging (matches how ironing runs and the results modal work).
+        if (currentRunId) {
+          const i = data.runs.findIndex(x => x.id === currentRunId);
+          if (i >= 0) data.runs.splice(i, 1);
+        }
+        currentRunId = null; loadGrid([]); clearJobDirty(); persist(); renderFilaments();
+        $("jobGuardModal").hidden = true; $("tab-test").hidden = true;
+      }
+    });
+    $("jobGuardCancel").addEventListener("click", () => { $("jobGuardModal").hidden = true; pendingModal = null; });
+    window.addEventListener("beforeunload", (e) => { if (jobDirty || ironDirty) { e.preventDefault(); e.returnValue = ""; } });
     // Cross-tab sync: if PA-Helper is open in another tab and it saves, pick up the change here so
     // this tab can't later export a stale in-memory copy. Skip while mid-edit so we don't clobber work.
     window.addEventListener("storage", (e) => {
-      if (e.key !== Store.key || !e.newValue || jobDirty) return;
+      if (e.key !== Store.key || !e.newValue || jobDirty || ironDirty) return;
       data = Store.load(); rebuildForms(); reloadAll();
     });
     // Auto-seeded default nozzle prompt (after saving a new printer)
@@ -2402,6 +2436,10 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("patternOk").addEventListener("click", () => { if (patternTr && patternSel != null) { const inp = patternTr.querySelector('input[data-key="bestPA"]'); inp.value = patternSel; inp.dispatchEvent(new window.Event("input", { bubbles: true })); } $("patternModal").hidden = true; });
     $("patternCancel").addEventListener("click", () => { $("patternModal").hidden = true; });
     $("patternModal").addEventListener("click", (e) => { if (e.target === $("patternModal")) $("patternModal").hidden = true; });
+    $("paModalClose").addEventListener("click", closePaModal);
+    $("tab-test").addEventListener("click", (e) => { if (e.target === $("tab-test")) closePaModal(); });
+    $("ironModalClose").addEventListener("click", closeIronModal);
+    $("tab-ironing").addEventListener("click", (e) => { if (e.target === $("tab-ironing")) closeIronModal(); });
     $("debugClearBtn").addEventListener("click", () => { $("debugModal").hidden = false; });
     $("debugModal").addEventListener("click", (e) => { if (e.target === $("debugModal")) $("debugModal").hidden = true; });
     $("debugModal").querySelectorAll("button[data-clear]").forEach(b => b.addEventListener("click", () => doClear(b.dataset.clear)));

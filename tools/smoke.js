@@ -71,8 +71,8 @@ ok($("filamentScope").value === "nozzle", "Scope defaults to 'This printer + noz
   let lastAlert = "";
   const origAlert = window.alert;
   window.alert = (msg) => { lastAlert = msg; };
-  [...document.querySelectorAll(".tab-btn")].find(b => b.dataset.tab === "test").dispatchEvent(new window.Event("click", { bubbles: true }));
-  ok($("tab-printers").classList.contains("active"), "navigating to PA Test with no printer selected bounces back to Printers");
+  [...document.querySelectorAll(".tab-btn")].find(b => b.dataset.tab === "filaments").dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok($("tab-printers").classList.contains("active"), "navigating to Filaments with no printer selected bounces back to Printers");
   ok(/printer/i.test(lastAlert), "bounce-back explains why via an alert");
   window.alert = origAlert;
 }
@@ -460,7 +460,7 @@ const plaCardResume = [...$("filamentList").querySelectorAll(".card,.frow")].fin
 const paResumeBtn = [...plaCardResume.querySelectorAll(".actions button")].find(b => /^PA/.test(b.textContent));
 ok(paResumeBtn && paResumeBtn.classList.contains("warn"), "PA button is orange while a run is in progress");
 paResumeBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
-ok($("tab-test").classList.contains("active"), "clicking the in-progress PA button resumes the run (test tab)");
+ok($("tab-test").hidden === false, "clicking the in-progress PA button resumes the run (opens the PA modal)");
 ok($("runInProgressModal").hidden === false, "in-progress explainer modal shown");
 ok(/Resumed planned run/.test($("recommendOut").textContent), "resume populated test tab");
 // formatVersion 2.0: geometry is never cached/persisted, so a resumed run's picker must
@@ -477,11 +477,14 @@ ok($("runInProgressModal").hidden === true, "OK dismisses the explainer modal");
 // clean up: the PA button now prioritizes an in-progress run over history (same as Iron), so
 // later "completed run" tests need this outstanding planned run gone first. Resuming already
 // marked the job dirty; abandon it via the unsaved-job guard (full delete, same path tested
-// again further down for a different job).
-[...document.querySelectorAll(".tab-btn")].find(b => b.dataset.tab === "printers").dispatchEvent(new window.Event("click", { bubbles: true }));
-ok($("jobGuardModal").hidden === false, "navigating away from the resumed job prompts the unsaved guard");
+// again further down for a different job). Closing the modal (not switching the underlying
+// Printers/Filaments tab, which no longer carries a dirty-guard of its own — the modal's backdrop
+// covers the tab nav in the real UI) is what now triggers the guard.
+click("paModalClose");
+ok($("jobGuardModal").hidden === false, "closing the PA modal on an unsaved job prompts the unsaved guard");
 $("jobGuardAbandon").dispatchEvent(new window.Event("click", { bubbles: true }));
 ok(!readData().runs.some(r => r.status === "planned" && r.filamentId === pla.id), "abandoning the resumed job deletes it (no more planned run for PLA)");
+ok($("tab-test").hidden === true, "abandon also closes the PA modal");
 
 // export robustness: stamps lastExportedAt, status reflects freshness, later edits go stale
 click("exportBtn");
@@ -504,7 +507,7 @@ ok($("dataStatus").classList.contains("stale") && /newer than/.test($("dataStatu
   const paBtnAgain = [...plaCardAgain.querySelectorAll(".actions button")].find(b => /^PA/.test(b.textContent));
   paBtnAgain.dispatchEvent(new window.Event("click", { bubbles: true }));   // resumes + sets currentRunId
   $("runInProgressOk").dispatchEvent(new window.Event("click", { bubbles: true }));
-  [...document.querySelectorAll(".tab-btn")].find(b => b.dataset.tab === "printers").dispatchEvent(new window.Event("click", { bubbles: true }));
+  click("paModalClose");
   $("jobGuardAbandon").dispatchEvent(new window.Event("click", { bubbles: true }));
   ok(!readData().runs.some(r => r.status === "planned" && r.filamentId === pla.id), "side-effect planned run from the stale-flag check is cleaned up");
 }
@@ -613,7 +616,7 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
   // clone → a fresh editable run with blank results, modal closed, on the PA tab
   $("resultsClone").dispatchEvent(new window.Event("click", { bubbles: true }));
   ok($("resultsModal").hidden === true, "clone closes the results modal");
-  ok($("tab-test").classList.contains("active"), "clone opens the PA test tab");
+  ok($("tab-test").hidden === false, "clone opens the PA modal");
   ok([...$("resultsBody").querySelectorAll('input[data-key="bestPA"]')].every(i => i.value === ""), "clone starts a new run with blank results (same settings)");
   ok($("resultsBody").querySelectorAll("tr.outlier").length === 0 && [...$("resultsBody").querySelectorAll(".edgewarn,.outlierwarn")].every(w => w.hidden), "clone clears stale row warning indicators");
   ok($("modelBlock").hidden === true, "clone hides the export model block (blank results = button only)");
@@ -625,8 +628,14 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
   ok($("resultsModal").hidden === true, "deleting the last run for a filament closes the modal");
   {
     const btn = resBtn();
-    ok(!!btn && btn.classList.contains("muted") && btn.disabled, "PA button goes grey/inert (not hidden) once the filament has no completed (or planned) runs");
+    ok(!!btn && btn.classList.contains("muted") && !btn.disabled, "PA button goes grey/inert but stays clickable once the filament has no completed (or planned) runs — grey now means 'start a fresh test', not disabled");
   }
+  // cleanup: the clone above (line ~617) left the PA modal open with an unsaved (never-persisted)
+  // run — close it via the unsaved-job guard so it doesn't leak into later sections.
+  click("paModalClose");
+  ok($("jobGuardModal").hidden === false, "closing the still-dirty cloned PA modal prompts the guard");
+  $("jobGuardAbandon").dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok($("tab-test").hidden === true, "PA modal closed after cleanup");
 }
 
 // outlier flag: neighbour-based, catches a local mispick that a global test would miss (real ABS run)
@@ -680,7 +689,7 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
 
   spCard().dispatchEvent(new window.Event("click", { bubbles: true }));
   nozCardS(sNozA).dispatchEvent(new window.Event("click", { bubbles: true }));
-  ok(scopeBtn().classList.contains("muted") && scopeBtn().disabled, "brand-new filament is grey under nozzle scope (no runs anywhere yet)");
+  ok(scopeBtn().classList.contains("muted") && !scopeBtn().disabled, "brand-new filament is grey (but clickable) under nozzle scope (no runs anywhere yet)");
 
   // save a planned run under this printer + nozzle A
   $("maxFlow").value = "20"; $("maxFlow").dispatchEvent(new window.Event("input", { bubbles: true }));
@@ -695,7 +704,7 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
 
   // switch to nozzle B on the SAME printer — nozzle scope no longer sees the run
   nozCardS(sNozB).dispatchEvent(new window.Event("click", { bubbles: true }));
-  ok(scopeBtn().classList.contains("muted") && scopeBtn().disabled, "nozzle scope: grey on a different nozzle of the same printer");
+  ok(scopeBtn().classList.contains("muted") && !scopeBtn().disabled, "nozzle scope: grey (but clickable) on a different nozzle of the same printer");
 
   // widen to printer scope (any nozzle) — the run counts again from nozzle B
   $("filamentScope").value = "printer"; ev($("filamentScope"), "change");
@@ -704,7 +713,7 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
   // switch to a completely different, still-alive printer — printer scope no longer sees the run
   const bCardHere = () => [...$("printerList").querySelectorAll(".card")].find(c => c.textContent.includes("Bambu Lab A1"));
   bCardHere().dispatchEvent(new window.Event("click", { bubbles: true }));
-  ok(scopeBtn().classList.contains("muted") && scopeBtn().disabled, "printer scope: grey on a completely different printer");
+  ok(scopeBtn().classList.contains("muted") && !scopeBtn().disabled, "printer scope: grey (but clickable) on a completely different printer");
 
   // widen to all printers — the run counts regardless of current selection
   $("filamentScope").value = "all"; ev($("filamentScope"), "change");
@@ -717,7 +726,7 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
   $("filamentScope").value = "nozzle"; ev($("filamentScope"), "change");
   scopeBtn().dispatchEvent(new window.Event("click", { bubbles: true }));   // resumes the run
   $("runInProgressOk").dispatchEvent(new window.Event("click", { bubbles: true }));
-  [...document.querySelectorAll(".tab-btn")].find(b => b.dataset.tab === "printers").dispatchEvent(new window.Event("click", { bubbles: true }));
+  click("paModalClose");
   $("jobGuardAbandon").dispatchEvent(new window.Event("click", { bubbles: true }));
   ok(!readData().runs.some(r => r.filamentId === scopeFil.id), "scope-test run cleaned up");
   const spRemoveBtn = () => [...spCard().querySelectorAll(".actions button")].find(b => b.title === "Remove");
@@ -882,6 +891,58 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
   [...document.querySelectorAll(".tab-btn")].find(b => b.dataset.tab === "printers").dispatchEvent(new window.Event("click", { bubbles: true }));
 }
 
+// modal-open/close mechanics: a grey (zero-match) PA/Iron button opens a fresh modal instead of
+// sitting inert, a clean modal's backdrop closes it outright, and Ironing carries its own
+// independent dirty-guard (ironDirty) that shares the jobGuardModal UI with PA's (jobDirty)
+{
+  setFieldKey($("printerForm"), "maker", "ModalTestCo");
+  setFieldKey($("printerForm"), "model", "RigM");
+  setFieldKey($("printerForm"), "bedX", "300");
+  setFieldKey($("printerForm"), "bedY", "300");
+  click("savePrinterBtn");
+  setFieldKey($("filamentForm"), "maker", "ModalCo");
+  setFieldKey($("filamentForm"), "material", "PLA");
+  click("saveFilamentBtn");
+  const mFil = readData().filaments.find(f => f.maker === "ModalCo");
+  const mFilCard = () => [...$("filamentList").querySelectorAll(".card,.frow")].find(c => c.textContent.includes("ModalCo"));
+  const mPaBtn = () => [...mFilCard().querySelectorAll(".actions button")].find(b => /^PA/.test(b.textContent));
+  const mIronBtn = () => [...mFilCard().querySelectorAll(".actions button")].find(b => /^Iron/.test(b.textContent));
+
+  // grey PA button (no runs yet) opens the PA modal fresh, rather than sitting inert
+  ok(mPaBtn().classList.contains("muted") && !mPaBtn().disabled, "fresh filament's PA button is grey but clickable");
+  ok($("tab-test").hidden === true, "PA modal starts closed");
+  mPaBtn().dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok($("tab-test").hidden === false, "clicking the grey PA button opens the PA modal fresh");
+  ok(readData().lastFilamentId === mFil.id, "opening fresh selects that filament");
+  // backdrop click closes a clean modal outright (nothing dirty to guard)
+  $("tab-test").dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok($("tab-test").hidden === true, "clicking the modal backdrop closes a clean PA modal");
+  ok($("jobGuardModal").hidden === true, "no guard fires when nothing is dirty");
+
+  // grey Iron button similarly opens the Ironing modal fresh
+  ok(mIronBtn().classList.contains("muted") && !mIronBtn().disabled, "fresh filament's Iron button is grey but clickable");
+  mIronBtn().dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok($("tab-ironing").hidden === false, "clicking the grey Iron button opens the Ironing modal fresh");
+  $("tab-ironing").dispatchEvent(new window.Event("click", { bubbles: true }));   // backdrop click, clean
+  ok($("tab-ironing").hidden === true, "clicking the modal backdrop closes a clean Ironing modal");
+
+  // Ironing has its own independent dirty-guard (ironDirty), separate from PA's jobDirty
+  mIronBtn().dispatchEvent(new window.Event("click", { bubbles: true }));
+  ev($("ironGap"), "input");   // marks the Ironing job dirty
+  click("ironModalClose");
+  ok($("jobGuardModal").hidden === false, "Ironing's own dirty flag prompts the shared guard on close");
+  ok(/Ironing/.test($("jobGuardTitle").textContent), "guard title reflects the Ironing context");
+  ok($("tab-ironing").hidden === false, "guard blocks the Ironing modal close until resolved");
+  $("jobGuardAbandon").dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok($("jobGuardModal").hidden === true && $("tab-ironing").hidden === true, "abandon closes the guard and the Ironing modal");
+  ok(!readData().ironingRuns.some(r => r.filamentId === mFil.id), "no stray Ironing run left behind by the guard's abandon path");
+
+  // clean up
+  const mpCard = () => [...$("printerList").querySelectorAll(".card")].find(c => c.textContent.includes("RigM"));
+  [...mpCard().querySelectorAll(".actions button")].find(b => b.title === "Remove").dispatchEvent(new window.Event("click", { bubbles: true }));
+  [...mFilCard().querySelectorAll(".actions button")].find(b => b.title === "Remove").dispatchEvent(new window.Event("click", { bubbles: true }));
+}
+
 // DEBUG clear data (destructive — keep last)
 click("debugClearBtn");
 ok($("debugModal").hidden === false, "clear-data modal opens");
@@ -920,23 +981,23 @@ ok(P25.plates === Math.ceil(25 / P25.perPlate) && P25.items.length === 25, "plat
 const Ptiny = window.PAPattern.planPlates({ bed: { shape: "rect", x: 60, y: 40 }, combos: [{ accel: 8000, flow: 8 }], paStart: 0, paEnd: 0.08, paStep: 0.005, lineWidth: 0.44, layerHeight: 0.2, wallLoops: 3 });
 ok(!Ptiny.fits && Ptiny.plates === Infinity, "plate-fit: object too big for a tiny bed does not fit");
 
-// unsaved-PA-job guard: navigating away while dirty prompts; abandon proceeds and clears
-// (DEBUG "clear ALL" above wiped every printer — the new printer-tab gate would otherwise bounce
-// any non-Printers navigation back before this section's own guard logic gets a chance to run)
+// unsaved-PA-job guard: closing the PA modal while dirty prompts; abandon proceeds and closes it
+// (the modal — not the underlying Printers/Filaments tab nav — is what the guard gates now; the
+// modal's backdrop covers the nav in the real UI, so the tab switch itself no longer needs a guard)
 setFieldKey($("printerForm"), "maker", "GuardTestCo");
 setFieldKey($("printerForm"), "model", "RigZ");
 setFieldKey($("printerForm"), "bedX", "250");
 setFieldKey($("printerForm"), "bedY", "250");
 click("savePrinterBtn");
-const tabBtn = (t) => [...document.querySelectorAll(".tab-btn")].find(b => b.dataset.tab === t);
-ev($("resultsBody"), "input");   // marks a PA job dirty
-tabBtn("filaments").dispatchEvent(new window.Event("click", { bubbles: true }));
-ok($("jobGuardModal").hidden === false, "unsaved-job guard prompts on navigation");
-ok(!$("tab-filaments").classList.contains("active"), "guard blocks the tab switch until resolved");
+$("tab-test").hidden = false;   // simulate the PA modal being open
+ev($("resultsBody"), "input");   // marks the PA job dirty
+click("paModalClose");
+ok($("jobGuardModal").hidden === false, "unsaved-job guard prompts on modal close");
+ok($("tab-test").hidden === false, "guard blocks the modal close until resolved");
 $("jobGuardAbandon").dispatchEvent(new window.Event("click", { bubbles: true }));
-ok($("jobGuardModal").hidden === true && $("tab-filaments").classList.contains("active"), "abandon closes guard and proceeds to target tab");
-tabBtn("printers").dispatchEvent(new window.Event("click", { bubbles: true }));
-ok($("jobGuardModal").hidden === true && $("tab-printers").classList.contains("active"), "no guard once the job is cleared");
+ok($("jobGuardModal").hidden === true && $("tab-test").hidden === true, "abandon closes the guard and the PA modal");
+click("paModalClose");
+ok($("jobGuardModal").hidden === true, "no guard once the job is cleared (nothing dirty to prompt about)");
 
 (async () => {
   // ---- multi-plate import + 3-state coverage ----

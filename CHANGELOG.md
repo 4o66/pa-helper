@@ -40,6 +40,14 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   matching, and PA/Ironing test setup all assume a printer is active, so navigating anywhere else
   without one now bounces back with an explanation. The Filament tab is disabled outright until
   then, with its subtitle swapped for a red "no" symbol and "Select a Printer".
+- **PA Test and Ironing Test are now modals opened from a filament's PA/Iron button, not nav
+  tabs.** The nav is down to Printer + Filament. A filament's PA/Iron button is always clickable
+  now — grey opens a fresh test for that filament instead of sitting inert, orange resumes the
+  in-progress run, blue opens its saved results (same color logic as before, just no longer paired
+  with a `disabled` state). Closing either modal (Close button or clicking its backdrop) guards on
+  unsaved changes exactly like the old tab-switch did; Ironing now has its own independent dirty
+  flag (previously only PA tracked this) and the two share one guard dialog, worded for whichever
+  modal is open.
 
 ### Fixed
 - **One in-flight run per printer+nozzle+filament combo is now actually enforced, for both PA
