@@ -95,12 +95,7 @@
   <section class="tab" id="tab-filaments">
     <h2>Filament</h2>
 
-    <div id="inProgressWrap" hidden>
-      <h3 class="pinhead">In progress — printed, waiting for data entry</h3>
-      <div id="inProgressList" class="cards"></div>
-    </div>
-
-    <p class="hint">Pick the filament you're calibrating, or add a new one. Filaments work on any printer unless you restrict them. Runs you've started but not finished appear pinned above.</p>
+    <p class="hint">Pick the filament you're calibrating, or add a new one. Filaments work on any printer unless you restrict them. A run you've started but not finished shows an orange PA or Iron button on its filament card — click it to pick up where you left off.</p>
     <div class="filbar">
       <div id="filamentFilters" class="filters"></div>
       <div class="viewtoggle" id="filamentViewToggle">
@@ -351,12 +346,12 @@
   </div>
 </div>
 
-<div id="ironInProgressModal" class="modal" hidden>
+<div id="runInProgressModal" class="modal" hidden>
   <div class="modal-box plain">
     <h2>Run in progress</h2>
-    <p class="hint">You have a run in progress. To start a new run, name samples on the open run and save, or delete the in progress run.</p>
+    <p class="hint" id="runInProgressMsg"></p>
     <div class="actions">
-      <button id="ironInProgressOk">OK</button>
+      <button id="runInProgressOk">OK</button>
     </div>
   </div>
 </div>

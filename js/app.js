@@ -525,31 +525,9 @@
   }
 
   /* =================== FILAMENTS TAB =================== */
-  function renderInProgress() {
-    const wrap = $("inProgressWrap"), list = $("inProgressList"); list.innerHTML = "";
-    const planned = data.runs.filter(r => r.status === "planned");
-    wrap.hidden = planned.length === 0;
-    planned.forEach(r => {
-      const f = getFilament(r.filamentId), p = getPrinter(r.printerId);
-      const card = el("div", "card pin");
-      const title = el("div", "title"); title.innerHTML = '<span class="badge warn">planned</span>' + filamentLabel(f); card.append(title);
-      const s = r.settings || {};
-      const rng = (s.paStart != null && s.paEnd != null) ? ` · PA ${s.paStart}–${s.paEnd}${s.paStep ? " step " + s.paStep : ""}` : "";
-      const meta = el("div", "meta"); meta.textContent = `${printerLabel(p)} · ${r.mode}${r.basicMethod ? " (" + r.basicMethod + ")" : ""}${rng} · ${r.date}`; card.append(meta);
-      const actions = el("div", "actions");
-      const res = el("button"); res.textContent = "Resume"; res.addEventListener("click", () => resumeRun(r.id));
-      const ab = el("button", "danger"); ab.textContent = "Abandon"; ab.addEventListener("click", () => abandonRun(r.id));
-      actions.append(res, ab); card.append(actions);
-      list.append(card);
-    });
-  }
-  function abandonRun(id) {
-    const r = data.runs.find(x => x.id === id); if (!r) return;
-    if (!confirm("Abandon this run? The filament stays; only this unfinished run is set aside.")) return;
-    r.status = "abandoned"; if (currentRunId === id) { currentRunId = null; clearJobDirty(); }
-    if (data.gcodeCache) delete data.gcodeCache[id];
-    persist(); renderInProgress();
-  }
+  // Planned (in-progress) runs no longer get their own pinned section — they're handled the same
+  // way as in-progress ironing runs: the "PA" button on the filament card turns orange, and
+  // clicking it jumps straight into the open run instead of the results modal. See filActions().
   const FACETS = [["maker", "Maker"], ["material", "Material"], ["formulation", "Formulation"], ["color", "Color"]];
   let filamentFilters = { maker: "", material: "", formulation: "", color: "" };
   const facetValues = (f, key) => key === "formulation" ? formList(f) : (f[key] ? [f[key]] : []);
@@ -562,8 +540,18 @@
     const clone = el("button", "secondary"); clone.textContent = "Clone"; clone.addEventListener("click", () => cloneFilament(f.id));
     const rm = removeButton(() => removeFilament(f.id));
     actions.append(selBtn, edit, clone);
-    const rc = data.runs.filter(r => r.filamentId === f.id && r.status === "complete").length;
-    if (rc) { const res = el("button"); res.textContent = "PA" + (rc > 1 ? " (" + rc + ")" : ""); res.addEventListener("click", () => openResults(f.id)); actions.append(res); }
+    const paRuns = completedRunsFor(f.id);
+    if (paRuns.length) {
+      const paPlanned = paRuns.find(r => r.status === "planned");   // in progress: printed, waiting on results
+      const res = el("button", paPlanned ? "warn" : null); res.textContent = "PA" + (paRuns.length > 1 ? " (" + paRuns.length + ")" : "");
+      res.addEventListener("click", () => {
+        // An in-progress run takes priority over the history view — jump straight to it instead
+        // of the results modal, since that's what needs finishing before anything else can happen.
+        if (paPlanned) { resumeRun(paPlanned.id); showRunInProgressModal("You have a run in progress. To start a new run, enter results on the open run and save, or delete the in progress run."); }
+        else openResults(f.id);
+      });
+      actions.append(res);
+    }
     const ironRuns = completedIroningRunsFor(f.id);
     if (ironRuns.length) {
       const incomplete = ironRuns.find(r => !(r.namedResults && r.namedResults.length));   // no named results yet == still waiting on print results
@@ -571,7 +559,7 @@
       iron.addEventListener("click", () => {
         // An in-progress run takes priority over the history view — jump straight to it instead
         // of the results modal, since that's what needs finishing before anything else can happen.
-        if (incomplete) { openIroningRun(incomplete.id); $("ironInProgressModal").hidden = false; }
+        if (incomplete) { openIroningRun(incomplete.id); showRunInProgressModal("You have a run in progress. To start a new run, name samples on the open run and save, or delete the in progress run."); }
         else openIronResults(f.id);
       });
       actions.append(iron);
@@ -1533,7 +1521,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   }
   function savePlanned() {
     if (!data.lastPrinterId || !getSelectedNozzle() || !data.lastFilamentId) { alert("Select a printer, nozzle and filament first."); return; }
-    const run = collectRun("planned"); currentRunId = run.id; upsertRun(run); cacheBlocksFor(run.id); persist(); renderInProgress(); renderFilaments(); clearJobDirty();
+    const run = collectRun("planned"); currentRunId = run.id; upsertRun(run); cacheBlocksFor(run.id); persist(); renderFilaments(); clearJobDirty();
     switchTab("filaments");   // back to the filament page (the run shows pinned there — no popup needed)…
     resetTestTab();           // …and leave the PA tab fresh for the next run
   }
@@ -1542,7 +1530,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     exportModel();   // generate the Orca export text now so it's stored with the run (shown on reopen)
     const run = collectRun("complete"); currentRunId = run.id; upsertRun(run);
     cacheBlocksFor(run.id);   // keep the geometry so a completed test can be reopened in the real picker
-    persist(); renderInProgress(); renderFilaments(); clearJobDirty();
+    persist(); renderFilaments(); clearJobDirty();
     switchTab("filaments");   // completed → back to the filament page (run shows under its filament)…
     resetTestTab();           // …and leave the PA tab fresh for the next run
   }
@@ -1550,9 +1538,13 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
 
   /* ---- Saved-results modal (per filament) ---- */
   let resultsRunId = null;
+  // Includes "planned" runs too (not just "complete") — a filament's in-progress run and its
+  // history all live in one place now, same as ironing runs. "abandoned" runs are permanently
+  // deleted rather than kept-but-hidden (see jobGuardAbandon / deleteRunById), so no filter needed for those.
   const completedRunsFor = (fid) => data.runs
-    .filter(r => r.status === "complete" && r.filamentId === fid)
+    .filter(r => r.filamentId === fid && (r.status === "complete" || r.status === "planned"))
     .sort((a, b) => String(b.created || b.date || "").localeCompare(String(a.created || a.date || "")));   // newest first
+  function showRunInProgressModal(msg) { $("runInProgressMsg").textContent = msg; $("runInProgressModal").hidden = false; }
   function openResults(fid) {
     const runs = completedRunsFor(fid); if (!runs.length) return;
     const fil = getFilament(fid);
@@ -1622,7 +1614,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     if (i >= 0) data.runs.splice(i, 1);
     if (data.gcodeCache) delete data.gcodeCache[id];
     if (currentRunId === id) currentRunId = null;
-    persist(); renderInProgress(); renderFilaments();
+    persist(); renderFilaments();
     if (completedRunsFor(fid).length) openResults(fid); else closeResults();   // stay on the modal if runs remain
   }
   function openRun(id) {
@@ -2146,7 +2138,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     persist(); rebuildForms(); reloadAll();
     $("debugModal").hidden = true;
   }
-  function reloadAll() { renderPrinters(); renderNozzles(); renderFilaments(); renderInProgress(); renderFilamentPrinterPicker(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); setStatus(); updateTabLabels(); $("themeSel").value = data.theme || "system"; applyTheme(data.theme); }
+  function reloadAll() { renderPrinters(); renderNozzles(); renderFilaments(); renderFilamentPrinterPicker(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); setStatus(); updateTabLabels(); $("themeSel").value = data.theme || "system"; applyTheme(data.theme); }
 
   function init() {
     applyTheme(data.theme);
@@ -2285,9 +2277,14 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     if ($("basicBestPA")) $("basicBestPA").addEventListener("input", markJobDirty);
     $("jobGuardSave").addEventListener("click", () => { savePlanned(); $("jobGuardModal").hidden = true; const t = pendingTab; pendingTab = null; if (t) applyTab(t); });
     $("jobGuardAbandon").addEventListener("click", () => {
-      const r = currentRunId ? data.runs.find(x => x.id === currentRunId) : null;
-      if (r) { r.status = "abandoned"; if (data.gcodeCache) delete data.gcodeCache[currentRunId]; }
-      currentRunId = null; loadGrid([]); clearJobDirty(); persist(); renderInProgress();
+      // Abandoned runs aren't recoverable, so there's no reason to keep them around — delete
+      // outright rather than soft-flagging (matches how ironing runs and the results modal work).
+      if (currentRunId) {
+        const i = data.runs.findIndex(x => x.id === currentRunId);
+        if (i >= 0) data.runs.splice(i, 1);
+        if (data.gcodeCache) delete data.gcodeCache[currentRunId];
+      }
+      currentRunId = null; loadGrid([]); clearJobDirty(); persist(); renderFilaments();
       $("jobGuardModal").hidden = true; const t = pendingTab; pendingTab = null; if (t) applyTab(t);
     });
     $("jobGuardCancel").addEventListener("click", () => { $("jobGuardModal").hidden = true; pendingTab = null; });
@@ -2300,7 +2297,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     });
     // Auto-seeded default nozzle prompt (after saving a new printer)
     $("nozzleSeedOk").addEventListener("click", () => { $("nozzleSeedModal").hidden = true; });
-    $("ironInProgressOk").addEventListener("click", () => { $("ironInProgressModal").hidden = true; });
+    $("runInProgressOk").addEventListener("click", () => { $("runInProgressModal").hidden = true; });
     $("nozzleSeedReplace").addEventListener("click", () => {
       const p = getPrinter(data.lastPrinterId);
       if (p) { p.nozzles = []; data.lastNozzleId = null; persist(); renderNozzles(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); }

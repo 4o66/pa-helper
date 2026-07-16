@@ -26,7 +26,6 @@ h1{font-size:1.25rem;margin:0}
 h1 .sub{font-size:.8rem;color:var(--muted);font-weight:400;margin-left:.5rem}
 h2{font-size:1.1rem;margin:0 0 .3rem;color:var(--accent)}
 h3{font-size:.95rem;margin:.2rem 0 .4rem}
-h3.pinhead{color:var(--warn)}
 .toolbar{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
 .usenow{flex-basis:100%;text-align:right;font-size:.82rem;color:var(--muted);margin-bottom:.15rem}
 .usenow a{color:var(--accent);font-weight:600}
@@ -147,7 +146,6 @@ details[open] summary{margin-bottom:.7rem}
 .card .meta{font-size:.8rem;color:var(--muted);line-height:1.35}
 .card .actions{display:flex;gap:.4rem;margin-top:.3rem;flex-wrap:wrap}
 .card .actions button{padding:.3rem .6rem;font-size:.82rem}
-.card.pin{border-color:var(--warn)}
 .badge{display:inline-block;border-radius:4px;padding:.05rem .4rem;font-size:.75rem;margin-right:.3rem}
 .badge.ok{background:rgba(55,201,139,.15);color:var(--accent2)}
 .badge.warn{background:rgba(255,184,74,.15);color:var(--warn)}
@@ -185,6 +183,9 @@ footer a{color:var(--accent)}
 
 /* danger modal */
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50;padding:1rem}
+/* Can be shown on top of another already-open modal (e.g. the ironing picker) — needs to win
+   regardless of DOM order. */
+#runInProgressModal{z-index:70}
 .modal[hidden]{display:none}
 .modal-box{background:var(--panel);border:2px solid var(--bad);border-radius:12px;max-width:460px;padding:1.2rem 1.3rem;
   box-shadow:0 12px 40px rgba(0,0,0,.5)}
