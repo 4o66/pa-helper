@@ -1,5 +1,7 @@
 # PA-Helper
 
+Prefer the always-current hosted version? Use it now, here: **[4o66.github.io/pa-helper](https://4o66.github.io/pa-helper/)**
+
 > ⚠️ **EARLY BETA — PROCEED WITH CAUTION.**
 > This is unfinished, largely untested software under active development. Features may break or
 > change without notice, and results may be wrong. **Verify every output against your own judgment
