@@ -1552,14 +1552,28 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     resetMaxFlowForCombo();                         // re-prefill + re-gate max flow for the current combo
     clearJobDirty();
   }
+  // One in-flight PA run per printer+nozzle+filament combo — mirrors Ironing's existing
+  // find-existing-and-update pattern in saveIroningRun() (which just needed nozzleId added).
+  // If a planned run already exists for the CURRENT combo and currentRunId isn't already tracking
+  // it (e.g. the test tab was reset, or the user never resumed it), adopt that run's id so saving
+  // updates it in place instead of collectRun() minting a duplicate for the same combo.
+  function adoptExistingPlannedRun() {
+    const active = data.runs.find(r => r.id === currentRunId);
+    const activeMatchesCombo = active && active.printerId === data.lastPrinterId && active.nozzleId === data.lastNozzleId && active.filamentId === data.lastFilamentId;
+    if (activeMatchesCombo) return;
+    const dupe = data.runs.find(r => r.status === "planned" && r.printerId === data.lastPrinterId && r.nozzleId === data.lastNozzleId && r.filamentId === data.lastFilamentId);
+    if (dupe) currentRunId = dupe.id;
+  }
   function savePlanned() {
     if (!data.lastPrinterId || !getSelectedNozzle() || !data.lastFilamentId) { alert("Select a printer, nozzle and filament first."); return; }
+    adoptExistingPlannedRun();
     const run = collectRun("planned"); currentRunId = run.id; upsertRun(run); persist(); renderFilaments(); clearJobDirty();
     switchTab("filaments");   // back to the filament page (the run shows pinned there — no popup needed)…
     resetTestTab();           // …and leave the PA tab fresh for the next run
   }
   function saveRun() {
     if (!data.lastPrinterId || !getSelectedNozzle() || !data.lastFilamentId) { alert("Select a printer, nozzle and filament first."); return; }
+    adoptExistingPlannedRun();   // completing shouldn't leave a stale planned duplicate for this combo behind
     exportModel();   // generate the Orca export text now so it's stored with the run (shown on reopen)
     const run = collectRun("complete"); currentRunId = run.id; upsertRun(run);
     persist(); renderFilaments(); clearJobDirty();
@@ -1732,8 +1746,8 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
 
   // The single incomplete (unnamed) ironing run for a printer+filament combo, if any — the same
   // "one in-progress run" invariant saveIroningRun/autoloadIncompleteIroningRun rely on.
-  function findIncompleteIroningRun(pid, fid) {
-    return (data.ironingRuns || []).find(r => r.printerId === pid && r.filamentId === fid && !(r.namedResults && r.namedResults.length));
+  function findIncompleteIroningRun(pid, nid, fid) {
+    return (data.ironingRuns || []).find(r => r.printerId === pid && r.nozzleId === nid && r.filamentId === fid && !(r.namedResults && r.namedResults.length));
   }
   function updateIroningContext() {
     const p = getPrinter(data.lastPrinterId), n = getSelectedNozzle(), f = getFilament(data.lastFilamentId);
@@ -1748,7 +1762,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const inst = (p.multi && data.lastInstanceId) ? " · unit " + data.lastInstanceId : "";
     ctx.innerHTML = `<b>${printerLabel(p)}</b>${inst}<br><span class="muted">Bed: ${bedSizeLabel(p)}</span><br>Nozzle: <b>${nozzleLabel(n)}</b><br>Filament: <b>${filamentLabel(f)}</b>`;
     $("ironingBody").hidden = false;
-    if ($("ironAbandonBtn")) $("ironAbandonBtn").hidden = !findIncompleteIroningRun(data.lastPrinterId, data.lastFilamentId);
+    if ($("ironAbandonBtn")) $("ironAbandonBtn").hidden = !findIncompleteIroningRun(data.lastPrinterId, n.id, data.lastFilamentId);
     if (!ironingLoaded) { loadIroningSettings(); ironingLoaded = true; }
     refreshIroning();
   }
@@ -1868,7 +1882,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const speeds = ironSpeeds(), flows = ironFlows();
     if (speeds.length < 2 || flows.length < 2) { alert("Enter at least 2 speed and 2 flow values first."); return; }
     data.ironingRuns = data.ironingRuns || [];
-    const existing = data.ironingRuns.find(r => r.printerId === data.lastPrinterId && r.filamentId === data.lastFilamentId && !(r.namedResults && r.namedResults.length));
+    const existing = findIncompleteIroningRun(data.lastPrinterId, data.lastNozzleId, data.lastFilamentId);
     const fresh = collectIroningRun(existing);
     if (existing) data.ironingRuns[data.ironingRuns.indexOf(existing)] = fresh;
     else data.ironingRuns.unshift(fresh);
@@ -1914,13 +1928,13 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     switchTab("ironing");
     loadIroningRunFields(r);
   }
-  // Auto-resume: since only one incomplete run may exist per printer+filament, opening the
+  // Auto-resume: since only one incomplete run may exist per printer+nozzle+filament, opening the
   // Ironing tab with that combo already selected loads it automatically instead of leaving you
   // to stumble into creating (what would look like) a duplicate.
   function autoloadIncompleteIroningRun() {
-    const pid = data.lastPrinterId, fid = data.lastFilamentId;
-    if (!pid || !fid) return;
-    const run = findIncompleteIroningRun(pid, fid);
+    const pid = data.lastPrinterId, nid = data.lastNozzleId, fid = data.lastFilamentId;
+    if (!pid || !nid || !fid) return;
+    const run = findIncompleteIroningRun(pid, nid, fid);
     if (run) loadIroningRunFields(run);
   }
   /* ---- Saved-results modal (per filament) — Ironing ---- */
@@ -2240,7 +2254,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("ironingDownloadBtn").addEventListener("click", downloadIroning3mf);
     $("ironingSaveBtn").addEventListener("click", saveIroningRun);
     $("ironAbandonBtn").addEventListener("click", () => {
-      const r = findIncompleteIroningRun(data.lastPrinterId, data.lastFilamentId);
+      const r = findIncompleteIroningRun(data.lastPrinterId, data.lastNozzleId, data.lastFilamentId);
       if (r) deleteIroningRun(r.id);
     });
 

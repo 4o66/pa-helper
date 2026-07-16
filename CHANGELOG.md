@@ -41,6 +41,16 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   without one now bounces back with an explanation. The Filament tab is disabled outright until
   then, with its subtitle swapped for a red "no" symbol and "Select a Printer".
 
+### Fixed
+- **One in-flight run per printer+nozzle+filament combo is now actually enforced, for both PA
+  and Ironing.** Previously this was only a soft UI convention for PA (the orange button jumped
+  to the right run, but nothing stopped `savePlanned()` from silently creating a second in-flight
+  run for the same combo if you didn't resume the first one), and Ironing's own existing
+  find-and-update guard was missing nozzle from its match key entirely (so switching nozzles on
+  the same printer could find/overwrite the wrong in-flight run). Saving again for the exact same
+  combo now updates the existing in-flight run in place instead of duplicating it; a different
+  nozzle on the same printer is treated as a genuinely separate combo with its own in-flight run.
+
 ### Changed
 - **Export filename now includes the time** (`pa_data_YYYY-MM-DD_HHMM.json`, was date-only) —
   multiple exports on the same day no longer look identical in Downloads.

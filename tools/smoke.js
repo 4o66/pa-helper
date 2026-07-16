@@ -726,6 +726,77 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
   [...document.querySelectorAll(".tab-btn")].find(b => b.dataset.tab === "printers").dispatchEvent(new window.Event("click", { bubbles: true }));
 }
 
+// one in-flight run per printer+nozzle+filament combo (PA + Iron) — saving again for the exact
+// same combo updates the existing in-flight run in place; a different nozzle on the same printer
+// is a genuinely separate combo and gets its own independent in-flight run
+{
+  setFieldKey($("printerForm"), "maker", "FlightTestCo");
+  setFieldKey($("printerForm"), "model", "RigF");
+  click("savePrinterBtn");
+  let dd = readData();
+  const fp = dd.printers.find(p => p.maker === "FlightTestCo");
+  setFieldKey($("nozzleForm"), "diameter", "0.6");
+  click("saveNozzleBtn");
+  dd = readData();
+  const fNozA = dd.printers.find(p => p.id === fp.id).nozzles.find(n => Number(n.diameter) === 0.4);
+  const fNozB = dd.printers.find(p => p.id === fp.id).nozzles.find(n => Number(n.diameter) === 0.6);
+
+  setFieldKey($("filamentForm"), "maker", "FlightCo");
+  setFieldKey($("filamentForm"), "material", "PLA");
+  click("saveFilamentBtn");
+  const flightFil = readData().filaments.find(f => f.maker === "FlightCo");
+
+  const fpCard = () => [...$("printerList").querySelectorAll(".card")].find(c => c.textContent.includes("RigF"));
+  const fNozCard = (n) => [...$("nozzleList").querySelectorAll(".card")].find(c => c.textContent.includes(n.diameter + "mm"));
+  const flightFilCard = () => [...$("filamentList").querySelectorAll(".card,.frow")].find(c => c.textContent.includes("FlightCo"));
+  const runsForNoz = (n) => readData().runs.filter(r => r.printerId === fp.id && r.nozzleId === n.id && r.filamentId === flightFil.id);
+  const ironForNoz = (n) => readData().ironingRuns.filter(r => r.printerId === fp.id && r.nozzleId === n.id && r.filamentId === flightFil.id);
+
+  const planRun = (accelLimit) => {
+    $("maxFlow").value = "20"; $("maxFlow").dispatchEvent(new window.Event("input", { bubbles: true }));
+    $("maxFlowConfirm").dispatchEvent(new window.Event("click", { bubbles: true }));
+    $("flowPoints").value = "3"; $("accelLimit").value = String(accelLimit); $("accelList").value = ""; $("speedList").value = "";
+    click("recommendBtn"); click("loadPointsBtn");
+    window.PA_test.savePlanned();
+  };
+
+  fpCard().dispatchEvent(new window.Event("click", { bubbles: true }));
+  fNozCard(fNozA).dispatchEvent(new window.Event("click", { bubbles: true }));
+  flightFilCard().dispatchEvent(new window.Event("click", { bubbles: true }));
+
+  planRun(4000);
+  ok(runsForNoz(fNozA).length === 1, "PA: first planned run for the combo saved");
+
+  // re-select the SAME combo (savePlanned already reset currentRunId) and save again
+  fpCard().dispatchEvent(new window.Event("click", { bubbles: true }));
+  fNozCard(fNozA).dispatchEvent(new window.Event("click", { bubbles: true }));
+  planRun(5000);
+  ok(runsForNoz(fNozA).length === 1, "PA: saving again for the exact same combo updates the existing planned run instead of duplicating it");
+
+  // a different nozzle on the same printer+filament is a separate combo
+  fNozCard(fNozB).dispatchEvent(new window.Event("click", { bubbles: true }));
+  planRun(4000);
+  ok(runsForNoz(fNozB).length === 1 && runsForNoz(fNozA).length === 1, "PA: a different nozzle gets its own independent in-flight run, doesn't merge with nozzle A's");
+
+  // Iron: same pattern — defaults (10 speed/flow points each) already satisfy the >=2 minimum
+  fNozCard(fNozA).dispatchEvent(new window.Event("click", { bubbles: true }));
+  click("ironingSaveBtn");
+  ok(ironForNoz(fNozA).length === 1, "Iron: first incomplete run for the combo saved");
+  fpCard().dispatchEvent(new window.Event("click", { bubbles: true }));
+  fNozCard(fNozA).dispatchEvent(new window.Event("click", { bubbles: true }));
+  click("ironingSaveBtn");   // same combo again — should update in place, not duplicate
+  ok(ironForNoz(fNozA).length === 1, "Iron: saving again for the same combo updates in place, doesn't duplicate");
+  fNozCard(fNozB).dispatchEvent(new window.Event("click", { bubbles: true }));
+  click("ironingSaveBtn");
+  ok(ironForNoz(fNozB).length === 1 && ironForNoz(fNozA).length === 1, "Iron: a different nozzle gets its own independent in-flight run");
+
+  // clean up: remove the disposable printer + filament (cascade-prunes all these test runs)
+  const fpRemoveBtn = () => [...fpCard().querySelectorAll(".actions button")].find(b => b.title === "Remove");
+  fpRemoveBtn().dispatchEvent(new window.Event("click", { bubbles: true }));
+  [...flightFilCard().querySelectorAll(".actions button")].find(b => b.title === "Remove").dispatchEvent(new window.Event("click", { bubbles: true }));
+  [...document.querySelectorAll(".tab-btn")].find(b => b.dataset.tab === "printers").dispatchEvent(new window.Event("click", { bubbles: true }));
+}
+
 // orphan cleanup: deleting a printer/nozzle/filament cascades to prune any run that referenced
 // it (a run pointing at something deleted can never be reached again from the UI) and, for
 // printer/nozzle, the confirm() warns with a count when there's actually something to lose.
