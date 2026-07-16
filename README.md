@@ -21,7 +21,7 @@ Phase B (planned): optional self-hosted backend for accounts (social login) and 
 **opt-in, anonymized community PA dataset**. See [Roadmap](#roadmap).
 
 ## What it does (Phase A)
-Three tabs, plus system/light/dark theming:
+Four tabs, plus system/light/dark theming:
 
 1. **Printers** — a library of your machines. A printer's identity is its maker/model,
    toolhead, **extruder + drive (direct/bowden)** and **hotend** — the things that
@@ -41,6 +41,17 @@ Three tabs, plus system/light/dark theming:
    height × line width). It plots, fits a trend (two-variable when multiple accels are
    present), flags outliers, and exports the Orca adaptive-PA model text (or the single
    PA for Basic).
+
+4. **Ironing Test** — pick a printer + filament, sweep **ironing speed** (mm/s) and
+   **ironing flow** (%) across a grid, and generate an OrcaSlicer **3MF project** (not
+   g-code — Orca still does the real slicing) with per-pad overrides already set, sized
+   and brimmed to fit your printer's real bed. Print it, then **name each pad**
+   (Glossy/Matte/Other) in a picker matching the physical grid — no measuring or
+   guessing which pad is which. Saved tests keep a full history per printer+filament,
+   same as PA Test. Based on [LeoganPro](https://www.printables.com/@LeoganPro)'s
+   [Top Surface Ironing Test](https://www.printables.com/model/1247198) (CC0) — this
+   feature exists because of that model; PA-Helper only automates generating and
+   reading it for your own printer/filament library.
 
 **Run lifecycle:** save a **planned** run before you print, come back later, find it
 pinned under Filaments, **Resume** it, enter results, and save it **complete**. Every

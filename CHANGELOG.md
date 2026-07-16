@@ -17,6 +17,10 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   dev tooling and reconciled with current behavior: fixed references to the removed Select
   buttons, the retired PA in-progress section, the Results→PA/Iron button split, and the
   temporarily-disabled Basic mode dropdown option.
+- **Ironing Test attribution.** README now documents the Ironing Test feature (it had no
+  section at all) and both README and the in-app Ironing tab credit
+  [LeoganPro's Top Surface Ironing Test](https://www.printables.com/model/1247198) (CC0) as
+  the model this feature is built on.
 
 ### Fixed
 - **Resuming a run could crash instead of scrolling** — `entrySec.scrollIntoView()` was called
