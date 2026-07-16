@@ -1244,24 +1244,11 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   }
   // ---- pattern picker ----
   let patternTr = null, patternSel = null;
-  // strip parsed blocks down to just the line coords the picker draws, so they can be
-  // cached in pa_data.json and survive a reload/resume (memory-only gcodeBlocks is lost).
-  function compactBlocks(gb) {
-    if (!gb || !gb.byKey) return null;
-    const c = s => ({ x1: +s.x1.toFixed(1), y1: +s.y1.toFixed(1), x2: +s.x2.toFixed(1), y2: +s.y2.toFixed(1) });
-    const out = { byKey: {}, plates: gb.plates };
-    for (const k in gb.byKey) {
-      const b = gb.byKey[k], byPa = {};
-      for (const pa in b.byPa) byPa[pa] = b.byPa[pa].map(c);
-      out.byKey[k] = { bbox: b.bbox, rbox: b.rbox, byPa, bg: (b.bg || []).map(c), text: (b.text || []).map(c) };
-    }
-    return out;
-  }
-  function cacheBlocksFor(runId) {
-    if (!gcodeBlocks || !runId) return;
-    data.gcodeCache = data.gcodeCache || {};
-    data.gcodeCache[runId] = compactBlocks(gcodeBlocks);
-  }
+  // Picker geometry is never persisted (formatVersion 2.0) — a reopened run always regenerates
+  // via synthPatternBlock() below, from the run's own stored settings (paStart/paEnd/paStep/
+  // lineW/layerH), the same path already used for "recommended" runs. This holds for imported
+  // g-code runs too: their settings were themselves parsed FROM the g-code, so the regenerated
+  // pattern matches — no raw-gcode re-parse needed. See openRun/openPattern.
   function patternSelectPa(pa) {
     patternSel = pa;
     [...$("patternSvg").querySelectorAll(".paline")].forEach(e2 => e2.classList.toggle("sel", e2.dataset.pa === String(pa)));
@@ -1526,7 +1513,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   }
   function savePlanned() {
     if (!data.lastPrinterId || !getSelectedNozzle() || !data.lastFilamentId) { alert("Select a printer, nozzle and filament first."); return; }
-    const run = collectRun("planned"); currentRunId = run.id; upsertRun(run); cacheBlocksFor(run.id); persist(); renderFilaments(); clearJobDirty();
+    const run = collectRun("planned"); currentRunId = run.id; upsertRun(run); persist(); renderFilaments(); clearJobDirty();
     switchTab("filaments");   // back to the filament page (the run shows pinned there — no popup needed)…
     resetTestTab();           // …and leave the PA tab fresh for the next run
   }
@@ -1534,7 +1521,6 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     if (!data.lastPrinterId || !getSelectedNozzle() || !data.lastFilamentId) { alert("Select a printer, nozzle and filament first."); return; }
     exportModel();   // generate the Orca export text now so it's stored with the run (shown on reopen)
     const run = collectRun("complete"); currentRunId = run.id; upsertRun(run);
-    cacheBlocksFor(run.id);   // keep the geometry so a completed test can be reopened in the real picker
     persist(); renderFilaments(); clearJobDirty();
     switchTab("filaments");   // completed → back to the filament page (run shows under its filament)…
     resetTestTab();           // …and leave the PA tab fresh for the next run
@@ -1617,7 +1603,6 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     if (!confirm("Delete this saved run permanently? This can't be undone.")) return;
     const fid = r.filamentId, i = data.runs.findIndex(x => x.id === id);
     if (i >= 0) data.runs.splice(i, 1);
-    if (data.gcodeCache) delete data.gcodeCache[id];
     if (currentRunId === id) currentRunId = null;
     persist(); renderFilaments();
     if (completedRunsFor(fid).length) openResults(fid); else closeResults();   // stay on the modal if runs remain
@@ -1625,7 +1610,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   function openRun(id) {
     const r = data.runs.find(x => x.id === id); if (!r) return;
     currentRunId = id;
-    gcodeBlocks = (data.gcodeCache && data.gcodeCache[id]) ? data.gcodeCache[id] : null;   // restore real pattern geometry
+    gcodeBlocks = null;   // never persisted (formatVersion 2.0) — openPattern falls back to synthPatternBlock(), regenerating from r.settings
     data.lastPrinterId = r.printerId; data.lastInstanceId = r.instanceId || null; data.lastFilamentId = r.filamentId;
     const rp = getPrinter(r.printerId);
     data.lastNozzleId = (rp && rp.nozzles && rp.nozzles.some(n => n.id === r.nozzleId)) ? r.nozzleId : (rp && rp.nozzles && rp.nozzles[0] ? rp.nozzles[0].id : null);
@@ -2150,7 +2135,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     };
     if (!confirm(`Permanently delete ${labels[kind]}?\n\nThere is no undo.`)) return;
     if (kind === "all") { const theme = data.theme; data = Store.defaultData(); data.theme = theme; }
-    else if (kind === "history") { data.runs = []; data.ironingRuns = []; data.gcodeCache = {}; data.customOptions = Store.defaultData().customOptions; }
+    else if (kind === "history") { data.runs = []; data.ironingRuns = []; data.customOptions = Store.defaultData().customOptions; }
     else if (kind === "filaments") { data.filaments = []; data.lastFilamentId = null; }
     else if (kind === "printers") { data.printers = []; data.lastPrinterId = null; data.lastInstanceId = null; data.lastNozzleId = null; }
     editingPrinterId = null; editingFilamentId = null; currentRunId = null; currentSettings = null; lastFit = null; clearJobDirty();
@@ -2305,7 +2290,6 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       if (currentRunId) {
         const i = data.runs.findIndex(x => x.id === currentRunId);
         if (i >= 0) data.runs.splice(i, 1);
-        if (data.gcodeCache) delete data.gcodeCache[currentRunId];
       }
       currentRunId = null; loadGrid([]); clearJobDirty(); persist(); renderFilaments();
       $("jobGuardModal").hidden = true; const t = pendingTab; pendingTab = null; if (t) applyTab(t);

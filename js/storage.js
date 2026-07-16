@@ -23,6 +23,10 @@ window.PAStore = (function () {
   function defaultData() {
     return {
       version: 2,
+      // Document-format revision WITHIN the v2 schema/storage key — bumped when the *shape* of
+      // what's exported changes in a way old files need migrating for. 2.0 = gcodeCache removed
+      // (see migrate() below); a file missing this (or with an older value) is old-format.
+      formatVersion: "2.0",
       theme: "system",              // system | light | dark
       customOptions: {
         printerMaker: [], printerModel: [], toolhead: [], extruder: [], hotend: [],
@@ -36,8 +40,10 @@ window.PAStore = (function () {
       lastInstanceId: null,
       lastNozzleId: null,           // selected nozzle within the selected printer
       lastFilamentId: null,
-      gcodeCache: {},                // runId -> parsed pattern-block geometry, so the picker
-                                    // still renders the real pattern after a reload/resume
+      // gcodeCache intentionally NOT part of the schema as of formatVersion 2.0 — the picker's
+      // pattern geometry is fully reproducible from a run's stored settings (js/pattern.js), so
+      // persisting it was pure machine-only bloat (~96% of a typical export's real data) in a
+      // file that's meant to be human-readable. See migrate() and js/app.js's openRun/openPattern.
       ironingSettings: null,         // last-used Ironing Test tab settings (speed/flow sweep,
                                       // pad geometry) — see updateIroningContext() in app.js
       ironingRuns: []                // saved ironing tests — {id, status:"complete", date, printerId,
@@ -48,7 +54,18 @@ window.PAStore = (function () {
 
   const uid = () => (Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
 
-  function merge(parsed) { return Object.assign(defaultData(), parsed || {}); }
+  // Old-format files (has gcodeCache, or missing/pre-2.0 formatVersion) migrate in memory here:
+  // drop gcodeCache, stamp the current formatVersion. No other data is touched or lost. Every
+  // load path (load/connectFile/importJSON) routes through merge(), so this always runs on read.
+  function migrate(d) {
+    if (d.gcodeCache || d.formatVersion !== "2.0") {
+      delete d.gcodeCache;
+      d.formatVersion = "2.0";
+    }
+    return d;
+  }
+
+  function merge(parsed) { return migrate(Object.assign(defaultData(), parsed || {})); }
 
   function load() {
     try {

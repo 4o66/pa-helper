@@ -436,6 +436,15 @@ paResumeBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
 ok($("tab-test").classList.contains("active"), "clicking the in-progress PA button resumes the run (test tab)");
 ok($("runInProgressModal").hidden === false, "in-progress explainer modal shown");
 ok(/Resumed planned run/.test($("recommendOut").textContent), "resume populated test tab");
+// formatVersion 2.0: geometry is never cached/persisted, so a resumed run's picker must
+// regenerate purely from its stored settings (synthPatternBlock fallback in openPattern)
+{
+  const resumedRow = $("resultsBody").querySelector("tr");
+  resumedRow.querySelector("button.iconbtn").dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok($("patternModal").hidden === false, "resumed run's pattern picker opens");
+  ok($("patternSvg").querySelectorAll("line").length > 5, "resumed run's picker renders geometry regenerated from settings, not a cache");
+  $("patternModal").hidden = true;
+}
 $("runInProgressOk").dispatchEvent(new window.Event("click", { bubbles: true }));
 ok($("runInProgressModal").hidden === true, "OK dismisses the explainer modal");
 // clean up: the PA button now prioritizes an in-progress run over history (same as Iron), so
@@ -451,6 +460,8 @@ ok(!readData().runs.some(r => r.status === "planned" && r.filamentId === pla.id)
 click("exportBtn");
 let dex = readData();
 ok(typeof dex.lastExportedAt === "string" && dex.lastExportedAt.length > 10, "export stamps lastExportedAt");
+ok(dex.formatVersion === "2.0", "export includes formatVersion 2.0");
+ok(!("gcodeCache" in dex), "export omits gcodeCache entirely");
 ok(/exported/.test($("dataStatus").textContent) && !$("dataStatus").classList.contains("stale"), "status shows a fresh (not stale) export");
 tickClock();
 window.PA_test.savePlanned();   // any save bumps lastModifiedAt past the export
@@ -698,6 +709,19 @@ ok($("jobGuardModal").hidden === true && $("tab-printers").classList.contains("a
   ok($("coverageModal").hidden === false && $("coverageComplete").hidden === true, "a complete-looking first plate still prompts to import more plates");
   clickEl("coverageImport");
   ok($("coverageModal").hidden === true, "'import additional plate' closes the prompt");
+
+  // ---- formatVersion 2.0 migration: old-format import drops gcodeCache and stamps 2.0 ----
+  {
+    const oldFormat = window.PAStore.defaultData();
+    delete oldFormat.formatVersion;   // simulate a pre-2.0 export
+    oldFormat.gcodeCache = { legacy: { byKey: {} } };
+    oldFormat.runs = [{ id: "r1", status: "complete", printerId: "p1", nozzleId: "n1", filamentId: "f1", settings: {} }];
+    const fakeOldFile = { text: () => Promise.resolve(JSON.stringify(oldFormat)) };
+    const migrated = await window.PAStore.importJSON(fakeOldFile);
+    ok(migrated.formatVersion === "2.0", "old-format import stamps formatVersion 2.0");
+    ok(!("gcodeCache" in migrated), "old-format import drops gcodeCache");
+    ok(migrated.runs.some(r => r.id === "r1"), "existing run data survives migration");
+  }
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

@@ -25,6 +25,13 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 ### Changed
 - **Export filename now includes the time** (`pa_data_YYYY-MM-DD_HHMM.json`, was date-only) —
   multiple exports on the same day no longer look identical in Downloads.
+- **`pa_data.json` no longer stores picker geometry (`formatVersion: "2.0"`).** `gcodeCache` was
+  ~96% of a typical export's real data (~267 KB/run) — machine-only noise in a file meant to be
+  human-readable. Picker geometry is fully reproducible from a run's stored settings
+  (`js/pattern.js`), so it's now regenerated on demand when a saved run is reopened, for both
+  "recommended" and imported-from-gcode runs. Old-format files (has `gcodeCache`, or missing
+  `formatVersion: "2.0"`) migrate automatically on load/import/connect — dropped cache, stamped
+  version, no data loss, connected files rewrite to disk immediately.
 
 ### Fixed
 - **Resuming a run could crash instead of scrolling** — `entrySec.scrollIntoView()` was called
