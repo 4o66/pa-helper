@@ -1687,11 +1687,17 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     return b.shape === "round" ? ("⌀" + b.diameter + "mm") : (b.x + "×" + b.y + "mm");
   }
 
+  // The single incomplete (unnamed) ironing run for a printer+filament combo, if any — the same
+  // "one in-progress run" invariant saveIroningRun/autoloadIncompleteIroningRun rely on.
+  function findIncompleteIroningRun(pid, fid) {
+    return (data.ironingRuns || []).find(r => r.printerId === pid && r.filamentId === fid && !(r.namedResults && r.namedResults.length));
+  }
   function updateIroningContext() {
     const p = getPrinter(data.lastPrinterId), n = getSelectedNozzle(), f = getFilament(data.lastFilamentId);
     const ctx = $("ironingContext"); if (!ctx) return;
     if (!p || !n || !f) {
       $("ironingBody").hidden = true;
+      if ($("ironAbandonBtn")) $("ironAbandonBtn").hidden = true;
       ctx.innerHTML = '<span class="badge info">setup</span>To generate an ironing test, select a <b>printer</b> and <b>nozzle</b> (Printer tab), then a <b>filament</b> (Filament tab).' +
         (!p ? "<br>• No printer selected." : "") + (p && !n ? "<br>• No nozzle selected." : "") + (!f ? "<br>• No filament selected." : "");
       return;
@@ -1699,6 +1705,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const inst = (p.multi && data.lastInstanceId) ? " · unit " + data.lastInstanceId : "";
     ctx.innerHTML = `<b>${printerLabel(p)}</b>${inst}<br><span class="muted">Bed: ${bedSizeLabel(p)}</span><br>Nozzle: <b>${nozzleLabel(n)}</b><br>Filament: <b>${filamentLabel(f)}</b>`;
     $("ironingBody").hidden = false;
+    if ($("ironAbandonBtn")) $("ironAbandonBtn").hidden = !findIncompleteIroningRun(data.lastPrinterId, data.lastFilamentId);
     if (!ironingLoaded) { loadIroningSettings(); ironingLoaded = true; }
     refreshIroning();
   }
@@ -1831,7 +1838,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     if (!confirm("Delete this saved ironing test? This cannot be undone.")) return;
     const fid = r.filamentId;
     data.ironingRuns = (data.ironingRuns || []).filter(x => x.id !== id);
-    persist(); renderFilaments();
+    persist(); renderFilaments(); updateIroningContext();   // refresh the Abandon button too, in case this was the in-progress run
     if (completedIroningRunsFor(fid).length) openIronResults(fid); else closeIronResults();
   }
   // Loads a saved run's sweep/geometry settings into the Ironing tab fields (shared by the
@@ -1870,7 +1877,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   function autoloadIncompleteIroningRun() {
     const pid = data.lastPrinterId, fid = data.lastFilamentId;
     if (!pid || !fid) return;
-    const run = (data.ironingRuns || []).find(r => r.printerId === pid && r.filamentId === fid && !(r.namedResults && r.namedResults.length));
+    const run = findIncompleteIroningRun(pid, fid);
     if (run) loadIroningRunFields(run);
   }
   /* ---- Saved-results modal (per filament) — Ironing ---- */
@@ -2188,6 +2195,10 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     ["ironPadDiameter", "ironGap"].forEach(id => $(id).addEventListener("input", () => refreshIroning()));
     $("ironingDownloadBtn").addEventListener("click", downloadIroning3mf);
     $("ironingSaveBtn").addEventListener("click", saveIroningRun);
+    $("ironAbandonBtn").addEventListener("click", () => {
+      const r = findIncompleteIroningRun(data.lastPrinterId, data.lastFilamentId);
+      if (r) deleteIroningRun(r.id);
+    });
 
     $("themeSel").addEventListener("change", () => { data.theme = $("themeSel").value; applyTheme(data.theme); persist(); });
     $("printerMulti").addEventListener("change", () => { $("instancesWrap").hidden = !$("printerMulti").checked; });
