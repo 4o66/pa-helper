@@ -49,6 +49,8 @@ nav.tabs{display:flex;gap:.4rem;max-width:960px;margin:0 auto;padding:.8rem 1.2r
 .tab-btn.active .ts{color:var(--ink)}
 
 /* filament filter bar + view toggle */
+.filscope{display:flex;align-items:center;gap:.4rem;margin:.6rem 0 .2rem;font-size:.85rem}
+.filscope select{font-size:.85rem}
 .filbar{display:flex;justify-content:space-between;align-items:flex-end;gap:.6rem;flex-wrap:wrap;margin:.3rem 0 .2rem}
 .filters{display:flex;gap:.4rem;flex-wrap:wrap}
 .filters select{font-size:.85rem}
@@ -111,6 +113,9 @@ button.secondary,header button{background:var(--panel2);color:var(--ink);border:
 button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad)}
 /* "planned" = the same orange as the planned badge on the filament screen */
 button.warn{background:transparent;color:var(--warn);border:1px solid var(--warn)}
+/* no tests yet at the current filament-tab Scope — always shown, just inert */
+button.muted{background:transparent;color:var(--muted);border:1px solid var(--muted);cursor:default}
+button.muted:hover{filter:none}
 button:hover{filter:brightness(1.08)}
 .custom-in{margin-top:.25rem}
 .radlabel{font-size:.8rem;color:var(--muted);align-self:center}

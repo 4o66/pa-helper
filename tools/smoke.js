@@ -59,6 +59,9 @@ ok(document.documentElement.dataset.theme === "system", "default theme system");
 $("themeSel").value = "light"; ev($("themeSel"), "change");
 ok(document.documentElement.dataset.theme === "light", "theme switches to light");
 
+// filament-tab Scope defaults to the tightest option, before anything touches it
+ok($("filamentScope").value === "nozzle", "Scope defaults to 'This printer + nozzle'");
+
 // add printer
 setFieldKey($("printerForm"), "maker", "Voron");
 setFieldKey($("printerForm"), "model", "Trident 350");
@@ -548,6 +551,11 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
 
 // saved-results modal (per filament): opens from the filament card, shows params + Orca-copy data
 {
+  // this block tests the modal itself, not Scope filtering — earlier clone/re-add steps left a
+  // different printer selected than the one the completed run was made under, which (correctly,
+  // under the new "nozzle" default) would grey out its PA button. Widen to "all" so the button
+  // reflects the filament's full history regardless of what's currently selected.
+  $("filamentScope").value = "all"; ev($("filamentScope"), "change");
   const before = readData().runs.filter(r => r.status === "complete").length;
   ok(before >= 1, "a completed run exists to show results for");
   // scoped to the ORIGINAL PLA card specifically — another filament (otherFil) still has its
@@ -591,7 +599,10 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
   $("resultsDelete").dispatchEvent(new window.Event("click", { bubbles: true }));   // confirm() mocked true
   ok(readData().runs.filter(r => r.status === "complete").length === before - 1, "delete removes the run");
   ok($("resultsModal").hidden === true, "deleting the last run for a filament closes the modal");
-  ok(!resBtn(), "PA button disappears once the filament has no completed (or planned) runs");
+  {
+    const btn = resBtn();
+    ok(!!btn && btn.classList.contains("muted") && btn.disabled, "PA button goes grey/inert (not hidden) once the filament has no completed (or planned) runs");
+  }
 }
 
 // outlier flag: neighbour-based, catches a local mispick that a global test would miss (real ABS run)
@@ -611,6 +622,84 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
   ok(!flagged.some(x => x.a === 1000), "clean flat low-accel row (all 0.03) is not flagged");
   ok(flagged.length <= 2, "outlier flag is conservative — doesn't light up the whole grid");
   window.PA_test.loadGrid([]);   // clear scratch grid
+}
+
+// filament-tab Scope: PA/Iron button state, count, and click target follow the selected
+// printer/nozzle scope, not just which filament they belong to
+{
+  // an earlier block (saved-results modal) deliberately widened Scope to "all" to test modal
+  // mechanics regardless of filter state, and never needed to reset it — pin it back here so
+  // this block's own nozzle/printer/all transitions are unambiguous regardless of run order.
+  $("filamentScope").value = "nozzle"; ev($("filamentScope"), "change");
+
+  // fresh printer with two nozzles, fresh filament — disposable, just for this test
+  setFieldKey($("printerForm"), "maker", "ScopeTestCo");
+  setFieldKey($("printerForm"), "model", "RigY");
+  click("savePrinterBtn");
+  let dd = readData();
+  const sp = dd.printers.find(p => p.maker === "ScopeTestCo");
+  setFieldKey($("nozzleForm"), "diameter", "0.6");
+  click("saveNozzleBtn");   // second nozzle, distinguishable by diameter
+  dd = readData();
+  const sNozA = dd.printers.find(p => p.id === sp.id).nozzles.find(n => Number(n.diameter) === 0.4);
+  const sNozB = dd.printers.find(p => p.id === sp.id).nozzles.find(n => Number(n.diameter) === 0.6);
+
+  setFieldKey($("filamentForm"), "maker", "ScopeCo");
+  setFieldKey($("filamentForm"), "material", "PLA");
+  click("saveFilamentBtn");
+  const scopeFil = readData().filaments.find(f => f.maker === "ScopeCo");
+
+  const spCard = () => [...$("printerList").querySelectorAll(".card")].find(c => c.textContent.includes("RigY"));
+  const nozCardS = (n) => [...$("nozzleList").querySelectorAll(".card")].find(c => c.textContent.includes(n.diameter + "mm"));
+  const scopeFilCard = () => [...$("filamentList").querySelectorAll(".card,.frow")].find(c => c.textContent.includes("ScopeCo"));
+  const scopeBtn = () => [...scopeFilCard().querySelectorAll(".actions button")].find(b => /^PA/.test(b.textContent));
+
+  spCard().dispatchEvent(new window.Event("click", { bubbles: true }));
+  nozCardS(sNozA).dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(scopeBtn().classList.contains("muted") && scopeBtn().disabled, "brand-new filament is grey under nozzle scope (no runs anywhere yet)");
+
+  // save a planned run under this printer + nozzle A
+  $("maxFlow").value = "20"; $("maxFlow").dispatchEvent(new window.Event("input", { bubbles: true }));
+  $("maxFlowConfirm").dispatchEvent(new window.Event("click", { bubbles: true }));
+  $("flowPoints").value = "3"; $("accelLimit").value = "4000"; $("accelList").value = ""; $("speedList").value = "";
+  click("recommendBtn"); click("loadPointsBtn");
+  window.PA_test.savePlanned();   // bounces to the Filaments tab; re-select the same combo below
+
+  spCard().dispatchEvent(new window.Event("click", { bubbles: true }));
+  nozCardS(sNozA).dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(scopeBtn().classList.contains("warn") && !scopeBtn().disabled, "nozzle scope: orange once a run exists on this exact printer+nozzle");
+
+  // switch to nozzle B on the SAME printer — nozzle scope no longer sees the run
+  nozCardS(sNozB).dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(scopeBtn().classList.contains("muted") && scopeBtn().disabled, "nozzle scope: grey on a different nozzle of the same printer");
+
+  // widen to printer scope (any nozzle) — the run counts again from nozzle B
+  $("filamentScope").value = "printer"; ev($("filamentScope"), "change");
+  ok(scopeBtn().classList.contains("warn") && !scopeBtn().disabled, "printer scope: orange regardless of which nozzle is selected, same printer");
+
+  // switch to a completely different, still-alive printer — printer scope no longer sees the run
+  const bCardHere = () => [...$("printerList").querySelectorAll(".card")].find(c => c.textContent.includes("Bambu Lab A1"));
+  bCardHere().dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(scopeBtn().classList.contains("muted") && scopeBtn().disabled, "printer scope: grey on a completely different printer");
+
+  // widen to all printers — the run counts regardless of current selection
+  $("filamentScope").value = "all"; ev($("filamentScope"), "change");
+  ok(scopeBtn().classList.contains("warn") && !scopeBtn().disabled, "all-printers scope: orange regardless of which printer/nozzle is selected");
+
+  // clean up: resume + abandon the scope-test run, remove the disposable printer/filament,
+  // restore the default scope for the sections that follow
+  spCard().dispatchEvent(new window.Event("click", { bubbles: true }));
+  nozCardS(sNozA).dispatchEvent(new window.Event("click", { bubbles: true }));
+  $("filamentScope").value = "nozzle"; ev($("filamentScope"), "change");
+  scopeBtn().dispatchEvent(new window.Event("click", { bubbles: true }));   // resumes the run
+  $("runInProgressOk").dispatchEvent(new window.Event("click", { bubbles: true }));
+  [...document.querySelectorAll(".tab-btn")].find(b => b.dataset.tab === "printers").dispatchEvent(new window.Event("click", { bubbles: true }));
+  $("jobGuardAbandon").dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(!readData().runs.some(r => r.filamentId === scopeFil.id), "scope-test run cleaned up");
+  const spRemoveBtn = () => [...spCard().querySelectorAll(".actions button")].find(b => b.title === "Remove");
+  spRemoveBtn().dispatchEvent(new window.Event("click", { bubbles: true }));
+  [...scopeFilCard().querySelectorAll(".actions button")].find(b => b.title === "Remove").dispatchEvent(new window.Event("click", { bubbles: true }));
+  [...document.querySelectorAll(".tab-btn")].find(b => b.dataset.tab === "printers").dispatchEvent(new window.Event("click", { bubbles: true }));
 }
 
 // orphan cleanup: deleting a printer/nozzle/filament cascades to prune any run that referenced

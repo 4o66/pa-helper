@@ -27,6 +27,12 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   associated filament tests; removing any of the three cascades to prune matching PA and Ironing
   runs immediately. `pa_data.json`'s `migrate()` step also sweeps any run already orphaned this
   way (e.g. from an older export or a hand-edited file) on every load.
+- **Filament tab: Scope control for the PA/Iron buttons.** A new "Scope" dropdown (This printer +
+  nozzle / This printer, any nozzle / All printers) decides how much of the current selection a
+  run has to match to count toward a filament's PA/Iron button color and count. Filaments always
+  show both buttons now — grey when nothing matches at the current Scope, orange while a matching
+  run is in progress, blue with a count once done — instead of hiding the button entirely when
+  there was nothing to show. Defaults to the tightest scope (this exact printer + nozzle).
 
 ### Changed
 - **Export filename now includes the time** (`pa_data_YYYY-MM-DD_HHMM.json`, was date-only) —

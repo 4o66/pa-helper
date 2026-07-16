@@ -95,6 +95,14 @@
     <h2>Filament</h2>
 
     <p class="hint">Pick the filament you're calibrating, or add a new one. Filaments work on any printer unless you restrict them. A run you've started but not finished shows an orange PA or Iron button on its filament card — click it to pick up where you left off.</p>
+    <div class="filscope">
+      <label for="filamentScope">Scope <span class="help" title="How much of your printer/nozzle setup counts toward a filament's PA/Iron button state, count, and what clicking it opens. Narrower = only tests done on exactly what's selected now; wider finds tests done on other nozzles or printers too.">?</span></label>
+      <select id="filamentScope">
+        <option value="nozzle">This printer + nozzle</option>
+        <option value="printer">This printer (any nozzle)</option>
+        <option value="all">All printers</option>
+      </select>
+    </div>
     <div class="filbar">
       <div id="filamentFilters" class="filters"></div>
       <div class="viewtoggle" id="filamentViewToggle">
@@ -113,9 +121,12 @@
       <div class="row"><button id="saveFilamentBtn">Save filament</button><button id="cancelFilamentBtn" class="secondary">Cancel</button></div>
     </details>
     <p class="hint legend-note">
+      <button type="button" class="muted legend-btn">PA</button>
+      <button type="button" class="muted legend-btn">Iron</button>
+      grey = no tests yet at the current Scope;
       <button type="button" class="warn legend-btn">PA</button>
       <button type="button" class="warn legend-btn">Iron</button>
-      — orange means that test's results are still in progress; once results are entered, the button turns blue.
+      orange = results still in progress; once entered, the button turns blue. A number badge shows when more than one test exists at that Scope.
     </p>
   </section>
 

@@ -476,7 +476,7 @@
       list.append(card);
     });
   }
-  function selectNozzle(id) { data.lastNozzleId = id; persist(); renderNozzles(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); resetMaxFlowForCombo(); updateTabLabels(); }
+  function selectNozzle(id) { data.lastNozzleId = id; persist(); renderNozzles(); renderFilaments(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); resetMaxFlowForCombo(); updateTabLabels(); }
   function removeNozzle(id) {
     const p = getPrinter(data.lastPrinterId); if (!p) return;
     const n = (p.nozzles || []).find(x => x.id === id); if (!n) return;
@@ -549,30 +549,38 @@
     const clone = el("button", "secondary"); clone.textContent = "Clone"; clone.addEventListener("click", () => cloneFilament(f.id));
     const rm = removeButton(() => removeFilament(f.id));
     actions.append(edit, clone);
+
+    // PA and Iron buttons always show (grey/inert with nothing at the current Scope, orange while
+    // in progress, blue/plain once done) so the two states are directly comparable across every
+    // filament, including ones with no tests at all yet.
     const paRuns = completedRunsFor(f.id);
+    const paPlanned = paRuns.find(r => r.status === "planned");   // in progress: printed, waiting on results
+    const pa = el("button", paRuns.length ? (paPlanned ? "warn" : null) : "muted");
+    pa.textContent = "PA" + (paRuns.length > 1 ? " (" + paRuns.length + ")" : "");
     if (paRuns.length) {
-      const paPlanned = paRuns.find(r => r.status === "planned");   // in progress: printed, waiting on results
-      const res = el("button", paPlanned ? "warn" : null); res.textContent = "PA" + (paRuns.length > 1 ? " (" + paRuns.length + ")" : "");
-      res.addEventListener("click", () => {
+      pa.addEventListener("click", () => {
         // An in-progress run takes priority over the history view — jump straight to it instead
         // of the results modal, since that's what needs finishing before anything else can happen.
         if (paPlanned) { resumeRun(paPlanned.id); showRunInProgressModal("You have a run in progress. To start a new run, enter results on the open run and save, or delete the in progress run."); }
         else openResults(f.id);
       });
-      actions.append(res);
-    }
+    } else pa.disabled = true;
+    actions.append(pa);
+
     const ironRuns = completedIroningRunsFor(f.id);
+    const incomplete = ironRuns.find(r => !(r.namedResults && r.namedResults.length));   // no named results yet == still waiting on print results
+    const iron = el("button", ironRuns.length ? (incomplete ? "warn" : null) : "muted");
+    iron.textContent = "Iron" + (ironRuns.length > 1 ? " (" + ironRuns.length + ")" : "");
     if (ironRuns.length) {
-      const incomplete = ironRuns.find(r => !(r.namedResults && r.namedResults.length));   // no named results yet == still waiting on print results
-      const iron = el("button", incomplete ? "warn" : null); iron.textContent = "Iron" + (ironRuns.length > 1 ? " (" + ironRuns.length + ")" : "");
       iron.addEventListener("click", () => {
         // Land on the actual data-entry screen (the naming picker), not just the Ironing tab's
         // settings — that's where "enter the datapoints" actually happens for an ironing run.
         if (incomplete) { openIroningRun(incomplete.id); openIronPicker(incomplete.id); showRunInProgressModal("You have a run in progress. To start a new run, name samples on the open run and save, or delete the in progress run."); }
         else openIronResults(f.id);
       });
-      actions.append(iron);
-    }
+    } else iron.disabled = true;
+    actions.append(iron);
+
     actions.append(rm); return actions;
   }
   function pinIcon() { const s = el("span", "pin-ic"); s.textContent = "📌"; s.title = "Restricted to specific printer(s)"; return s; }
@@ -628,6 +636,7 @@
     data.printers.forEach(p => { const l = el("label", "checkline"); const cb = el("input"); cb.type = "checkbox"; cb.value = p.id; l.append(cb, document.createTextNode(" " + printerLabel(p))); box.append(l); });
   }
   function renderFilaments() {
+    if ($("filamentScope")) $("filamentScope").value = data.filamentScope || "nozzle";
     const pid = data.lastPrinterId;
     const all = data.filaments.slice();
     let base = all, hiddenByPin = 0;
@@ -1545,11 +1554,23 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
 
   /* ---- Saved-results modal (per filament) ---- */
   let resultsRunId = null;
+  // Filament-tab Scope control: how much of the current printer/nozzle selection a run has to
+  // match to count toward a filament's PA/Iron button state, count, and click target.
+  //   "nozzle"  — exact printer + nozzle match (default: tightest, matches what's in front of you)
+  //   "printer" — same printer, any nozzle
+  //   "all"     — no printer/nozzle filter (today's only behavior, before Scope existed)
+  function runMatchesScope(r) {
+    const scope = data.filamentScope || "nozzle";
+    if (scope === "all") return true;
+    if (r.printerId !== data.lastPrinterId) return false;
+    if (scope === "nozzle" && r.nozzleId !== data.lastNozzleId) return false;
+    return true;
+  }
   // Includes "planned" runs too (not just "complete") — a filament's in-progress run and its
   // history all live in one place now, same as ironing runs. "abandoned" runs are permanently
   // deleted rather than kept-but-hidden (see jobGuardAbandon / deleteRunById), so no filter needed for those.
   const completedRunsFor = (fid) => data.runs
-    .filter(r => r.filamentId === fid && (r.status === "complete" || r.status === "planned"))
+    .filter(r => r.filamentId === fid && (r.status === "complete" || r.status === "planned") && runMatchesScope(r))
     .sort((a, b) => String(b.created || b.date || "").localeCompare(String(a.created || a.date || "")));   // newest first
   function showRunInProgressModal(msg) { $("runInProgressMsg").textContent = msg; $("runInProgressModal").hidden = false; }
   function openResults(fid) {
@@ -1889,7 +1910,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   /* ---- Saved-results modal (per filament) — Ironing ---- */
   let ironResultsRunId = null;
   const completedIroningRunsFor = (fid) => (data.ironingRuns || [])
-    .filter(r => r.filamentId === fid)
+    .filter(r => r.filamentId === fid && runMatchesScope(r))
     .sort((a, b) => String(b.created || b.date || "").localeCompare(String(a.created || a.date || "")));   // newest first
   function openIronResults(fid) {
     const runs = completedIroningRunsFor(fid); if (!runs.length) return;
@@ -2184,6 +2205,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("filamentForm").addEventListener("change", () => updateFilamentConditionals());
     $("filamentRestrict").addEventListener("change", () => { const on = $("filamentRestrict").checked; if (on) renderFilamentPrinterPicker(); $("filamentPrinters").hidden = !on; });
     $("filamentViewToggle").addEventListener("click", (e) => { const b = e.target.closest("button[data-view]"); if (!b) return; data.filamentView = b.dataset.view; persist(); renderFilaments(); });
+    $("filamentScope").addEventListener("change", () => { data.filamentScope = $("filamentScope").value; persist(); renderFilaments(); });
 
     document.querySelectorAll(".tab-btn").forEach(b => b.addEventListener("click", () => {
       switchTab(b.dataset.tab);
