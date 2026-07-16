@@ -93,7 +93,7 @@ window.PAStore = (function () {
     const d = new Date(), p = (n) => String(n).padStart(2, "0");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `pa_data_${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.json`;
+    a.download = `pa_data_${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
     return at;

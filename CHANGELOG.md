@@ -22,6 +22,10 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   [LeoganPro's Top Surface Ironing Test](https://www.printables.com/model/1247198) (CC0) as
   the model this feature is built on.
 
+### Changed
+- **Export filename now includes the time** (`pa_data_YYYY-MM-DD_HHMM.json`, was date-only) —
+  multiple exports on the same day no longer look identical in Downloads.
+
 ### Fixed
 - **Resuming a run could crash instead of scrolling** — `entrySec.scrollIntoView()` was called
   unconditionally; environments that don't implement it (older browsers, embedded webviews, and
