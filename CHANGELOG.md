@@ -13,6 +13,16 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 ## [Unreleased]
 
 ### Added
+- **Scope dropdown auto-locks when a choice would be a no-op.** With exactly one printer that has
+  exactly one nozzle, every Scope value behaves identically, so the whole dropdown locks to "This
+  printer + nozzle" and the help tooltip says why. With two or more printers but none of them
+  having a second nozzle, "This printer (any nozzle)" specifically locks (relabeled in place to
+  explain), since it can never differ from "This printer + nozzle" for whatever's selected — both
+  checks are fleet-wide, not based on the currently-selected printer alone, so switching between
+  printers you already have can never flip the lock out from under you; it only reacts to your
+  printer/nozzle roster actually changing. If a stored scope of "printer" becomes unselectable this
+  way, it snaps down to "nozzle" automatically (the visible filament list doesn't change either
+  way, since the two were already equivalent).
 - **`tools/smoke.js` jsdom smoke test** (~228 assertions over the whole app), carried over from
   dev tooling and reconciled with current behavior: fixed references to the removed Select
   buttons, the retired PA in-progress section, the Results→PA/Iron button split, and the

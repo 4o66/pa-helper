@@ -540,7 +540,9 @@
     p.nozzles = p.nozzles || []; p.nozzles.push(nz);
     rememberCustoms(nozzleForm); data.lastNozzleId = nz.id; persist();
     $("nozzleAdd").open = false; nozzleForm = buildForm($("nozzleForm"), NOZZLE_FIELDS);
-    renderNozzles(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); updateTabLabels();
+    // renderFilaments() re-evaluates Scope gating too — adding a 2nd nozzle to a printer can
+    // un-lock "This printer (any nozzle)" (or the whole dropdown), so this can't be skipped.
+    renderNozzles(); renderFilaments(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); updateTabLabels();
   }
   function deriveGeometryFromNozzle() {
     const n = getSelectedNozzle(); const dia = n ? (num(n.diameter) || 0.4) : 0.4;
@@ -678,7 +680,42 @@
     if (!data.printers.length) { box.innerHTML = '<p class="hint">No printers yet — add one on the Printer tab first.</p>'; return; }
     data.printers.forEach(p => { const l = el("label", "checkline"); const cb = el("input"); cb.type = "checkbox"; cb.value = p.id; l.append(cb, document.createTextNode(" " + printerLabel(p))); box.append(l); });
   }
+  // Scope help text — shared default, extended when the dropdown or "any nozzle" option is locked.
+  const SCOPE_HELP_DEFAULT = "How much of your printer/nozzle setup counts toward a filament's PA/Iron button state, count, and what clicking it opens. Narrower = only tests done on exactly what's selected now; wider finds tests done on other nozzles or printers too.";
+  const SCOPE_PRINTER_OPT_LABEL = "This printer (any nozzle)";
+  // Scope only matters when there's actually something to distinguish. Both checks below are
+  // fleet-wide (every printer, not just the currently selected one) on purpose: gating on the
+  // CURRENT printer's nozzle count alone would flip the dropdown's/option's enabled state just
+  // from switching between printers you already have, which could look like the scope silently
+  // changed out from under you. Basing it on the whole fleet means it only ever changes when your
+  // printer/nozzle roster itself changes (add/remove a printer or nozzle).
+  function updateScopeGating() {
+    const sel = $("filamentScope"); if (!sel) return;
+    const help = $("filamentScopeHelp"), printerOpt = $("filamentScopePrinterOpt");
+    const allSingleNozzle = data.printers.every(p => (p.nozzles || []).length <= 1);
+    const onlyOnePrinter = data.printers.length === 1;
+    const nothingToScope = onlyOnePrinter && allSingleNozzle;   // every scope value would be identical
+    const before = data.filamentScope;
+    if (nothingToScope) data.filamentScope = "nozzle";
+    else if (allSingleNozzle && data.filamentScope === "printer") {
+      // The option backing the stored value just became unselectable (fleet changed under it) —
+      // snap to the tightest scope instead of leaving a stale, unselectable value in place. The
+      // visible filament list doesn't actually change: with every printer single-nozzle, "printer"
+      // and "nozzle" scope were already equivalent sets.
+      data.filamentScope = "nozzle";
+    }
+    if (data.filamentScope !== before) persist();
+    sel.disabled = nothingToScope;
+    help.title = nothingToScope
+      ? SCOPE_HELP_DEFAULT + " Locked here — with only one printer and one nozzle in your fleet, every Scope option would behave identically."
+      : SCOPE_HELP_DEFAULT;
+    if (printerOpt) {
+      printerOpt.disabled = allSingleNozzle;
+      printerOpt.textContent = allSingleNozzle ? SCOPE_PRINTER_OPT_LABEL + " — n/a, no printer has more than one nozzle" : SCOPE_PRINTER_OPT_LABEL;
+    }
+  }
   function renderFilaments() {
+    updateScopeGating();
     if ($("filamentScope")) $("filamentScope").value = data.filamentScope || "nozzle";
     const pid = data.lastPrinterId;
     const all = data.filaments.slice();

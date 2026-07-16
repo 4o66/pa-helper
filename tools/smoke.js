@@ -103,6 +103,13 @@ ok($("nozzleSeedModal").hidden === false, "new printer prompts about its seeded 
 $("nozzleSeedOk").dispatchEvent(new window.Event("click", { bubbles: true }));
 ok($("nozzleSeedModal").hidden === true, "seeded-nozzle prompt dismisses on OK");
 
+// Scope dropdown gating: with exactly one printer that has exactly one nozzle, every Scope value
+// is identical — the whole dropdown should lock to "nozzle" rather than offer a choice with no
+// actual effect
+ok($("filamentScope").disabled === true, "single printer + single nozzle: Scope dropdown is locked");
+ok(readData().filamentScope === "nozzle", "single printer + single nozzle: scope forced to the tightest value");
+ok(/Locked here/.test($("filamentScopeHelp").title), "locked dropdown's tooltip explains why");
+
 // maker stock defaulting (fresh form was rebuilt after save)
 setFieldKey($("printerForm"), "maker", "QIDI");
 ok(getFieldKey($("printerForm"), "toolhead") === "QIDI (stock)", "QIDI toolhead default");
@@ -200,6 +207,14 @@ const qidi = d.printers.find(p => p.maker === "QIDI");
 ok(!!qidi, "QIDI printer saved");
 ok(qidi.bed && qidi.bed.x === 245, "QIDI bed auto-filled from model (Q1 Pro)");
 ok(qidi.nozzles && qidi.nozzles[0] && qidi.nozzles[0].maker === "Generic" && qidi.nozzles[0].material === "Brass" && qidi.nozzles[0].diameter === 0.4, "new printer seeded a Generic 0.4mm Brass nozzle");
+
+// Scope dropdown gating: now two printers, but each still has just one nozzle — the dropdown
+// itself is meaningful again ("all printers" now differs from "this printer"), but "This printer
+// (any nozzle)" specifically is still a no-op (no printer has a second nozzle to distinguish), so
+// only that one option should stay locked
+ok($("filamentScope").disabled === false, "two single-nozzle printers: Scope dropdown itself unlocks");
+ok($("filamentScopePrinterOpt").disabled === true, "two single-nozzle printers: 'This printer (any nozzle)' stays locked (still a no-op)");
+ok(/n\/a/.test($("filamentScopePrinterOpt").textContent), "locked option's label explains why");
 
 // restrict a filament to the QIDI printer only
 setFieldKey($("filamentForm"), "material", "ASA");
@@ -782,6 +797,25 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
   // widen to all printers — the run counts regardless of current selection
   $("filamentScope").value = "all"; ev($("filamentScope"), "change");
   ok(scopeBtn().classList.contains("warn") && !scopeBtn().disabled, "all-printers scope: orange regardless of which printer/nozzle is selected");
+
+  // Scope dropdown gating: RigY (this block's printer) has two nozzles, so the fleet is "mixed" —
+  // everything should be fully unlocked, regardless of how many other single-nozzle printers exist
+  ok($("filamentScope").disabled === false, "mixed fleet (a multi-nozzle printer exists): Scope dropdown is not locked");
+  ok($("filamentScopePrinterOpt").disabled === false, "mixed fleet: 'This printer (any nozzle)' stays enabled");
+  ok($("filamentScopePrinterOpt").textContent === "This printer (any nozzle)", "mixed fleet: option label is the plain, unqualified one");
+  // pick "printer" scope, then remove RigY's second nozzle — the fleet becomes all-single-nozzle
+  // (assuming no other printer at this point has more than one), so the option should lock AND the
+  // now-unselectable "printer" value should snap down to "nozzle" rather than sit stale
+  $("filamentScope").value = "printer"; ev($("filamentScope"), "change");
+  ok(readData().filamentScope === "printer", "scope set to 'printer' ahead of the nozzle-count-drop check");
+  spCard().dispatchEvent(new window.Event("click", { bubbles: true }));   // RigY must be selected — removeNozzle acts on data.lastPrinterId
+  const nozBRemoveBtn = [...nozCardS(sNozB).querySelectorAll(".actions button")].find(b => b.textContent === "Remove");
+  nozBRemoveBtn.dispatchEvent(new window.Event("click", { bubbles: true }));   // confirm() mocked true
+  ok(readData().printers.find(p => p.id === sp.id).nozzles.length === 1, "RigY's second nozzle removed, back to a single-nozzle printer");
+  ok($("filamentScopePrinterOpt").disabled === true, "fleet now all-single-nozzle: 'This printer (any nozzle)' locks again");
+  ok(/n\/a/.test($("filamentScopePrinterOpt").textContent), "locked option's label explains why");
+  ok(readData().filamentScope === "nozzle", "the now-unselectable 'printer' scope snapped down to 'nozzle' automatically");
+  ok($("filamentScope").disabled === false, "more than one printer still exists, so the dropdown itself stays usable (only the option locked)");
 
   // clean up: resume + abandon the scope-test run, remove the disposable printer/filament,
   // restore the default scope for the sections that follow
