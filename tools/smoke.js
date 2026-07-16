@@ -613,6 +613,91 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
   window.PA_test.loadGrid([]);   // clear scratch grid
 }
 
+// orphan cleanup: deleting a printer/nozzle/filament cascades to prune any run that referenced
+// it (a run pointing at something deleted can never be reached again from the UI) and, for
+// printer/nozzle, the confirm() warns with a count when there's actually something to lose.
+{
+  let lastConfirmMsg = "";
+  const origConfirm = window.confirm;
+  window.confirm = (msg) => { lastConfirmMsg = msg; return true; };
+  const setupRun = (accelLimit) => {
+    $("maxFlow").value = "20"; $("maxFlow").dispatchEvent(new window.Event("input", { bubbles: true }));
+    $("maxFlowConfirm").dispatchEvent(new window.Event("click", { bubbles: true }));
+    $("flowPoints").value = "3"; $("accelLimit").value = String(accelLimit); $("accelList").value = ""; $("speedList").value = "";
+    click("recommendBtn"); click("loadPointsBtn");
+    window.PA_test.savePlanned();
+  };
+
+  // fresh printer with two nozzles, fresh filament — all disposable, just for this test
+  setFieldKey($("printerForm"), "maker", "OrphanTestCo");
+  setFieldKey($("printerForm"), "model", "RigX");
+  click("savePrinterBtn");
+  let dd = readData();
+  const op = dd.printers.find(p => p.maker === "OrphanTestCo");
+  setFieldKey($("nozzleForm"), "diameter", "0.6");
+  click("saveNozzleBtn");   // second nozzle, distinguishable by diameter
+  dd = readData();
+  const nozA = dd.printers.find(p => p.id === op.id).nozzles.find(n => Number(n.diameter) === 0.4);
+  const nozB = dd.printers.find(p => p.id === op.id).nozzles.find(n => Number(n.diameter) === 0.6);
+  ok(nozA && nozB, "orphan-test printer has two distinguishable nozzles");
+
+  setFieldKey($("filamentForm"), "maker", "OrphanCo");
+  setFieldKey($("filamentForm"), "material", "PLA");
+  click("saveFilamentBtn");
+  const orphFil = readData().filaments.find(f => f.maker === "OrphanCo");
+
+  const opCard = () => [...$("printerList").querySelectorAll(".card")].find(c => c.textContent.includes("RigX"));
+  opCard().dispatchEvent(new window.Event("click", { bubbles: true }));   // select printer
+  const nozCard = (n) => [...$("nozzleList").querySelectorAll(".card")].find(c => c.textContent.includes(n.diameter + "mm"));
+  nozCard(nozA).dispatchEvent(new window.Event("click", { bubbles: true }));   // select nozzle A
+  const orphFilCard = () => [...$("filamentList").querySelectorAll(".card,.frow")].find(c => c.textContent.includes("OrphanCo"));
+  orphFilCard().dispatchEvent(new window.Event("click", { bubbles: true }));   // select filament
+
+  setupRun(5000);
+  ok(readData().runs.some(r => r.printerId === op.id && r.nozzleId === nozA.id && r.filamentId === orphFil.id), "orphan-test run saved (printer+nozzleA+filament)");
+
+  // removing the OTHER nozzle (no runs tied to it) shouldn't warn or touch anything
+  const beforeRunCount = readData().runs.length;
+  const nozRemoveBtn = (n) => [...nozCard(n).querySelectorAll(".actions button")].find(b => b.textContent === "Remove");
+  nozRemoveBtn(nozB).dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(!/filament test/.test(lastConfirmMsg), "removing an unused nozzle has no orphan warning");
+  ok(readData().runs.length === beforeRunCount, "removing an unused nozzle doesn't touch runs");
+
+  // removing nozzle A (has the run) warns with a count and prunes it
+  nozRemoveBtn(nozA).dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(/This will delete all filament tests associated with this nozzle \(1\)/.test(lastConfirmMsg), "removing a nozzle with runs warns with the affected count");
+  ok(!readData().runs.some(r => r.nozzleId === nozA.id), "removing the nozzle prunes its run");
+
+  // rebuild under the same printer for the printer-delete case
+  click("saveNozzleBtn");
+  const nozC = readData().printers.find(p => p.id === op.id).nozzles[0];
+  nozCard(nozC).dispatchEvent(new window.Event("click", { bubbles: true }));
+  setupRun(6000);
+  ok(readData().runs.some(r => r.printerId === op.id), "second orphan-test run saved under the printer");
+  const pRemoveBtn = () => [...opCard().querySelectorAll(".actions button")].find(b => b.title === "Remove");
+  pRemoveBtn().dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(/This will delete all filament tests associated with this printer \(1\)/.test(lastConfirmMsg), "removing a printer with runs warns with the affected count");
+  ok(!readData().runs.some(r => r.printerId === op.id), "removing the printer prunes its runs");
+  ok(!readData().printers.some(p => p.id === op.id), "printer itself removed");
+
+  // filament cascade: rebuild one more run under a still-alive printer/nozzle (Bambu Lab A1,
+  // from the earlier nozzle-cleanup test), tied to the same orphan filament, then remove the
+  // filament and confirm its run goes with it
+  const bCardNow = () => [...$("printerList").querySelectorAll(".card")].find(c => c.textContent.includes("Bambu Lab A1"));
+  bCardNow().dispatchEvent(new window.Event("click", { bubbles: true }));
+  orphFilCard().dispatchEvent(new window.Event("click", { bubbles: true }));
+  setupRun(7000);
+  ok(readData().runs.some(r => r.filamentId === orphFil.id), "third orphan-test run saved under the filament");
+  [...orphFilCard().querySelectorAll(".actions button")].find(b => b.title === "Remove").dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(!readData().filaments.some(f => f.id === orphFil.id), "filament removed");
+  ok(!readData().runs.some(r => r.filamentId === orphFil.id), "removing the filament prunes its runs");
+
+  window.confirm = origConfirm;
+  // savePlanned()/removeFilament() leave the Filaments tab active — restore the pre-block tab
+  // state so the unsaved-job-guard test below (which assumes it isn't already active) still holds.
+  [...document.querySelectorAll(".tab-btn")].find(b => b.dataset.tab === "printers").dispatchEvent(new window.Event("click", { bubbles: true }));
+}
+
 // DEBUG clear data (destructive — keep last)
 click("debugClearBtn");
 ok($("debugModal").hidden === false, "clear-data modal opens");
@@ -710,17 +795,25 @@ ok($("jobGuardModal").hidden === true && $("tab-printers").classList.contains("a
   clickEl("coverageImport");
   ok($("coverageModal").hidden === true, "'import additional plate' closes the prompt");
 
-  // ---- formatVersion 2.0 migration: old-format import drops gcodeCache and stamps 2.0 ----
+  // ---- formatVersion 2.0 migration: old-format import drops gcodeCache, stamps 2.0,
+  // and sweeps any run left pointing at a printer/nozzle/filament that no longer exists ----
   {
     const oldFormat = window.PAStore.defaultData();
     delete oldFormat.formatVersion;   // simulate a pre-2.0 export
     oldFormat.gcodeCache = { legacy: { byKey: {} } };
-    oldFormat.runs = [{ id: "r1", status: "complete", printerId: "p1", nozzleId: "n1", filamentId: "f1", settings: {} }];
+    oldFormat.printers = [{ id: "p1", maker: "Test", model: "X", nozzles: [{ id: "n1", maker: "Generic", material: "Brass", diameter: 0.4 }] }];
+    oldFormat.filaments = [{ id: "f1", maker: "Test", material: "PLA", printers: [] }];
+    oldFormat.runs = [
+      { id: "r1", status: "complete", printerId: "p1", nozzleId: "n1", filamentId: "f1", settings: {} },
+      { id: "r2", status: "complete", printerId: "ghost-printer", nozzleId: "n1", filamentId: "f1", settings: {} },
+      { id: "r3", status: "planned", printerId: "p1", nozzleId: "ghost-nozzle", filamentId: "f1", settings: {} },
+      { id: "r4", status: "complete", printerId: "p1", nozzleId: "n1", filamentId: "ghost-filament", settings: {} }
+    ];
     const fakeOldFile = { text: () => Promise.resolve(JSON.stringify(oldFormat)) };
     const migrated = await window.PAStore.importJSON(fakeOldFile);
     ok(migrated.formatVersion === "2.0", "old-format import stamps formatVersion 2.0");
     ok(!("gcodeCache" in migrated), "old-format import drops gcodeCache");
-    ok(migrated.runs.some(r => r.id === "r1"), "existing run data survives migration");
+    ok(migrated.runs.length === 1 && migrated.runs[0].id === "r1", "runs orphaned by a deleted printer/nozzle/filament are swept on migration, valid run survives");
   }
 
   console.log(`\n${pass} passed, ${fail} failed`);

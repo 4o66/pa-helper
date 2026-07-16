@@ -21,6 +21,12 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   section at all) and both README and the in-app Ironing tab credit
   [LeoganPro's Top Surface Ironing Test](https://www.printables.com/model/1247198) (CC0) as
   the model this feature is built on.
+- **Deleting a printer, nozzle, or filament now cleans up its saved/planned runs.** Previously a
+  run referencing a deleted printer/nozzle/filament just sat in `pa_data.json` forever, invisible
+  from the UI. Removing a printer or nozzle now warns with a count when it would delete
+  associated filament tests; removing any of the three cascades to prune matching PA and Ironing
+  runs immediately. `pa_data.json`'s `migrate()` step also sweeps any run already orphaned this
+  way (e.g. from an older export or a hand-edited file) on every load.
 
 ### Changed
 - **Export filename now includes the time** (`pa_data_YYYY-MM-DD_HHMM.json`, was date-only) —

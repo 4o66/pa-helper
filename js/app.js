@@ -387,8 +387,14 @@
   }
   function removePrinter(id) {
     const p = getPrinter(id); if (!p) return;
-    if (!confirm(`Remove printer "${printerLabel(p)}"? This cannot be undone.`)) return;
+    const orphanCount = (data.runs || []).filter(x => x.printerId === id).length + (data.ironingRuns || []).filter(x => x.printerId === id).length;
+    const warn = orphanCount ? ` This will delete all filament tests associated with this printer (${orphanCount}).` : "";
+    if (!confirm(`Remove printer "${printerLabel(p)}"? This cannot be undone.${warn}`)) return;
     data.printers = data.printers.filter(x => x.id !== id);
+    // cascade: a run pointing at a deleted printer can never be reached from the UI again — prune it
+    if (currentRunId && (data.runs || []).some(r => r.id === currentRunId && r.printerId === id)) currentRunId = null;
+    data.runs = (data.runs || []).filter(x => x.printerId !== id);
+    data.ironingRuns = (data.ironingRuns || []).filter(x => x.printerId !== id);
     // remove this printer from any filament pin lists; empty list = unrestricted again
     data.filaments.forEach(f => { if (Array.isArray(f.printers) && f.printers.length) f.printers = f.printers.filter(x => x !== id); });
     if (data.lastPrinterId === id) { data.lastPrinterId = null; data.lastInstanceId = null; data.lastNozzleId = null; }
@@ -474,10 +480,16 @@
   function removeNozzle(id) {
     const p = getPrinter(data.lastPrinterId); if (!p) return;
     const n = (p.nozzles || []).find(x => x.id === id); if (!n) return;
-    if (!confirm(`Remove nozzle "${nozzleLabel(n)}"? This cannot be undone.`)) return;
+    const orphanCount = (data.runs || []).filter(x => x.printerId === p.id && x.nozzleId === id).length + (data.ironingRuns || []).filter(x => x.printerId === p.id && x.nozzleId === id).length;
+    const warn = orphanCount ? ` This will delete all filament tests associated with this nozzle (${orphanCount}).` : "";
+    if (!confirm(`Remove nozzle "${nozzleLabel(n)}"? This cannot be undone.${warn}`)) return;
     p.nozzles = p.nozzles.filter(x => x.id !== id);
+    // cascade: a run tied to a deleted nozzle can never be reached from the UI again — prune it
+    if (currentRunId && (data.runs || []).some(r => r.id === currentRunId && r.printerId === p.id && r.nozzleId === id)) currentRunId = null;
+    data.runs = (data.runs || []).filter(x => !(x.printerId === p.id && x.nozzleId === id));
+    data.ironingRuns = (data.ironingRuns || []).filter(x => !(x.printerId === p.id && x.nozzleId === id));
     if (data.lastNozzleId === id) data.lastNozzleId = p.nozzles[0] ? p.nozzles[0].id : null;
-    persist(); renderNozzles(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); updateTabLabels();
+    persist(); renderNozzles(); renderFilaments(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); updateTabLabels();
   }
   function saveNozzle() {
     const p = getPrinter(data.lastPrinterId); if (!p) { alert("Select a printer first."); return; }
@@ -638,6 +650,10 @@
     const f = getFilament(id); if (!f) return;
     if (!confirm(`Remove filament "${filamentLabel(f)}"? This cannot be undone.`)) return;
     data.filaments = data.filaments.filter(x => x.id !== id);
+    // cascade: a run tied to a deleted filament can never be reached from the UI again — prune it
+    if (currentRunId && (data.runs || []).some(r => r.id === currentRunId && r.filamentId === id)) currentRunId = null;
+    data.runs = (data.runs || []).filter(x => x.filamentId !== id);
+    data.ironingRuns = (data.ironingRuns || []).filter(x => x.filamentId !== id);
     if (data.lastFilamentId === id) data.lastFilamentId = null;
     if (editingFilamentId === id) resetFilamentForm();
     persist(); renderFilaments(); updateTestContext(); updateIroningContext(); updateTabLabels();

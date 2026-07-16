@@ -54,14 +54,34 @@ window.PAStore = (function () {
 
   const uid = () => (Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
 
+  // A run (PA or ironing) whose printer/nozzle/filament has since been deleted can never be
+  // reached from the UI again — filaments/printers only render cards for things that still
+  // exist, so an orphaned run just sits in the export forever as invisible dead weight. Deleting
+  // a printer/nozzle/filament already cascades this in app.js at delete-time, but this sweep
+  // catches anything orphaned before that existed (hand-edited files, older exports, etc.).
+  function pruneOrphans(d) {
+    const prune = (list) => (list || []).filter((r) => {
+      const p = (d.printers || []).find((x) => x.id === r.printerId);
+      if (!p) return false;
+      if (r.nozzleId && !(p.nozzles || []).some((n) => n.id === r.nozzleId)) return false;
+      if (r.filamentId && !(d.filaments || []).some((f) => f.id === r.filamentId)) return false;
+      return true;
+    });
+    d.runs = prune(d.runs);
+    d.ironingRuns = prune(d.ironingRuns);
+    return d;
+  }
+
   // Old-format files (has gcodeCache, or missing/pre-2.0 formatVersion) migrate in memory here:
-  // drop gcodeCache, stamp the current formatVersion. No other data is touched or lost. Every
-  // load path (load/connectFile/importJSON) routes through merge(), so this always runs on read.
+  // drop gcodeCache, stamp the current formatVersion, and sweep orphaned runs. No other data is
+  // touched or lost. Every load path (load/connectFile/importJSON) routes through merge(), so
+  // this always runs on read.
   function migrate(d) {
     if (d.gcodeCache || d.formatVersion !== "2.0") {
       delete d.gcodeCache;
       d.formatVersion = "2.0";
     }
+    pruneOrphans(d);
     return d;
   }
 
