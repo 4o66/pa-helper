@@ -12,6 +12,18 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 
 ## [Unreleased]
 
+### Added
+- **`tools/smoke.js` jsdom smoke test** (~228 assertions over the whole app), carried over from
+  dev tooling and reconciled with current behavior: fixed references to the removed Select
+  buttons, the retired PA in-progress section, the Results→PA/Iron button split, and the
+  temporarily-disabled Basic mode dropdown option.
+
+### Fixed
+- **Resuming a run could crash instead of scrolling** — `entrySec.scrollIntoView()` was called
+  unconditionally; environments that don't implement it (older browsers, embedded webviews, and
+  jsdom) throw instead of no-op'ing. Now guarded like the app's three other `scrollIntoView`
+  call sites. Caught by the new smoke test.
+
 ## [0.2.32] "Put a hot rock on it" — 2026-07-15
 Ironing Test joins PA Test as a full calibration workflow, and filament cards get a shared,
 clearer in-progress/done pattern for both.
