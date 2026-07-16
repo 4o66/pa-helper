@@ -50,6 +50,11 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   modal is open.
 
 ### Fixed
+- **The pattern picker no longer opens behind the PA Test modal.** Both are `.modal` elements at
+  the same `z-index`, and with no nested stacking context the tie resolves by DOM order — the
+  picker was declared near the top of `<body>` (from before PA Test was a modal at all), so it
+  rendered underneath instead of on top. Moved its markup to after `</main>`, alongside the other
+  floating modals (coverage prompt, run-in-progress, nozzle-seed) that already stacked correctly.
 - **Custom filament nicknames now actually save.** The optional "Filament name" field (shown as
   the card title) was read from the form but never copied into the saved filament record, so
   anything typed there was silently discarded on both create and edit.

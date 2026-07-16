@@ -364,6 +364,11 @@ fr0.querySelector("button.iconbtn").dispatchEvent(new window.Event("click", { bu
 ok($("patternModal").hidden === false, "pattern picker opens");
 ok($("patternSvg").querySelectorAll("line").length > 5, "picker renders the pattern block");
 ok(!document.getElementById("patternThumb"), "no plate thumbnail element (dropped — position not predictable)");
+// z-index ties between same-level .modal elements resolve by DOM order (later wins) — patternModal
+// must come after tab-test/tab-ironing so it renders on top when opened from inside the PA test,
+// not behind it
+ok(($("tab-test").compareDocumentPosition($("patternModal")) & window.Node.DOCUMENT_POSITION_FOLLOWING) !== 0, "pattern picker is declared after the PA test modal (wins the stacking tie)");
+ok(($("tab-ironing").compareDocumentPosition($("patternModal")) & window.Node.DOCUMENT_POSITION_FOLLOWING) !== 0, "pattern picker is declared after the Ironing test modal (wins the stacking tie)");
 $("patternModal").hidden = true;
 ok(/mm\/s/.test(fi0.title), "flow cell shows speed on hover");
 ov0.checked = true; ev(ov0, "change");

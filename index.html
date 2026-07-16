@@ -25,20 +25,6 @@
   </div>
 </header>
 
-<div id="patternModal" class="modal" hidden>
-  <div class="modal-box plain wide">
-    <div class="pmhead">
-      <div>
-        <h3 id="patternTitle">Pick the best line</h3>
-        <p class="hint">Find the block printed with this flow and acceleration (they're labelled on each block), then click the line that printed cleanest (sharpest corners, no bulge/gap) — its PA value fills the row. Hover to highlight. Enlarge the window or rotate your screen if the pattern is hard to read.</p>
-      </div>
-    </div>
-    <div id="patternSvgWrap"><svg id="patternSvg" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"></svg></div>
-    <p id="patternSel" class="muted"></p>
-    <div class="row" style="margin-top:.4rem"><button id="patternOk">OK</button><button id="patternCancel" class="secondary">Cancel</button></div>
-  </div>
-</div>
-
 <div id="debugModal" class="modal" hidden>
   <div class="modal-box">
     <h3>⚠ Clear data — here there be dragons</h3>
@@ -354,6 +340,25 @@
   </div><!-- /modal-box -->
   </div><!-- /#tab-ironing modal -->
 </main>
+
+<!-- Declared after </main> (specifically after #tab-test/#tab-ironing) so it wins the z-index tie
+     when opened from inside the PA test — .modal elements share z-index:50, and with no nested
+     stacking context, ties resolve by DOM order. Previously declared near the top of <body>
+     (before #tab-test existed as a modal), so it rendered BEHIND the PA test modal instead of on
+     top of it. -->
+<div id="patternModal" class="modal" hidden>
+  <div class="modal-box plain wide">
+    <div class="pmhead">
+      <div>
+        <h3 id="patternTitle">Pick the best line</h3>
+        <p class="hint">Find the block printed with this flow and acceleration (they're labelled on each block), then click the line that printed cleanest (sharpest corners, no bulge/gap) — its PA value fills the row. Hover to highlight. Enlarge the window or rotate your screen if the pattern is hard to read.</p>
+      </div>
+    </div>
+    <div id="patternSvgWrap"><svg id="patternSvg" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"></svg></div>
+    <p id="patternSel" class="muted"></p>
+    <div class="row" style="margin-top:.4rem"><button id="patternOk">OK</button><button id="patternCancel" class="secondary">Cancel</button></div>
+  </div>
+</div>
 
 <div id="coverageModal" class="modal" hidden>
   <div class="modal-box plain">
