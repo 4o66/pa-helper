@@ -50,6 +50,9 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   modal is open.
 
 ### Fixed
+- **Custom filament nicknames now actually save.** The optional "Filament name" field (shown as
+  the card title) was read from the form but never copied into the saved filament record, so
+  anything typed there was silently discarded on both create and edit.
 - **One in-flight run per printer+nozzle+filament combo is now actually enforced, for both PA
   and Ironing.** Previously this was only a soft UI convention for PA (the orange button jumped
   to the right run, but nothing stopped `savePlanned()` from silently creating a second in-flight

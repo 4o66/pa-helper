@@ -124,7 +124,8 @@ ok(hwField.style.display === "none", "hardness hidden by default (non-TPU)");
 setFieldKey($("filamentForm"), "material", "TPU");
 ok(hwField.style.display !== "none", "hardness shown when TPU selected");
 ok(getFieldKey($("filamentForm"), "hardness") === "95A", "hardness defaults to 95A");
-// add filament (custom formulation)
+// add filament (custom formulation, plus a custom nickname)
+setFieldKey($("filamentForm"), "name", "Kitchen Roll PLA");
 setFieldKey($("filamentForm"), "maker", "Polymaker");
 setFieldKey($("filamentForm"), "material", "PLA");
 setFieldKey($("filamentForm"), "formulation", "PolyTerra");
@@ -134,6 +135,8 @@ d = readData();
 ok(d.filaments.length === 1, "filament saved");
 ok(d.customOptions.filamentFormulation.includes("PolyTerra"), "custom formulation remembered");
 ok(d.filaments[0].hardness == null, "hardness null for non-TPU filament");
+ok(d.filaments[0].name === "Kitchen Roll PLA", "custom filament nickname is actually saved");
+ok([...$("filamentList").querySelectorAll(".card .title")].some(t => t.textContent.includes("Kitchen Roll PLA")), "custom nickname shows as the filament card title");
 
 // (the "Use it now, here" hosted-build link moved out of the app header into README — no
 // longer part of the running app, so no longer asserted here.)

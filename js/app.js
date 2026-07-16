@@ -749,6 +749,7 @@
     let printers = [];
     if ($("filamentRestrict").checked) printers = [...$("filamentPrinters").querySelectorAll("input:checked")].map(i => i.value);
     const fields = {
+      name: v.name,
       maker: v.maker, material: v.material, formulation: v.formulation, color: v.color, diameter: v.diameter,
       hardness: /tpu/i.test(v.material) ? v.hardness : null,
       fiber, fiberName: fiber === "Custom" ? (v.fiberName || null) : null, fiberPct: needPct ? (num(v.fiberPct) || null) : null,
