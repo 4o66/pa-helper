@@ -132,12 +132,16 @@
   <div class="modal" id="tab-test" hidden>
   <div class="modal-box plain results-box test-modal-box">
     <div class="results-head">
-      <div class="results-title"><h2>PA Test</h2></div>
-      <button id="paModalClose" class="secondary">Close</button>
+      <div class="results-head-row">
+        <div class="results-title"><h2>PA Test</h2></div>
+        <button id="paModalClose" class="secondary">Close</button>
+      </div>
+      <!-- printer/nozzle/filament card lives in the fixed header (not the scrolling body) so it's
+           always visible — otherwise it's easy to lose track of which combo a test is running
+           against once you've scrolled down into the settings. -->
+      <div id="testContext" class="context"></div>
     </div>
     <div class="results-body">
-    <div id="testContext" class="context"></div>
-
     <div id="testBody" hidden>
       <!-- max volumetric speed (from a prior flow calibration) — advanced only; gates the rest until confirmed -->
       <div class="subsec advanced-only">

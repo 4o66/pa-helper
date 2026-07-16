@@ -240,6 +240,10 @@ plaCard.dispatchEvent(new window.Event("click", { bubbles: true }));
 // test context now active
 ok($("testBody").hidden === false, "test body shown once printer+nozzle+filament chosen");
 ok($("tab-test").dataset.mode === "advanced", "default mode advanced");
+// printer/nozzle/filament context card lives in the fixed header, not the scrolling body, so it
+// stays visible while scrolled into the settings below
+ok($("testContext").closest(".results-head") != null, "PA test's context card lives in the modal's fixed header");
+ok($("testContext").closest(".results-body") == null, "PA test's context card is not inside the scrolling body");
 ok($("basicMethod").disabled === true, "method control locked in advanced");
 ok($("basicMethod").value === "pattern", "advanced forces pattern method");
 ok(/max accel 12000/.test($("testContext").innerHTML), "printer max accel shown on test page");
