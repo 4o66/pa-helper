@@ -141,6 +141,8 @@ details[open] summary{margin-bottom:.7rem}
 #filamentList.cards{grid-template-columns:repeat(auto-fill,350px);justify-content:start}
 #printerList .actions{flex-wrap:nowrap}
 #printerList .actions button,#filamentList.cards .actions button{white-space:nowrap}
+#printerList .card,#nozzleList .card{cursor:pointer}
+#printerList .card .actions,#nozzleList .card .actions,#printerList .card select{cursor:default}
 .card{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:.7rem .8rem;
   display:flex;flex-direction:column;gap:.35rem}
 .card.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}

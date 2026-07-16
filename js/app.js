@@ -370,12 +370,11 @@
         const iw = el("div", "meta"); iw.append(document.createTextNode("Unit: ")); iw.append(sel); card.append(iw);
       }
       const actions = el("div", "actions");
-      const selBtn = el("button"); selBtn.textContent = p.id === data.lastPrinterId ? "Selected ✓" : "Select";
-      selBtn.addEventListener("click", () => selectPrinter(p.id));
       const edit = el("button", "secondary"); edit.textContent = "Edit"; edit.addEventListener("click", () => editPrinter(p.id));
       const clone = el("button", "secondary"); clone.textContent = "Clone"; clone.addEventListener("click", () => clonePrinter(p.id));
       const rm = removeButton(() => removePrinter(p.id));
-      actions.append(selBtn, edit, clone, rm); card.append(actions);
+      actions.append(edit, clone, rm); card.append(actions);
+      card.addEventListener("click", (e) => selectCardOnClick(e, () => selectPrinter(p.id)));
       wrap.append(card);
     });
   }
@@ -464,11 +463,11 @@
       const card = el("div", "card" + (n.id === data.lastNozzleId ? " selected" : ""));
       const title = el("div", "title"); title.textContent = nozzleLabel(n); card.append(title);
       const actions = el("div", "actions");
-      const sel = el("button"); sel.textContent = n.id === data.lastNozzleId ? "Selected ✓" : "Select";
-      sel.addEventListener("click", () => selectNozzle(n.id));
       const rm = el("button", "danger"); rm.textContent = "Remove";
       rm.addEventListener("click", () => removeNozzle(n.id));
-      actions.append(sel, rm); card.append(actions); list.append(card);
+      actions.append(rm); card.append(actions);
+      card.addEventListener("click", (e) => selectCardOnClick(e, () => selectNozzle(n.id)));
+      list.append(card);
     });
   }
   function selectNozzle(id) { data.lastNozzleId = id; persist(); renderNozzles(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); resetMaxFlowForCombo(); updateTabLabels(); }
@@ -576,16 +575,17 @@
     if (fill) sq.style.background = fill; else sq.classList.add("nocolor");
     return sq;
   }
-  // Clicking anywhere on a filament card/row selects it (no dedicated Select button) — except
-  // clicks on the action buttons (Edit/Clone/Remove/PA/Iron), which have their own handlers.
-  function selectFilamentOnCardClick(e, f) { if (e.target.closest(".actions")) return; selectFilament(f.id); }
+  // Clicking anywhere on a card/row selects it (no dedicated Select button) — except clicks on
+  // the action buttons (Edit/Clone/Remove/PA/Iron/etc.) or an inline <select> (e.g. the printer
+  // card's multi-instance unit picker), which have their own handlers.
+  function selectCardOnClick(e, selectFn) { if (e.target.closest(".actions") || e.target.closest("select")) return; selectFn(); }
   function filamentCard(f) {
     const card = el("div", "card fcard" + (f.id === data.lastFilamentId ? " selected" : ""));
     const band = el("div", "colorband"); const fill = colorFill(f); if (fill) band.style.background = fill; else band.classList.add("nocolor"); card.append(band);
     const title = el("div", "title"); title.textContent = filamentLabel(f); if (isRestricted(f)) title.prepend(pinIcon()); card.append(title);
     const meta = el("div", "meta"); meta.textContent = filMeta(f); card.append(meta);
     card.append(filActions(f));
-    card.addEventListener("click", (e) => selectFilamentOnCardClick(e, f));
+    card.addEventListener("click", (e) => selectCardOnClick(e, () => selectFilament(f.id)));
     return card;
   }
   function filamentRow(f) {
@@ -593,7 +593,7 @@
     const sq = el("span", "colorsq"); const fill = colorFill(f); if (fill) sq.style.background = fill; else sq.classList.add("nocolor"); row.append(sq);
     const name = el("span", "fname"); name.textContent = filamentLabel(f); if (isRestricted(f)) name.prepend(pinIcon()); row.append(name);
     row.append(filActions(f));
-    row.addEventListener("click", (e) => selectFilamentOnCardClick(e, f));
+    row.addEventListener("click", (e) => selectCardOnClick(e, () => selectFilament(f.id)));
     return row;
   }
   function renderFilamentFilters(base) {
