@@ -557,9 +557,9 @@
       const incomplete = ironRuns.find(r => !(r.namedResults && r.namedResults.length));   // no named results yet == still waiting on print results
       const iron = el("button", incomplete ? "warn" : null); iron.textContent = "Iron" + (ironRuns.length > 1 ? " (" + ironRuns.length + ")" : "");
       iron.addEventListener("click", () => {
-        // An in-progress run takes priority over the history view — jump straight to it instead
-        // of the results modal, since that's what needs finishing before anything else can happen.
-        if (incomplete) { openIroningRun(incomplete.id); showRunInProgressModal("You have a run in progress. To start a new run, name samples on the open run and save, or delete the in progress run."); }
+        // Land on the actual data-entry screen (the naming picker), not just the Ironing tab's
+        // settings — that's where "enter the datapoints" actually happens for an ironing run.
+        if (incomplete) { openIroningRun(incomplete.id); openIronPicker(incomplete.id); showRunInProgressModal("You have a run in progress. To start a new run, name samples on the open run and save, or delete the in progress run."); }
         else openIronResults(f.id);
       });
       actions.append(iron);
@@ -1625,6 +1625,8 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const rp = getPrinter(r.printerId);
     data.lastNozzleId = (rp && rp.nozzles && rp.nozzles.some(n => n.id === r.nozzleId)) ? r.nozzleId : (rp && rp.nozzles && rp.nozzles[0] ? rp.nozzles[0].id : null);
     $("testMode").value = r.mode || "advanced";
+    applyMode();   // sets #tab-test's data-mode so the correct (basic vs advanced) results section
+                    // is actually visible — setting testMode's value alone doesn't trigger this
     if ((r.mode || "advanced") === "basic") lastBasicMethod = r.basicMethod || P.basicDefault;
     $("basicMethod").value = r.basicMethod || P.basicDefault;
     $("unitMode").value = r.unit || "speed";
@@ -1649,6 +1651,11 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     renderPrinters(); renderNozzles(); renderFilaments(); updateTestContext(); updateIroningContext();
     switchTab("test");
     persist(); markJobDirty();
+    // Land on the actual data-entry screen, not just the top of the tab — the results table
+    // (advanced) / result fields (basic) sit below the setup sections, so resuming without this
+    // leaves the user staring at "Recommend settings" with the thing they came to do off-screen.
+    const entrySec = ((r.mode || "advanced") === "basic") ? $("basicResultSec") : $("resultsSec");
+    if (entrySec) entrySec.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function setStatus() {
