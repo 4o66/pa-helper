@@ -13,6 +13,16 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 ## [Unreleased]
 
 ### Added
+- **Resuming an in-flight PA run now locks the settings that shaped its results table.** Once a
+  planned run has been saved with a generated table, everything above it (max volumetric speed,
+  Mode/Method, both "Recommend settings" and "Settings I already printed" subtabs, gcode import)
+  is disabled on reopen — changing any of it after the fact could silently invalidate rows already
+  collected. The table itself stays fully usable (Best PA / Notes editable, Add row / Delete row
+  both work, the pattern picker still opens), each row's Override checkbox is disabled so an
+  existing row's flow/accel identity can't be unlocked (a freshly added row still starts editable,
+  since there's no other way to define one), "Group / sort by" stays enabled (view-only), and
+  Analyze / Export for Orca / Save all keep working. The modal's titlebar gets an "In-Flight ·
+  Settings locked" badge so it's obvious why fields are greyed out.
 - **Settings modal**, opened via a new gear-icon button in the header (to the right of Export).
   Consolidates the Theme picker and the `DEBUG: Clear data` button — both removed from the main
   toolbar and relocated here (Theme at the top; Clear data at the bottom, in its own danger zone)

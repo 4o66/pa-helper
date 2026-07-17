@@ -503,6 +503,29 @@ paResumeBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
 ok($("tab-test").hidden === false, "clicking the in-progress PA button resumes the run (opens the PA modal)");
 ok($("runInProgressModal").hidden === false, "in-progress explainer modal shown");
 ok(/Resumed planned run/.test($("recommendOut").textContent), "resume populated test tab");
+// resuming a saved in-flight (planned) run locks every setting that shaped its results table —
+// only the table itself (plus Analyze/Export/Save and the view-only sort) stays usable.
+{
+  ok($("testInFlightBadge").hidden === false && /In-Flight/.test($("testInFlightBadge").textContent) && /settings locked/i.test($("testInFlightBadge").textContent), "titlebar shows an In-Flight / settings-locked badge while resumed");
+  ["maxFlow", "maxFlowConfirm", "testMode", "basicMethod", "layerH", "flowPoints", "speedList", "accelPoints", "accelList", "recommendBtn", "loadPointsBtn", "importGcodeBtn", "pvStart", "pvEnd", "pvStep", "pvFlows", "pvAccels", "pvLoadBtn"].forEach(id => {
+    ok($(id).disabled === true, "resuming an in-flight run disables #" + id);
+  });
+  [...document.getElementsByName("recUnit"), ...document.getElementsByName("pvUnit")].forEach(r => ok(r.disabled === true, "resuming an in-flight run disables the " + r.name + " radio"));
+  ok($("resultSort").disabled !== true, "'Group / sort by' stays enabled while locked (view-only, doesn't touch the test)");
+  const lockedRow = $("resultsBody").querySelector("tr");
+  ok(lockedRow.querySelector(".ovchk").disabled === true, "an existing row's Override checkbox is disabled — can't unlock its flow/accel");
+  ok(lockedRow.querySelector('input[data-key="flow"]').disabled === true && lockedRow.querySelector('input[data-key="accel"]').disabled === true, "existing row's flow/accel stay locked (Override can't be ticked to free them)");
+  ok(lockedRow.querySelector('input[data-key="bestPA"]').disabled !== true && lockedRow.querySelector('input[data-key="notes"]').disabled !== true, "existing row's Best PA / Notes stay editable — that's the whole point of resuming");
+  ok($("analyzeBtn").disabled !== true && $("exportBtnModel").disabled !== true && $("savePlannedBtn").disabled !== true && $("saveRunBtn").disabled !== true, "Analyze / Export / Save stay usable while locked");
+  const rowsBefore = $("resultsBody").querySelectorAll("tr").length;
+  click("addRowBtn");
+  const newRow = $("resultsBody").querySelectorAll("tr")[rowsBefore];
+  ok($("resultsBody").querySelectorAll("tr").length === rowsBefore + 1, "Add row still works while locked");
+  ok(newRow.querySelector(".ovchk").disabled === true, "a freshly added row's Override checkbox is still disabled (can't be un-ticked either way)");
+  ok(newRow.querySelector('input[data-key="flow"]').disabled !== true && newRow.querySelector('input[data-key="accel"]').disabled !== true, "…but a freshly added row's flow/accel start out editable — it's the only way to define a new row's identity");
+  newRow.querySelector("td:last-child button").dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok($("resultsBody").querySelectorAll("tr").length === rowsBefore, "Delete row still works while locked");
+}
 // formatVersion 2.0: geometry is never cached/persisted, so a resumed run's picker must
 // regenerate purely from its stored settings (synthPatternBlock fallback in openPattern)
 {
@@ -1037,6 +1060,10 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
   mPaBtn().dispatchEvent(new window.Event("click", { bubbles: true }));
   ok($("tab-test").hidden === false, "clicking the grey PA button opens the PA modal fresh");
   ok(readData().lastFilamentId === mFil.id, "opening fresh selects that filament");
+  // a brand-new (not resumed) test is fully unlocked — no leftover lock state from a previously
+  // resumed run elsewhere in the suite, and no in-flight badge
+  ok($("testInFlightBadge").hidden === true, "no in-flight badge on a fresh test");
+  ok($("maxFlow").disabled !== true && $("testMode").disabled !== true && $("pvStart").disabled !== true, "a fresh test's settings are fully editable, not locked");
   // backdrop click closes a clean modal outright (nothing dirty to guard)
   $("tab-test").dispatchEvent(new window.Event("click", { bubbles: true }));
   ok($("tab-test").hidden === true, "clicking the modal backdrop closes a clean PA modal");

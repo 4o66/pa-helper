@@ -167,6 +167,7 @@ details[open] summary{margin-bottom:.7rem}
 .badge.warn{background:rgba(255,184,74,.15);color:var(--warn)}
 .badge.bad{background:rgba(255,93,93,.15);color:var(--bad)}
 .badge.info{background:rgba(74,168,255,.15);color:var(--accent)}
+.badge.muted{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
 .context{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:.6rem .8rem;font-size:.9rem}
 #maxFlowConfirm.confirmed{background:var(--accent2);border-color:var(--accent2);color:#fff}
 

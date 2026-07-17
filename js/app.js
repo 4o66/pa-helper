@@ -71,7 +71,7 @@
   const PALETTE = ["#4aa8ff", "#37c98b", "#ffb84a", "#c98bff", "#5de0e6", "#ff8f5d", "#8bff9e"];
 
   // ---- session state ----
-  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, ironDirty = false, pendingModal = null, importPlates = [], coverageMissing = [], accelListAuto = true, speedListAuto = true, accelPtsAuto = true, speedPtsAuto = true, maxFlowConfirmed = false;
+  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, ironDirty = false, pendingModal = null, importPlates = [], coverageMissing = [], accelListAuto = true, speedListAuto = true, accelPtsAuto = true, speedPtsAuto = true, maxFlowConfirmed = false, testFormLocked = false;
   let ironSpeedListAuto = true, ironFlowListAuto = true, ironingLoaded = false;
   const PA_FACTORS = ["toolhead", "extruder", "drive", "hotend"];
   const FILAMENT_PA_FACTORS = ["material", "formulation", "fiber", "fiberName", "fiberPct", "hardness", "diameter"];
@@ -323,6 +323,27 @@
   const clearJobDirty = () => { jobDirty = false; };
   const markIronDirty = () => { ironDirty = true; };
   const clearIronDirty = () => { ironDirty = false; };
+  // Once a PA run has been saved in-flight (status "planned") and its results table generated,
+  // reopening it locks every setting that shaped that table — changing them after the fact would
+  // silently invalidate rows already collected against the original settings. Only the results
+  // table stays live (Best PA / Notes / Add row / Delete row), plus Analyze / Export / Save, and
+  // "Group / sort by" (view-only, doesn't touch the test itself). Per-row Override checkboxes are
+  // locked too, so an existing row's flow/accel identity can't be unlocked for editing — a freshly
+  // added row still gets an editable flow/accel by default (addRow() below), since there's no
+  // other way to define one.
+  const TEST_LOCK_IDS = [
+    "maxFlow", "maxFlowConfirm", "testMode", "basicMethod",
+    "layerH", "flowPoints", "speedList", "accelPoints", "accelList", "recommendBtn", "loadPointsBtn",
+    "importGcodeBtn", "importAddBtn", "gcodeInput", "gcodeInputAdd",
+    "pvStart", "pvEnd", "pvStep", "pvFlows", "pvAccels", "pvLoadBtn"
+  ];
+  function setTestFormLocked(locked) {
+    testFormLocked = locked;
+    TEST_LOCK_IDS.forEach(id => { const e = $(id); if (e) e.disabled = locked; });
+    document.querySelectorAll('input[name="recUnit"], input[name="pvUnit"]').forEach(r => { r.disabled = locked; });
+    document.querySelectorAll("#resultsBody .ovchk").forEach(c => { c.disabled = locked; });
+    if ($("testInFlightBadge")) $("testInFlightBadge").hidden = !locked;
+  }
   function applyTab(name) {
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
     document.querySelectorAll(".tab").forEach(s => s.classList.toggle("active", s.id === "tab-" + name));
@@ -1323,7 +1344,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     override = override == null ? true : override;
     const tr = el("tr");
     if (r.speed != null) tr.dataset.speed = r.speed;   // commanded speed → locate its g-code block
-    const tdOv = el("td"); const ov = el("input"); ov.type = "checkbox"; ov.className = "ovchk"; ov.checked = !!override; tdOv.append(ov);
+    const tdOv = el("td"); const ov = el("input"); ov.type = "checkbox"; ov.className = "ovchk"; ov.checked = !!override; ov.disabled = testFormLocked; tdOv.append(ov);
     const inputs = {};
     const cells = ["flow", "accel", "bestPA", "notes"].map(key => {
       const td = el("td"); const inp = el("input"); inp.type = key === "notes" ? "text" : "number";
@@ -1666,6 +1687,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   // Blank the PA test tab back to a fresh, gated state (used after saving a planned run).
   function resetTestTab() {
     currentRunId = null; currentSettings = null; lastFit = null;
+    setTestFormLocked(false);                       // a fresh/reset test is always fully editable
     loadGrid([]);                                   // empty the results grid
     if ($("basicBestPA")) { $("basicBestPA").value = ""; $("basicNotes").value = ""; }
     drawPlot([], null, []);
@@ -1801,6 +1823,10 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   function openRun(id) {
     const r = data.runs.find(x => x.id === id); if (!r) return;
     currentRunId = id;
+    // A saved in-flight ("planned") run already has its results table generated — lock the
+    // settings that shaped it so they can't be changed out from under it. A completed run being
+    // reopened (e.g. cloneFromRun(), which always targets a "complete" run) stays fully editable.
+    setTestFormLocked(r.status === "planned");
     gcodeBlocks = null;   // never persisted (formatVersion 2.0) — openPattern falls back to synthPatternBlock(), regenerating from r.settings
     data.lastPrinterId = r.printerId; data.lastInstanceId = r.instanceId || null; data.lastFilamentId = r.filamentId;
     const rp = getPrinter(r.printerId);
