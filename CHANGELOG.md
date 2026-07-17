@@ -77,6 +77,10 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   modal is open.
 
 ### Fixed
+- **Filament list-view action buttons (Select/Edit/Clone/PA/Iron/trash) are now sized to match
+  card view.** List rows had no button-size override, so they silently fell back to the larger
+  base button size instead of the compact sizing card view already used — same buttons, same
+  row, two different sizes depending on which view was active.
 - **Settings gear button is now a proper square, matching the height of the other header
   buttons (Export, etc.).** It was inheriting the compact `.iconbtn` padding used for small
   in-card icon buttons (trashcans), which made it noticeably shorter and wider than its
