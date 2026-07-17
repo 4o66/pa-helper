@@ -1422,16 +1422,16 @@ ok($("jobGuardModal").hidden === true, "no guard once the job is cleared (nothin
     // nav tab subtitle shows the unit in parens
     ok($("tabSelPrinter").textContent.includes("Multi Unit Test (Unit B)"), "nav tab subtitle shows the selected unit in parens after the printer name");
 
-    // a genuinely different printer still lands on ITS own units — switching away and back to the
-    // multi printer resets to unit A, same boundary as nozzle selection (no cross-printer memory)
+    // each printer remembers its OWN last-picked unit — switching to a different printer and back
+    // to the multi printer must still land on unit B, not reset to unit A.
     // Whatever other printer still exists at this point in the suite (fixture printers created and
     // removed earlier vary run to run) — anything that isn't our own disposable multi printer works.
     const otherCard = () => [...document.querySelectorAll("#printerList .card")].find(c => !c.textContent.includes("Multi Unit Test"));
     if (otherCard()) {
       otherCard().dispatchEvent(new window.Event("click", { bubbles: true }));
+      ok(mpCard().querySelector("select").value === mp.instances[1].id, "a non-selected multi printer's own card still shows unit B, not the first unit (per-printer memory)");
       mpCard().dispatchEvent(new window.Event("click", { bubbles: true }));
-      ok(readData().lastInstanceId === mp.instances[0].id, "switching to a different printer and back resets to unit A (same boundary as nozzle selection)");
-      unitSel().value = mp.instances[1].id; ev(unitSel(), "change");   // back to unit B for the rest of this block
+      ok(readData().lastInstanceId === mp.instances[1].id, "switching to a different printer and back still lands on unit B (per-printer memory, not global)");
     }
 
     // picking a unit on a DIFFERENT (not-currently-selected) printer's own card must select that

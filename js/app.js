@@ -516,14 +516,18 @@
       if (p.multi && p.instances && p.instances.length) {
         const sel = el("select");
         p.instances.forEach(inst => { const o = el("option"); o.value = inst.id; o.textContent = inst.label; sel.append(o); });
-        if (p.id === data.lastPrinterId && data.lastInstanceId) sel.value = data.lastInstanceId;
-        // Picking a unit on a printer that ISN'T the currently-selected one used to silently set
-        // lastInstanceId while leaving some other printer as data.lastPrinterId — the sticky
-        // context card would then show the wrong printer entirely. Select this printer first.
+        // Each printer remembers its OWN last-picked unit (p.lastInstanceId), independent of which
+        // printer is currently active — so this dropdown always reflects where you left this
+        // specific printer, instead of defaulting to the first unit the moment it's not selected.
+        sel.value = (p.lastInstanceId && p.instances.some(i => i.id === p.lastInstanceId)) ? p.lastInstanceId : p.instances[0].id;
         sel.addEventListener("change", () => {
           const chosen = sel.value;
+          p.lastInstanceId = chosen;
+          // Picking a unit on a printer that ISN'T the currently-selected one used to silently set
+          // lastInstanceId while leaving some other printer as data.lastPrinterId — the sticky
+          // context card would then show the wrong printer entirely. Select this printer first.
           if (data.lastPrinterId !== p.id) selectPrinter(p.id);
-          data.lastInstanceId = chosen; persist(); updateTestContext(); updateIroningContext(); updateTabLabels();
+          else { data.lastInstanceId = chosen; persist(); updateTestContext(); updateIroningContext(); updateTabLabels(); }
         });
         const iw = el("div", "meta"); iw.append(document.createTextNode("Unit: ")); iw.append(sel); card.append(iw);
       }
@@ -539,11 +543,13 @@
   function selectPrinter(id) {
     data.lastPrinterId = id;
     const p = getPrinter(id);
-    // Only default to the first unit if the currently-stored instance doesn't actually belong to
-    // this printer — otherwise re-clicking the already-selected printer's own card (or returning to
-    // it) silently threw away whatever unit you'd picked, snapping back to unit 1 every time.
-    if (!(p && p.multi && p.instances && p.instances.some(inst => inst.id === data.lastInstanceId))) {
-      data.lastInstanceId = (p && p.multi && p.instances && p.instances.length) ? p.instances[0].id : null;
+    // Each printer remembers its own last-picked unit (p.lastInstanceId) — selecting it resumes
+    // wherever you left THAT printer, rather than always snapping back to unit 1.
+    if (p && p.multi && p.instances && p.instances.length) {
+      data.lastInstanceId = (p.lastInstanceId && p.instances.some(inst => inst.id === p.lastInstanceId)) ? p.lastInstanceId : p.instances[0].id;
+      p.lastInstanceId = data.lastInstanceId;
+    } else {
+      data.lastInstanceId = null;
     }
     if (!(p && p.nozzles && p.nozzles.some(n => n.id === data.lastNozzleId))) data.lastNozzleId = (p && p.nozzles && p.nozzles.length) ? p.nozzles[0].id : null;
     persist(); renderPrinters(); renderNozzles(); renderFilaments(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); resetMaxFlowForCombo(); updateTabLabels();

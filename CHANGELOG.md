@@ -19,6 +19,13 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   run was actually made on (`run.instanceId`), not whatever unit happens to be selected live.
 
 ### Fixed
+- **A multi-instance printer's own card forgot which unit you'd picked the moment it wasn't the
+  active printer** — its unit dropdown would visually snap back to the first entry as soon as you
+  selected a different printer, even though you'd deliberately picked another one. Each printer now
+  remembers its own last-picked unit (`printer.lastInstanceId`), independent of which printer is
+  globally active, so its card always shows where you actually left it — this also covers
+  re-clicking the same card and switching away and back, superseding the narrower conditional-reset
+  fix from earlier in this list.
 - **Picking a unit on a multi-instance printer's card didn't select that printer** if some other
   printer was currently active — it silently set `lastInstanceId` while leaving the other printer
   as `lastPrinterId`, so the sticky context card would show the wrong printer entirely alongside a
