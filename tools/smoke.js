@@ -1388,9 +1388,18 @@ ok($("jobGuardModal").hidden === true, "no guard once the job is cleared (nothin
     click("settingsCloseBtn");
   }
 
-  // ---- selectPrinter must not reset a multi-instance printer's chosen unit when reselecting the
-  // same printer's own card (it used to, unconditionally, snapping back to unit 1 every time) ----
+  // ---- multi-instance printer: unit label lookup, selectPrinter instance-preservation, and the
+  // "(unit)" suffix in the nav tab + both saved-results modals ----
   {
+    // instanceLabel() must look up the unit's label, not assume the instance id IS the label —
+    // real UI-created instances always have id===label (parseInstances), so this only ever showed
+    // up on data where that's not true (e.g. an imported/generated file with real distinct ids).
+    const fakePrinter = { multi: true, instances: [{ id: "raw-id-1", label: "Trident 1" }, { id: "raw-id-2", label: "Trident 2" }] };
+    ok(window.PA_test.instanceLabel(fakePrinter, "raw-id-2") === "Trident 2", "instanceLabel looks up the real label instead of assuming id === label");
+    ok(window.PA_test.instanceLabel(fakePrinter, "orphaned-id") === "orphaned-id", "instanceLabel falls back to the raw id only if it's truly orphaned");
+    ok(window.PA_test.instanceLabel(null, "x") === null && window.PA_test.instanceLabel(fakePrinter, null) === null, "instanceLabel is null-safe");
+
+    // build a disposable multi-instance printer + filament through the real UI
     setFieldKey($("printerForm"), "maker", "Voron");
     setFieldKey($("printerForm"), "model", "Multi Unit Test");
     $("printerMulti").checked = true;
@@ -1410,6 +1419,9 @@ ok($("jobGuardModal").hidden === true, "no guard once the job is cleared (nothin
     mpCard().dispatchEvent(new window.Event("click", { bubbles: true }));
     ok(readData().lastInstanceId === mp.instances[1].id, "re-clicking the already-selected multi printer's own card preserves unit B (bug fix)");
 
+    // nav tab subtitle shows the unit in parens
+    ok($("tabSelPrinter").textContent.includes("Multi Unit Test (Unit B)"), "nav tab subtitle shows the selected unit in parens after the printer name");
+
     // a genuinely different printer still lands on ITS own units — switching away and back to the
     // multi printer resets to unit A, same boundary as nozzle selection (no cross-printer memory)
     const otherCard = () => [...document.querySelectorAll("#printerList .card")].find(c => c.textContent.includes("Trident 350") && !c.textContent.includes("Multi"));
@@ -1417,11 +1429,40 @@ ok($("jobGuardModal").hidden === true, "no guard once the job is cleared (nothin
       otherCard().dispatchEvent(new window.Event("click", { bubbles: true }));
       mpCard().dispatchEvent(new window.Event("click", { bubbles: true }));
       ok(readData().lastInstanceId === mp.instances[0].id, "switching to a different printer and back resets to unit A (same boundary as nozzle selection)");
+      unitSel().value = mp.instances[1].id; ev(unitSel(), "change");   // back to unit B for the rest of this block
     }
 
+    setFieldKey($("filamentForm"), "maker", "Test");
+    setFieldKey($("filamentForm"), "material", "PLA");
+    setFieldKey($("filamentForm"), "color", "Unit Test Blue");
+    click("saveFilamentBtn");
+    const muFil = readData().filaments.find(f => f.color === "Unit Test Blue");
+    window.PA_test.selectFilament(muFil.id);
+
+    // PA saved-results view: title shows the unit too
+    $("maxFlow").value = "20"; ev($("maxFlow"), "input");
+    ev($("maxFlowConfirm"), "click");
+    $("flowPoints").value = "3"; $("accelLimit").value = "4000"; $("accelList").value = ""; $("speedList").value = "";
+    click("recommendBtn"); click("loadPointsBtn");
+    [...$("resultsBody").querySelectorAll("tr")].forEach(tr => { tr.querySelector('input[data-key="bestPA"]').value = "0.03"; });
+    click("saveRunBtn");
+    const muCard = () => [...document.querySelectorAll("#filamentList .card,#filamentList .frow")].find(c => c.textContent.includes("Unit Test Blue"));
+    const muPaBtn = () => [...muCard().querySelectorAll(".actions button")].find(b => /^PA/.test(b.textContent));
+    muPaBtn().dispatchEvent(new window.Event("click", { bubbles: true }));
+    ok($("resultsModal").hidden === false, "PA results modal opens for the unit-test run");
+    ok($("resultsPrinterRow").textContent.includes("Multi Unit Test (Unit B)"), "PA saved-results title shows the unit the run was made on");
+    click("resultsClose");
+
+    // Ironing saved-results view: same check
+    click("ironingSaveBtn");
+    ok($("ironResultsModal").hidden === false, "Ironing results modal opens for the unit-test run");
+    ok($("ironResultsPrinterRow").textContent.includes("Multi Unit Test (Unit B)"), "Ironing saved-results title shows the unit the run was made on");
+    click("ironResultsClose");
+
     // cleanup
-    const rmBtn = [...mpCard().querySelectorAll(".actions button")].find(b => b.title === "Remove");
-    rmBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+    const rmBtn = (card) => [...card.querySelectorAll(".actions button")].find(b => b.title === "Remove");
+    rmBtn(mpCard()).dispatchEvent(new window.Event("click", { bubbles: true }));
+    if (muCard()) rmBtn(muCard()).dispatchEvent(new window.Event("click", { bubbles: true }));
   }
 
   console.log(`\n${pass} passed, ${fail} failed`);

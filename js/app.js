@@ -291,6 +291,15 @@
     return r ? r.maxFlow : null;
   }
   const printerLabel = (p) => p ? (p.name || [p.maker, p.model].filter(Boolean).join(" ")) || "(unnamed printer)" : "?";
+  // A multi-instance printer's units are stored as {id, label} — id and label happen to be equal
+  // for anything created through the instances textarea (parseInstances), but that's not
+  // guaranteed (e.g. imported/generated data can give units real distinct ids), so anywhere an
+  // instance is displayed must look up its label rather than assume the id IS the label.
+  function instanceLabel(p, instanceId) {
+    if (!p || !instanceId) return null;
+    const inst = (p.instances || []).find(i => i.id === instanceId);
+    return inst ? inst.label : instanceId;   // fall back to the raw id only if it's truly orphaned
+  }
   const COLORS = P.colorDict || {};
   const COLOR_KEYS = Object.keys(COLORS).sort((a, b) => b.length - a.length);
   function colorHex(name) { if (!name) return null; const s = String(name).toLowerCase(); for (const k of COLOR_KEYS) if (s.includes(k)) return COLORS[k]; return null; }
@@ -449,8 +458,10 @@
     const p = getPrinter(data.lastPrinterId), n = getSelectedNozzle(), f = getFilament(data.lastFilamentId);
     const tp = $("tabSelPrinter"), tf = $("tabSelFilament");
     if (tp) {
-      if (p) tabSel(tp, makerFavicon(p.maker), printerLabel(p), n ? nozzleLabel(n) : "No nozzle");
-      else { tp.innerHTML = ""; tp.textContent = "Not selected"; }
+      if (p) {
+        const unit = p.multi && data.lastInstanceId ? " (" + instanceLabel(p, data.lastInstanceId) + ")" : "";
+        tabSel(tp, makerFavicon(p.maker), printerLabel(p) + unit, n ? nozzleLabel(n) : "No nozzle");
+      } else { tp.innerHTML = ""; tp.textContent = "Not selected"; }
     }
     if (tf) {
       if (!p) {
@@ -964,7 +975,7 @@
         (!p ? "<br>• No printer selected." : "") + (p && !n ? "<br>• No nozzle selected." : "") + (!f ? "<br>• No filament selected." : "");
       return;
     }
-    const inst = (p.multi && data.lastInstanceId) ? " · unit " + data.lastInstanceId : "";
+    const inst = (p.multi && data.lastInstanceId) ? " · unit " + instanceLabel(p, data.lastInstanceId) : "";
     const mx = num(p.maxAccel) || 12000;
     $("accelLimit").value = mx;
     // Smart default: fewer accel points for a narrow accel range (unless the user set the count).
@@ -1891,7 +1902,10 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const nz = run.nozzle || (data.lastRunNozzle);
     // Title bar: printer/nozzle (with maker icon) on top, filament (with color swatch) below —
     // same icon+two-line pattern the Printer/Filament nav tabs already use.
-    tabSel($("resultsPrinterRow"), p ? makerFavicon(p.maker) : null, p ? printerLabel(p) : "(deleted printer)", nz ? nozzleLabel(nz) : "");
+    {
+      const unit = p && p.multi && run.instanceId ? " (" + instanceLabel(p, run.instanceId) + ")" : "";
+      tabSel($("resultsPrinterRow"), p ? makerFavicon(p.maker) : null, p ? printerLabel(p) + unit : "(deleted printer)", nz ? nozzleLabel(nz) : "");
+    }
     tabSel($("resultsFilamentRow"), f ? colorSquare(f, "colorsq tabsw") : null, f ? filLine1(f) : "(deleted filament)", f ? filLine2(f) : "");
     const bed = p && p.bed ? (p.bed.shape === "round" ? (p.bed.diameter + " mm ø") : (p.bed.x + "×" + p.bed.y + " mm")) : "";
     const printer = p ? [["Maker", p.maker], ["Model", p.model], ["Toolhead", p.toolhead], ["Extruder", (p.extruder || "") + (p.drive ? " (" + p.drive + ")" : "")], ["Hotend", p.hotend], ["Nozzle", nz ? nozzleLabel(nz) : ""], ["Bed", bed]] : [["Status", "(deleted)"]];
@@ -2084,7 +2098,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
         (!p ? "<br>• No printer selected." : "") + (p && !n ? "<br>• No nozzle selected." : "") + (!f ? "<br>• No filament selected." : "");
       return;
     }
-    const inst = (p.multi && data.lastInstanceId) ? " · unit " + data.lastInstanceId : "";
+    const inst = (p.multi && data.lastInstanceId) ? " · unit " + instanceLabel(p, data.lastInstanceId) : "";
     ctx.innerHTML = `<b>${printerLabel(p)}</b>${inst}<br><span class="muted">Bed: ${bedSizeLabel(p)}</span><br>Nozzle: <b>${nozzleLabel(n)}</b><br>Filament: <b>${filamentLabel(f)}</b>`;
     $("ironingBody").hidden = false;
     if ($("ironAbandonBtn")) $("ironAbandonBtn").hidden = !findIncompleteIroningRun(data.lastPrinterId, n.id, data.lastFilamentId);
@@ -2277,7 +2291,10 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const dl = (rows) => '<dl class="results-dl">' + rows.filter(r => r[1] != null && String(r[1]) !== "").map(([k, v, c]) => `<dt>${esc(k)}</dt><dd>${esc(v)}${c != null ? copy(c) : ""}</dd>`).join("") + "</dl>";
     // Title bar: printer/nozzle (with maker icon) on top, filament (with color swatch) below — same
     // icon+two-line pattern the Printer/Filament nav tabs (and the PA saved-results view) use.
-    tabSel($("ironResultsPrinterRow"), p ? makerFavicon(p.maker) : null, p ? printerLabel(p) : "(deleted printer)", nz ? nozzleLabel(nz) : "");
+    {
+      const unit = p && p.multi && run.instanceId ? " (" + instanceLabel(p, run.instanceId) + ")" : "";
+      tabSel($("ironResultsPrinterRow"), p ? makerFavicon(p.maker) : null, p ? printerLabel(p) + unit : "(deleted printer)", nz ? nozzleLabel(nz) : "");
+    }
     tabSel($("ironResultsFilamentRow"), f ? colorSquare(f, "colorsq tabsw") : null, f ? filLine1(f) : "(deleted filament)", f ? filLine2(f) : "");
     const bed = p && p.bed ? (p.bed.shape === "round" ? (p.bed.diameter + " mm ø") : (p.bed.x + "×" + p.bed.y + " mm")) : "";
     const printer = p ? [["Maker", p.maker], ["Model", p.model], ["Toolhead", p.toolhead], ["Extruder", (p.extruder || "") + (p.drive ? " (" + p.drive + ")" : "")], ["Hotend", p.hotend], ["Nozzle", nz ? nozzleLabel(nz) : ""], ["Bed", bed]] : [["Status", "(deleted)"]];
@@ -2652,7 +2669,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("coverageImport").addEventListener("click", () => { $("coverageModal").hidden = true; $("gcodeInputAdd").click(); });
     $("coverageContinue").addEventListener("click", () => { $("coverageModal").hidden = true; });
     window.PA_parseGcode = parsePaGcode;
-    window.PA_test = { importGcode, addPlate, resetGcode, buildPaBlocks, colorList, colorFill, suggestAccelPts, suggestSpeedPts, beadArea, selectFilament, savePlanned, loadGrid, backfillSinglePaResults };   // test hooks (jsdom smoke)
+    window.PA_test = { importGcode, addPlate, resetGcode, buildPaBlocks, colorList, colorFill, suggestAccelPts, suggestSpeedPts, beadArea, selectFilament, savePlanned, loadGrid, backfillSinglePaResults, instanceLabel };   // test hooks (jsdom smoke)
     $("loadPointsBtn").addEventListener("click", (e) => { loadGrid(e.target._points || []); sortResults(); markJobDirty(); });
     $("resultSort").addEventListener("change", sortResults);
     $("savePlannedBtn").addEventListener("click", savePlanned);

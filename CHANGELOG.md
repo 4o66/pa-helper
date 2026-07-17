@@ -12,6 +12,20 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 
 ## [Unreleased]
 
+### Added
+- **A multi-instance printer's selected unit now shows in the nav tab subtitle and both
+  saved-results modals** — e.g. "Voron Trident 350 AWD (Trident 2)" — instead of only being visible
+  on the printer's own card back in the Printers tab. The saved-results modals read the unit the
+  run was actually made on (`run.instanceId`), not whatever unit happens to be selected live.
+
+### Fixed
+- **A multi-instance printer's unit could show its raw internal id instead of its label** (e.g.
+  "unit mroptprum5hsh") in the PA Test / Ironing sticky context header. Real UI-created units
+  always have `id === label` (the instances textarea sets both to the same text), which masked the
+  bug — it only surfaced on data where that's not true, like an imported file with real distinct
+  instance ids. Added an `instanceLabel()` lookup used everywhere a unit is displayed, including
+  the new spots above.
+
 ### Changed
 - **Ironing's saved-results view gets the same title restructure and reorder as PA's.** The title
   bar is now two rows — printer/nozzle (with the printer's maker icon) on top, filament (with its
