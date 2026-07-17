@@ -1339,12 +1339,22 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   // The results table always shows FLOW (mm³/s) — that's what actually prints in the
   // pattern — with the equivalent speed on hover. flow & accel are locked unless the
   // row's Override box is ticked (grid/gcode points are trusted; ticking lets you edit).
-  function addRow(r, override) {
+  // opts.readonly builds a display-only row for the saved-results view: no Override checkbox, no
+  // Delete button, every value cell disabled. opts.target picks which <tbody> the row is appended
+  // to (defaults to the live #resultsBody). The pattern-picker button still works either way — in
+  // readonly mode it opens the picker read-only (see openPattern).
+  function addRow(r, override, opts) {
+    opts = opts || {};
+    const readonly = !!opts.readonly, target = opts.target || $("resultsBody"), viewSettings = opts.settings || null;
     r = r || { flow: "", accel: "", bestPA: "", notes: "" };
     override = override == null ? true : override;
     const tr = el("tr");
     if (r.speed != null) tr.dataset.speed = r.speed;   // commanded speed → locate its g-code block
-    const tdOv = el("td"); const ov = el("input"); ov.type = "checkbox"; ov.className = "ovchk"; ov.checked = !!override; ov.disabled = testFormLocked; tdOv.append(ov);
+    let ov = null;
+    if (!readonly) {
+      const tdOv = el("td"); ov = el("input"); ov.type = "checkbox"; ov.className = "ovchk"; ov.checked = !!override; ov.disabled = testFormLocked; tdOv.append(ov);
+      tr.append(tdOv);
+    }
     const inputs = {};
     const cells = ["flow", "accel", "bestPA", "notes"].map(key => {
       const td = el("td"); const inp = el("input"); inp.type = key === "notes" ? "text" : "number";
@@ -1356,33 +1366,47 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       const fl = num(inputs.flow.value), cf = convFactor(); inputs.flow.title = (fl != null && cf) ? "≈ " + Math.round(fl / cf) + " mm/s" : "";
     };
     setFlowTitle(); inputs.flow.addEventListener("input", setFlowTitle);
-    const applyLock = () => { inputs.flow.disabled = !ov.checked; inputs.accel.disabled = !ov.checked; };
-    ov.addEventListener("change", applyLock); applyLock();
+    if (readonly) {
+      inputs.flow.disabled = true; inputs.accel.disabled = true; inputs.bestPA.disabled = true; inputs.notes.disabled = true;
+    } else {
+      const applyLock = () => { inputs.flow.disabled = !ov.checked; inputs.accel.disabled = !ov.checked; };
+      ov.addEventListener("change", applyLock); applyLock();
+    }
     // pattern picker button in the Best PA cell (cells[2])
     cells[2].classList.add("pacell");
     const patBtn = el("button", "secondary iconbtn"); patBtn.type = "button"; patBtn.textContent = "▤";
-    patBtn.title = "Pick best PA from the printed pattern"; patBtn.addEventListener("click", () => openPattern(tr));
+    patBtn.title = "Pick best PA from the printed pattern"; patBtn.addEventListener("click", () => openPattern(tr, { readonly, settings: viewSettings }));
     cells[2].append(patBtn);
     // range-edge warning: if the chosen PA sits on the tested range's floor/ceiling, the true
     // optimum probably lies beyond the range — flag it so an edge value isn't mistaken for an answer.
-    const edge = el("span", "edgewarn"); edge.textContent = "⚠"; edge.hidden = true; cells[2].append(edge);
-    const checkEdge = () => {
-      const v = num(inputs.bestPA.value), s = currentSettings || {};
-      const lo = num(s.paStart), hi = num(s.paEnd), tol = (num(s.paStep) || 0.005) / 2;
-      const atHi = v != null && hi != null && Math.abs(v - hi) <= tol;
-      const atLo = v != null && lo != null && Math.abs(v - lo) <= tol;
-      edge.hidden = !(atHi || atLo);
-      edge.title = atHi
-        ? `Best PA is at the top of the tested range (${hi}). The real optimum may be higher — raise End PA and re-test.`
-        : `Best PA is at the bottom of the tested range (${lo}). The real optimum may be lower — lower Start PA and re-test.`;
-    };
-    inputs.bestPA.addEventListener("input", checkEdge); checkEdge();
-    // outlier marker: set by refreshOutliers() when this cell is out of line with its row/col neighbours
+    // Reads the LIVE tab's currentSettings, so it's meaningless (and could reference the wrong
+    // run's range) in the read-only saved-results view — skip it there.
+    if (!readonly) {
+      const edge = el("span", "edgewarn"); edge.textContent = "⚠"; edge.hidden = true; cells[2].append(edge);
+      const checkEdge = () => {
+        const v = num(inputs.bestPA.value), s = currentSettings || {};
+        const lo = num(s.paStart), hi = num(s.paEnd), tol = (num(s.paStep) || 0.005) / 2;
+        const atHi = v != null && hi != null && Math.abs(v - hi) <= tol;
+        const atLo = v != null && lo != null && Math.abs(v - lo) <= tol;
+        edge.hidden = !(atHi || atLo);
+        edge.title = atHi
+          ? `Best PA is at the top of the tested range (${hi}). The real optimum may be higher — raise End PA and re-test.`
+          : `Best PA is at the bottom of the tested range (${lo}). The real optimum may be lower — lower Start PA and re-test.`;
+      };
+      inputs.bestPA.addEventListener("input", checkEdge); checkEdge();
+    }
+    // outlier marker: set by refreshOutliers() (neighbour-based) when this cell is out of line with
+    // its row/col neighbours — live tab only. The read-only view's row-level "outlier" class (tinted
+    // red via CSS) comes from a different, regression-based check; see renderViewAnalysis.
     const outl = el("span", "outlierwarn"); outl.textContent = "◆"; outl.hidden = true; cells[2].append(outl);
-    inputs.bestPA.addEventListener("input", refreshOutliers);
-    const tdDel = el("td"); const del = el("button", "secondary"); del.textContent = "✕"; del.style.padding = ".2rem .5rem";
-    del.addEventListener("click", () => tr.remove()); tdDel.append(del);
-    tr.append(tdOv, ...cells, tdDel); $("resultsBody").append(tr);
+    if (!readonly) inputs.bestPA.addEventListener("input", refreshOutliers);
+    tr.append(...cells);
+    if (!readonly) {
+      const tdDel = el("td"); const del = el("button", "secondary"); del.textContent = "✕"; del.style.padding = ".2rem .5rem";
+      del.addEventListener("click", () => tr.remove()); tdDel.append(del);
+      tr.append(tdDel);
+    }
+    target.append(tr);
   }
   const loadGrid = (rows) => { $("resultsBody").innerHTML = ""; rows.forEach(r => addRow(r, r.override === true)); refreshOutliers(); };
   // Flag Best-PA cells that are out of line with their NEIGHBOURS (same accel row or same flow column),
@@ -1420,7 +1444,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     });
   }
   // ---- pattern picker ----
-  let patternTr = null, patternSel = null;
+  let patternTr = null, patternSel = null, patternReadonly = false;
   // Picker geometry is never persisted (formatVersion 2.0) — a reopened run always regenerates
   // via synthPatternBlock() below, from the run's own stored settings (paStart/paEnd/paStep/
   // lineW/layerH), the same path already used for "recommended" runs. This holds for imported
@@ -1440,16 +1464,32 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const accel = tr ? tr.querySelector('input[data-key="accel"]').value : null;
     return window.PAPattern.synthBlock({ paStart: s.paStart, paEnd: s.paEnd, paStep: s.paStep, lineWidth: num(s.lineW), layerHeight: num(s.layerH), wallLoops: 3, flow: flow, accel: accel });
   }
-  function openPattern(tr) {
+  // opts.readonly: viewing a saved-results run — the picker still opens (for reference) but line
+  // clicks don't select anything and OK just closes it (see the click wiring further down).
+  // opts.settings: the SAVED run's own settings, since the read-only picker isn't necessarily
+  // opened from the live PA Test tab — currentSettings there could be for a completely different
+  // run (or nothing at all). Temporarily substituted for the duration of this render, restored
+  // right after, same idea as openRun() nulling gcodeBlocks so it always regenerates from settings
+  // rather than risk matching some unrelated live-session g-code import.
+  function openPattern(tr, opts) {
+    opts = opts || {};
     patternTr = tr; patternSel = null;
-    const accel = +tr.querySelector('input[data-key="accel"]').value;
-    const speed = tr.dataset.speed != null ? +tr.dataset.speed : NaN;
-    const block = (gcodeBlocks && gcodeBlocks.byKey && isFinite(accel) && isFinite(speed)) ? gcodeBlocks.byKey[accel + "|" + speed] : null;
-    if (block) { renderRealPattern(tr, block, accel, speed); }
-    else {
-      const synth = synthPatternBlock(tr);
-      if (synth) renderRealPattern(tr, synth, accel, isFinite(speed) ? speed : "?");
-      else renderSchematic(tr);   // last-ditch fallback (no PA range available)
+    patternReadonly = !!opts.readonly;
+    $("patternModal").classList.toggle("readonly", patternReadonly);
+    const prevSettings = currentSettings, prevGcodeBlocks = gcodeBlocks;
+    if (opts.settings) { currentSettings = opts.settings; gcodeBlocks = null; }
+    try {
+      const accel = +tr.querySelector('input[data-key="accel"]').value;
+      const speed = tr.dataset.speed != null ? +tr.dataset.speed : NaN;
+      const block = (gcodeBlocks && gcodeBlocks.byKey && isFinite(accel) && isFinite(speed)) ? gcodeBlocks.byKey[accel + "|" + speed] : null;
+      if (block) { renderRealPattern(tr, block, accel, speed); }
+      else {
+        const synth = synthPatternBlock(tr);
+        if (synth) renderRealPattern(tr, synth, accel, isFinite(speed) ? speed : "?");
+        else renderSchematic(tr);   // last-ditch fallback (no PA range available)
+      }
+    } finally {
+      currentSettings = prevSettings; gcodeBlocks = prevGcodeBlocks;
     }
     $("patternModal").hidden = false;
   }
@@ -1486,7 +1526,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       const g = svgEl("g"); g.setAttribute("class", "paline" + (pa === patternSel ? " sel" : "")); g.dataset.pa = pa;
       block.byPa[pa].forEach(seg => g.append(line(seg, "zig")));
       block.byPa[pa].forEach(seg => g.append(line(seg, "hit")));
-      g.addEventListener("click", () => patternSelectPa(pa));
+      if (!patternReadonly) g.addEventListener("click", () => patternSelectPa(pa));
       svg.append(g);
     });
     (block.text || []).forEach(seg => svg.append(line(seg, "labtext")));  // digits: imported strokes or synthetic seven-segment glyphs
@@ -1525,7 +1565,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       }
       const hit = svgEl("polyline"); hit.setAttribute("class", "hit"); hit.setAttribute("points", `${apexX - amp},${ay - amp} ${apexX},${ay} ${apexX + amp},${ay - amp}`); g.append(hit);
       if (i % 2 === 0) { const t = svgEl("text"); t.setAttribute("class", "snum"); t.setAttribute("x", barX + 8); t.setAttribute("y", ay + 4); t.textContent = pa.toFixed(dp); g.append(t); }
-      g.addEventListener("click", () => patternSelectPa(pa));
+      if (!patternReadonly) g.addEventListener("click", () => patternSelectPa(pa));
       svg.append(g);
     });
     const foot = (txt, dy) => { const t = svgEl("text"); t.setAttribute("class", "snum"); t.setAttribute("x", barX + 8); t.setAttribute("y", H - pad - dy); t.textContent = txt; svg.append(t); };
@@ -1582,34 +1622,45 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     for (let i = 0; i < n; i++) { const pv = c[0] + c[1] * xs[i] + c[2] * as[i]; ssRes += (ys[i] - pv) ** 2; ssTot += (ys[i] - my) ** 2; }
     return { type: "mlr", b0: c[0], b1: c[1], b2: c[2], r2: ssTot === 0 ? 1 : 1 - ssRes / ssTot, predict: (x, a) => c[0] + c[1] * x + c[2] * a };
   }
-  function analyze() {
-    const all = readResults();
-    all.forEach(r => r.tr.classList.remove("outlier"));
-    const rows = all.filter(r => r.x != null && r.bestPA != null && r.accel != null);
-    const out = $("analysisOut");
-    if (rows.length < 3) { out.innerHTML = '<span class="badge warn">need data</span>Enter at least 3 points to analyze.'; drawPlot([], null, []); return; }
+  // Pure fit + outlier-detection math, shared between the live Analyze button and the saved-results
+  // view's read-only Plot & Analysis section. Caller guarantees rows.length >= 3 and each row has
+  // non-null x/accel/bestPA; the row objects themselves are untouched (no .tr side effects here —
+  // callers own their own DOM and decide how to mark outliers on it).
+  function computeFitAnalysis(rows) {
     const xs = rows.map(r => r.x), as = rows.map(r => r.accel), ys = rows.map(r => r.bestPA);
     const accelSet = [...new Set(as)].sort((a, b) => a - b);
     const multi = accelSet.length > 1 && rows.length >= 4;
     const fit = multi ? (mlr(xs, as, ys) || linreg(xs, ys)) : linreg(xs, ys);
-    lastFit = fit;
     const pred = rows.map(r => fit.type === "mlr" ? fit.predict(r.x, r.accel) : fit.predict(r.x));
     const resid = rows.map((r, i) => Math.abs(ys[i] - pred[i]));
     const mean = resid.reduce((a, b) => a + b, 0) / resid.length;
     const std = Math.sqrt(resid.reduce((a, d) => a + (d - mean) ** 2, 0) / resid.length) || 0;
     const range = Math.max(...ys) - Math.min(...ys), absThresh = Math.max(0.01, range * 0.15);
-    const outliers = []; rows.forEach((r, i) => { if (resid[i] > Math.max(2 * std, absThresh)) { outliers.push(r); r.tr.classList.add("outlier"); } });
-    drawPlot(rows, fit, outliers);
+    const outliers = []; rows.forEach((r, i) => { if (resid[i] > Math.max(2 * std, absThresh)) outliers.push(r); });
     let html = "";
     if (fit.r2 < 0.4) html += '<span class="badge bad">scattered</span>Points don’t follow a clear trend (R²=' + fit.r2.toFixed(2) + '). Usually the print was inconsistent, not your reading — re-check first-layer squish / flow, then re-run.';
     else if (outliers.length) html += '<span class="badge warn">' + outliers.length + ' outlier' + (outliers.length > 1 ? "s" : "") + '</span>Off-trend (highlighted) — likely a misread line. Re-check: ' + outliers.map(o => o.x + " mm³/s @ " + o.accel + " (picked " + o.bestPA + ")").join("; ") + ".";
     else html += '<span class="badge ok">clean</span>Good fit (R²=' + fit.r2.toFixed(2) + '). ';
     if (fit.type === "mlr") html += ' PA ≈ ' + fit.b1.toExponential(2) + '·mm³/s + ' + fit.b2.toExponential(2) + '·accel + ' + fit.b0.toFixed(4) + '.';
     else if (fit.r2 >= 0.4) html += ' PA ≈ ' + fit.slope.toExponential(2) + '·mm³/s + ' + fit.intercept.toFixed(4) + '.';
+    return { fit, outliers, html };
+  }
+  function analyze() {
+    const all = readResults();
+    all.forEach(r => r.tr.classList.remove("outlier"));
+    const rows = all.filter(r => r.x != null && r.bestPA != null && r.accel != null);
+    const out = $("analysisOut");
+    if (rows.length < 3) { out.innerHTML = '<span class="badge warn">need data</span>Enter at least 3 points to analyze.'; drawPlot([], null, []); return; }
+    const { fit, outliers, html } = computeFitAnalysis(rows);
+    lastFit = fit;
+    outliers.forEach(r => r.tr.classList.add("outlier"));
+    drawPlot(rows, fit, outliers);
     out.innerHTML = html;
   }
-  function drawPlot(rows, fit, outliers) {
-    const svg = $("plot"); while (svg.firstChild) svg.removeChild(svg.firstChild);
+  // svgTarget lets the saved-results view's read-only Plot & Analysis section render into its own
+  // <svg> (e.g. #viewPlot) instead of the live PA Test tab's #plot — same drawing code either way.
+  function drawPlot(rows, fit, outliers, svgTarget) {
+    const svg = svgTarget || $("plot"); while (svg.firstChild) svg.removeChild(svg.firstChild);
     const W = 640, H = 360, m = { l: 64, r: 20, t: 20, b: 46 }; if (!rows.length) return;
     const xs = rows.map(r => r.x), ys = rows.map(r => r.bestPA);
     const xmin = Math.min(...xs), xmax = Math.max(...xs) || 1;
@@ -1751,10 +1802,6 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   function showRunInProgressModal(msg) { $("runInProgressMsg").textContent = msg; $("runInProgressModal").hidden = false; }
   function openResults(fid) {
     const runs = completedRunsFor(fid); if (!runs.length) return;
-    const fil = getFilament(fid);
-    $("resultsTitle").textContent = filamentLabel(fil);
-    const sw = $("resultsSwatch"); const fill = fil ? colorFill(fil) : null;   // colour swatch in the title bar
-    if (sw) { sw.style.background = fill || ""; sw.classList.toggle("nocolor", !fill); }
     const pick = $("resultsPick"); pick.innerHTML = "";
     runs.forEach(r => { const o = el("option"); o.value = r.id; o.textContent = printerLabel(getPrinter(r.printerId)) + " · " + fmtDateTime(r.created || r.date, r.status === "planned"); pick.append(o); });
     $("resultsPickWrap").hidden = runs.length < 2;
@@ -1769,6 +1816,10 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const copy = (val) => (val != null && String(val) !== "") ? ` <button class="copybtn" data-copy="${esc(val)}" title="Copy to clipboard" aria-label="Copy">⧉</button>` : "";
     const dl = (rows) => '<dl class="results-dl">' + rows.filter(r => r[1] != null && String(r[1]) !== "").map(([k, v, c]) => `<dt>${esc(k)}</dt><dd>${esc(v)}${c != null ? copy(c) : ""}</dd>`).join("") + "</dl>";
     const nz = run.nozzle || (data.lastRunNozzle);
+    // Title bar: printer/nozzle (with maker icon) on top, filament (with color swatch) below —
+    // same icon+two-line pattern the Printer/Filament nav tabs already use.
+    tabSel($("resultsPrinterRow"), p ? makerFavicon(p.maker) : null, p ? printerLabel(p) : "(deleted printer)", nz ? nozzleLabel(nz) : "");
+    tabSel($("resultsFilamentRow"), f ? colorSquare(f, "colorsq tabsw") : null, f ? filLine1(f) : "(deleted filament)", f ? filLine2(f) : "");
     const bed = p && p.bed ? (p.bed.shape === "round" ? (p.bed.diameter + " mm ø") : (p.bed.x + "×" + p.bed.y + " mm")) : "";
     const printer = p ? [["Maker", p.maker], ["Model", p.model], ["Toolhead", p.toolhead], ["Extruder", (p.extruder || "") + (p.drive ? " (" + p.drive + ")" : "")], ["Hotend", p.hotend], ["Nozzle", nz ? nozzleLabel(nz) : ""], ["Bed", bed]] : [["Status", "(deleted)"]];
     const fil = f ? [["Maker", f.maker], ["Material", f.material], ["Formulation", formText(f)], ["Color", f.color], ["Diameter", f.diameter ? f.diameter + " mm" : ""], ["Fiber", fiberTag(f)], ["Hardness", f.hardness]] : [["Status", "(deleted)"]];
@@ -1785,13 +1836,55 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     if (run.modelText) orca += `<label class="blocklabel">Adaptive PA model — paste into Orca${copy(run.modelText)}</label><pre class="resultblock">${esc(run.modelText)}</pre>`;
     if (run.singlePaText) orca += run.singlePaText;   // already carries its own label + boxed value (see exportModel)
     if (!orca) orca = '<p class="hint">No exported values were saved for this run.</p>';
-    // Printer / Filament / Test settings collapse (collapsed by default); Results stays open/static.
+    // Section order below Results mirrors the in-flight PA Test tab's own order (settings, then
+    // the data table, then Analyze) — Results itself is the one exception, pulled to the top since
+    // it's the thing you most likely came here to read/copy. Printer/Filament/Test settings
+    // collapse (collapsed by default, as before); Data table and Plot & Analysis are new, also
+    // collapsed by default, and only shown when there's an advanced-mode results grid to show.
     const sec = (title, body) => `<details class="rsec"><summary>${esc(title)}</summary>${body}</details>`;
+    const hasGrid = !!(run.results && run.results.length && (run.mode || "advanced") !== "basic");
+    const dataTableShell = hasGrid
+      ? '<table class="results-table"><thead><tr><th>Flow (mm³/s)</th><th>Accel (mm/s²)</th><th>Best PA</th><th>Notes</th></tr></thead><tbody id="viewResultsBody"></tbody></table>'
+      : "";
+    const plotShell = hasGrid
+      ? '<svg id="viewPlot" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid meet" aria-label="PA vs flow plot"></svg><div id="viewAnalysisOut" class="out"></div>'
+      : "";
     $("resultsBodyView").innerHTML =
+      `<h3 class="rsec-static">Results</h3>${orca}` +
       sec("Printer - " + (p ? printerLabel(p) : "(deleted)"), dl(printer)) +
       sec("Filament - " + (f ? filamentLabel(f) : "(deleted)"), dl(fil)) +
       sec("Test settings", dl(settings)) +
-      `<h3 class="rsec-static">Results</h3>${orca}`;
+      (hasGrid ? sec("Data table", dataTableShell) : "") +
+      (hasGrid ? sec("Plot & Analysis", plotShell) : "");
+    if (hasGrid) { renderViewResultsTable(run); renderViewAnalysis(run); }
+  }
+  // Read-only Data table: same look as the live results grid, minus Override/Delete — nothing here
+  // is meant to change after the fact (see addRow's readonly mode).
+  function renderViewResultsTable(run) {
+    const body = $("viewResultsBody"); if (!body) return;
+    body.innerHTML = "";
+    (run.results || []).forEach(r => addRow(
+      { flow: r.x, accel: r.accel, bestPA: r.bestPA, notes: r.notes },
+      r.override === true,
+      { readonly: true, target: body, settings: run.settings }
+    ));
+  }
+  // Read-only Plot & Analysis: recomputes the fit/outlier-flagging from the run's saved results
+  // (outlier flags aren't themselves persisted per row) using the same math as the live Analyze
+  // button, rendered into this modal's own <svg>/<div> rather than the live PA Test tab's.
+  function renderViewAnalysis(run) {
+    const plotSvg = $("viewPlot"), out = $("viewAnalysisOut"), body = $("viewResultsBody");
+    if (!plotSvg || !out || !body) return;
+    const trs = [...body.querySelectorAll("tr")];
+    trs.forEach(tr => tr.classList.remove("outlier"));
+    const rows = (run.results || [])
+      .map((r, i) => ({ x: r.x, accel: r.accel, bestPA: r.bestPA, tr: trs[i] }))
+      .filter(r => r.x != null && r.bestPA != null && r.accel != null);
+    if (rows.length < 3) { out.innerHTML = '<span class="badge warn">need data</span>Not enough points to analyze.'; drawPlot([], null, [], plotSvg); return; }
+    const { fit, outliers, html } = computeFitAnalysis(rows);
+    outliers.forEach(r => r.tr.classList.add("outlier"));
+    drawPlot(rows, fit, outliers, plotSvg);
+    out.innerHTML = html;
   }
   function closeResults() { $("resultsModal").hidden = true; resultsRunId = null; }
   function cloneFromRun(id) {   // load a saved run's settings into a fresh editable run (a re-run)
@@ -2582,7 +2675,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     });
     $("saveRunBtn").addEventListener("click", saveRun);
 
-    $("patternOk").addEventListener("click", () => { if (patternTr && patternSel != null) { const inp = patternTr.querySelector('input[data-key="bestPA"]'); inp.value = patternSel; inp.dispatchEvent(new window.Event("input", { bubbles: true })); } $("patternModal").hidden = true; });
+    $("patternOk").addEventListener("click", () => { if (!patternReadonly && patternTr && patternSel != null) { const inp = patternTr.querySelector('input[data-key="bestPA"]'); inp.value = patternSel; inp.dispatchEvent(new window.Event("input", { bubbles: true })); } $("patternModal").hidden = true; });
     $("patternCancel").addEventListener("click", () => { $("patternModal").hidden = true; });
     $("patternModal").addEventListener("click", (e) => { if (e.target === $("patternModal")) $("patternModal").hidden = true; });
     $("paModalClose").addEventListener("click", closePaModal);

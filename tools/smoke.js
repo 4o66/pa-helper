@@ -725,16 +725,55 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
   ok(/Single PA/.test(body), "saved-results view shows the Single PA value");
   ok($("resultsBodyView").querySelectorAll(".out .out").length === 0, "Single PA box isn't nested inside a second .out wrapper in the saved-results view");
   ok($("resultsBodyView").querySelector("label.blocklabel + div.out b") !== null, "saved-results view: Single PA title sits right before its boxed value, same as live");
-  // title bar: no "Results —" prefix, plus a colour swatch
-  ok($("resultsTitle").textContent.length > 0 && !/Results\s*[—-]/.test($("resultsTitle").textContent), "modal title drops the 'Results —' prefix (just the filament)");
-  ok(!!$("resultsSwatch"), "modal title bar has a colour swatch");
-  // Printer/Filament/Test settings collapse (collapsed by default); Results does not
+  // title bar: printer/nozzle row (with maker icon) on top, filament row (with swatch) below —
+  // instead of the old single filament-name title
+  ok($("resultsPrinterRow").textContent.length > 0 && !/deleted/.test($("resultsPrinterRow").textContent), "title's printer/nozzle row is populated");
+  ok($("resultsFilamentRow").textContent.length > 0 && !/deleted/.test($("resultsFilamentRow").textContent), "title's filament row is populated");
+  ok(!!$("resultsFilamentRow").querySelector(".colorsq"), "filament row shows a colour swatch");
+  ok($("resultsPrinterRow").querySelector(".tsname") && $("resultsPrinterRow").querySelector(".tssub"), "printer row has a name line and a nozzle sub-line");
+  // Results is first and not collapsible; Printer/Filament/Test settings/Data table/Plot & Analysis
+  // follow, all collapsed by default — the last two mirror the in-flight test's own section order
+  // (settings, then the table, then Analyze) and only appear because this run has a full grid.
+  ok(!$("resultsBodyView").querySelector("h3.rsec-static").closest("details"), "Results section is not collapsible");
+  ok($("resultsBodyView").firstElementChild.tagName === "H3" && $("resultsBodyView").firstElementChild.classList.contains("rsec-static"), "Results is the first thing in the modal body");
   const secs = [...$("resultsBodyView").querySelectorAll("details.rsec")];
-  ok(secs.length === 3, "Printer/Filament/Test settings are three collapsible sections");
+  ok(secs.length === 5, "Printer/Filament/Test settings/Data table/Plot & Analysis are five collapsible sections (this run has a full grid)");
   ok(secs.every(d => !d.open), "sections are collapsed by default");
   ok(/^Printer - /.test(secs[0].querySelector("summary").textContent), "printer section title is 'Printer - [name]'");
   ok(/^Filament - /.test(secs[1].querySelector("summary").textContent), "filament section title is 'Filament - [name]'");
-  ok(!$("resultsBodyView").querySelector("h3.rsec-static").closest("details"), "Results section is not collapsible");
+  ok(/^Test settings/.test(secs[2].querySelector("summary").textContent), "test settings section comes third");
+  ok(/^Data table/.test(secs[3].querySelector("summary").textContent), "Data table section comes fourth");
+  ok(/^Plot & Analysis/.test(secs[4].querySelector("summary").textContent), "Plot & Analysis section comes fifth (last)");
+  // Data table: read-only — no Override checkboxes, no Delete buttons, every value cell disabled
+  {
+    const viewRows = [...secs[3].querySelectorAll("#viewResultsBody tr")];
+    ok(viewRows.length === 15, "read-only data table shows all 15 saved rows");
+    ok(viewRows.every(tr => !tr.querySelector(".ovchk")), "read-only rows have no Override checkbox");
+    ok(viewRows.every(tr => !tr.querySelector('button:not(.iconbtn)')), "read-only rows have no Delete button");
+    ok(viewRows.every(tr => ["flow", "accel", "bestPA", "notes"].every(k => tr.querySelector(`input[data-key="${k}"]`).disabled)), "every value in a read-only row is disabled — nothing here can be edited");
+    ok(viewRows.every(tr => !!tr.querySelector("button.iconbtn")), "read-only rows still have the pattern-picker button");
+  }
+  // Plot & Analysis: recomputed from the saved run's results, same as the live Analyze button
+  {
+    const plotSvg = secs[4].querySelector("#viewPlot"), analysisOut = secs[4].querySelector("#viewAnalysisOut");
+    ok(!!plotSvg && plotSvg.childNodes.length > 0, "read-only plot is drawn from the saved run's data");
+    ok(!!analysisOut && /badge/.test(analysisOut.innerHTML), "read-only analysis text is produced (clean/outlier/scattered badge)");
+  }
+  // Read-only pattern picker: opens for reference, but nothing about it is editable
+  {
+    const firstPickBtn = secs[3].querySelector("#viewResultsBody tr button.iconbtn");
+    firstPickBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+    ok($("patternModal").hidden === false, "read-only pick button still opens the picker");
+    ok($("patternModal").classList.contains("readonly"), "picker is flagged read-only");
+    const beforeSelText = $("patternSel").textContent;
+    const otherLine = [...$("patternSvg").querySelectorAll(".paline")].find(g => !g.classList.contains("sel"));
+    if (otherLine) otherLine.dispatchEvent(new window.Event("click", { bubbles: true }));
+    ok($("patternSel").textContent === beforeSelText, "clicking another line does nothing in read-only mode — highlighting is fixed");
+    const bestPaBefore = firstPickBtn.closest("tr").querySelector('input[data-key="bestPA"]').value;
+    click("patternOk");
+    ok($("patternModal").hidden === true, "OK just closes the read-only picker");
+    ok(firstPickBtn.closest("tr").querySelector('input[data-key="bestPA"]').value === bestPaBefore, "OK does not write anything back in read-only mode");
+  }
   ok($("resultsClone").textContent === "Rerun with these settings", "run-clone button relabelled 'Rerun with these settings'");
   const copyBtns = [...$("resultsBodyView").querySelectorAll(".copybtn")];
   ok(copyBtns.length > 0, "results expose copy buttons for the Orca-bound values");

@@ -13,6 +13,18 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 ## [Unreleased]
 
 ### Added
+- **Saved PA results view: read-only Data table and Plot & Analysis sections, reordered and
+  retitled.** The saved-results modal now shows the full results grid (Flow/Accel/Best PA/Notes)
+  and the fit plot + analysis text — previously only visible while a test was in progress —
+  entirely read-only: no Override checkboxes, no Delete row, every value disabled, and the
+  pattern-picker button still opens for reference but with fixed highlighting (no hover feedback,
+  clicking other lines does nothing, OK just closes without writing back). Both are collapsed by
+  default and sit after Test settings, in the same relative order as the in-flight test's own
+  sections (settings → table → Analyze). The Results (Orca export) section moves to the very top,
+  above Printer/Filament/Test settings, since it's the thing most likely being copied out. The
+  title bar is restructured into two rows: printer/nozzle (with the printer's maker icon) on top,
+  filament (with its color swatch) below — reusing the same icon+two-line pattern the Printer and
+  Filament nav tabs already use, instead of showing just the filament name.
 - **Resuming an in-flight PA run now locks the settings that shaped its results table.** Once a
   planned run has been saved with a generated table, everything above it (max volumetric speed,
   Mode/Method, both "Recommend settings" and "Settings I already printed" subtabs, gcode import)
