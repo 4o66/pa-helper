@@ -9,7 +9,7 @@
  * Re-run after edits:  node tools/stamp.js
  */
 const fs = require("fs"), crypto = require("crypto"), path = require("path");
-const MAJOR_MINOR = "0.2";
+const MAJOR_MINOR = "0.3";
 const root = path.resolve(__dirname, "..");
 const versionPath = path.join(root, "js", "version.js");
 const files = [];

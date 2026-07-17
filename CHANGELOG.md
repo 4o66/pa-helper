@@ -10,240 +10,84 @@ release** — `git push origin main`, then `bash tools/release.sh` builds a `dis
 release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 [`RELEASES.md`](RELEASES.md). **v1.0** will mark the first "fully usable" release.
 
-## [Unreleased]
+## [0.3.1] "Open Sesame" — 2026-07-17
+PA and Ironing tests move out of the nav bar and into modals triggered straight from a
+filament's card — with a full pass over saved-results views, run storage, and multi-instance
+printer handling along the way.
 
 ### Added
-- **A multi-instance printer's selected unit now shows in the nav tab subtitle and both
-  saved-results modals** — e.g. "Voron Trident 350 AWD (Trident 2)" — instead of only being visible
-  on the printer's own card back in the Printers tab. The saved-results modals read the unit the
-  run was actually made on (`run.instanceId`), not whatever unit happens to be selected live.
-
-### Fixed
-- **A multi-instance printer's own card forgot which unit you'd picked the moment it wasn't the
-  active printer** — its unit dropdown would visually snap back to the first entry as soon as you
-  selected a different printer, even though you'd deliberately picked another one. Each printer now
-  remembers its own last-picked unit (`printer.lastInstanceId`), independent of which printer is
-  globally active, so its card always shows where you actually left it — this also covers
-  re-clicking the same card and switching away and back, superseding the narrower conditional-reset
-  fix from earlier in this list.
-- **Picking a unit on a multi-instance printer's card didn't select that printer** if some other
-  printer was currently active — it silently set `lastInstanceId` while leaving the other printer
-  as `lastPrinterId`, so the sticky context card would show the wrong printer entirely alongside a
-  unit that didn't belong to it. Choosing a unit now selects its printer first if it wasn't already.
-- **A multi-instance printer's unit could show its raw internal id instead of its label** (e.g.
-  "unit mroptprum5hsh") in the PA Test / Ironing sticky context header. Real UI-created units
-  always have `id === label` (the instances textarea sets both to the same text), which masked the
-  bug — it only surfaced on data where that's not true, like an imported file with real distinct
-  instance ids. Added an `instanceLabel()` lookup used everywhere a unit is displayed, including
-  the new spots above.
-
-### Changed
-- **Ironing's saved-results view gets the same title restructure and reorder as PA's.** The title
-  bar is now two rows — printer/nozzle (with the printer's maker icon) on top, filament (with its
-  color swatch) below — instead of a single generic "Saved ironing tests" heading with just a color
-  swatch. Results moves to the very top, above Printer/Filament/Test settings, since it's what
-  you're most likely here to read. Unlike PA, ironing results stay fully editable from this view —
-  there's no in-flight/lock concept to mirror (a run is complete the moment it's saved), and
-  ironing results are a subjective call rather than a measurement, so renaming samples after the
-  fact remains a feature, not a data-integrity risk.
-- **A run now stores the actual result — not a rendering of it.** `singlePaText` (a baked HTML
-  snapshot of the Single PA line) is replaced with `singlePaValue`/`singlePaMedian`, the two real
-  numbers; the label/value/tooltip markup is built from those at render time, live and in the saved
-  view, so a saved run always displays with the current format instead of freezing whatever HTML
-  existed the moment it was saved. The value itself now sits unboxed on its own line — plain text,
-  same presentation as the Adaptive PA model block below it, not a highlighted box.
-  `analysis` (fit coefficients) is dropped from storage entirely —
-  it was write-only (never read back anywhere), and the saved view already recomputes its own fit
-  fresh from `results` when Plot & Analysis is opened, so persisting a stale copy served no purpose.
-  `formatVersion` bumps to 2.1: `analysis`/`singlePaText` are stripped from every run on load
-  (`js/storage.js`), and `singlePaValue`/`singlePaMedian` are backfilled for any run that predates
-  them straight from its own stored `results` (`js/app.js` — the fit math storage.js can't do
-  itself). Runs newly reachable via later imports/reconnects get the same backfill, not just the
-  very first load. `modelText` (the Adaptive PA CSV table) is untouched — it was already a plain
-  value, never presentation markup, so nothing about it could go stale.
-
-### Added
-- **Direct "Abandon this run" button for an in-flight PA run.** Previously the only way to discard
-  a resumed planned run was to dirty some field first (so the unsaved-job guard would even offer
-  an Abandon choice), then close the modal. Now a red "Abandon this run" button sits right next to
-  Save at the bottom whenever a run is actually in-flight (same visibility as the titlebar badge),
-  deleting it immediately (with a confirm prompt) — no field to twiddle first.
-
-### Fixed
-- **Selecting a multi-instance printer's already-selected card snapped its unit back to the first
-  one.** `selectPrinter()` unconditionally reset `lastInstanceId` to `instances[0]` every time it
-  ran — including a re-click on the printer you already had open, or returning to it after
-  selecting a different printer — silently discarding whichever unit you'd picked. Now mirrors the
-  nozzle-selection guard right below it: the stored instance is only reset if it doesn't actually
-  belong to the printer being selected.
-- **Opening a saved PA (or ironing) run could land already scrolled partway down the modal**,
-  instead of at the top. Replacing `#resultsBodyView`'s (or `#ironResultsBodyView`'s) `innerHTML`
-  doesn't reset its own `scrollTop` — it's the same scrollable element, just with new children — so
-  whatever scroll position was left over from a previous view carried straight into the next one.
-  Both the render functions now explicitly reset scroll to the top.
-- **Saved-results modal title rows (printer/nozzle, filament) were stacking icon-above-text and
-  centering, instead of sitting icon-then-text in a row like the Printer/Filament nav tabs.** An
-  older rule (`.results-title>div`, written for the previous single-line title) also matched the
-  new title rows since they're direct children of `.results-title` too, silently injecting
-  `flex-direction:column` and `justify-content:center` into each row.
-
-### Changed
-- **Single PA (non-adaptive) output now matches the Adaptive PA model block's layout exactly**, and
-  sits above it (mirroring Orca's own field order). The copy icon moved from beside the value into
-  the label line itself; the value now sits on its own boxed line below the label; and the
-  "(fit at mid-point; median entry = …)" note is its own line below the value, with a "?" tooltip
-  explaining what the number means. Applies both live (PA Test tab) and in the saved-results view.
-- **The separate "Run in progress" popup for PA is gone.** The titlebar's "In-Flight · Settings
-  locked" badge (added alongside the settings-lock feature) already explains why the form is
-  greyed out, so the extra modal on top of it was redundant. Ironing's own equivalent popup is
-  unchanged for now.
-- **Saved PA results view: read-only Data table and Plot & Analysis sections, reordered and
-  retitled.** The saved-results modal now shows the full results grid (Flow/Accel/Best PA/Notes)
-  and the fit plot + analysis text — previously only visible while a test was in progress —
-  entirely read-only: no Override checkboxes, no Delete row, every value disabled, and the
-  pattern-picker button still opens for reference but with fixed highlighting (no hover feedback,
-  clicking other lines does nothing, OK just closes without writing back). Both are collapsed by
-  default and sit after Test settings, in the same relative order as the in-flight test's own
-  sections (settings → table → Analyze). The Results (Orca export) section moves to the very top,
-  above Printer/Filament/Test settings, since it's the thing most likely being copied out. The
-  title bar is restructured into two rows: printer/nozzle (with the printer's maker icon) on top,
-  filament (with its color swatch) below — reusing the same icon+two-line pattern the Printer and
-  Filament nav tabs already use, instead of showing just the filament name.
-- **Resuming an in-flight PA run now locks the settings that shaped its results table.** Once a
-  planned run has been saved with a generated table, everything above it (max volumetric speed,
-  Mode/Method, both "Recommend settings" and "Settings I already printed" subtabs, gcode import)
-  is disabled on reopen — changing any of it after the fact could silently invalidate rows already
-  collected. The table itself stays fully usable (Best PA / Notes editable, Add row / Delete row
-  both work, the pattern picker still opens), each row's Override checkbox is disabled so an
-  existing row's flow/accel identity can't be unlocked (a freshly added row still starts editable,
-  since there's no other way to define one), "Group / sort by" stays enabled (view-only), and
-  Analyze / Export for Orca / Save all keep working. The modal's titlebar gets an "In-Flight ·
-  Settings locked" badge so it's obvious why fields are greyed out.
-- **Settings modal**, opened via a new gear-icon button in the header (to the right of Export).
-  Consolidates the Theme picker and the `DEBUG: Clear data` button — both removed from the main
-  toolbar and relocated here (Theme at the top; Clear data at the bottom, in its own danger zone)
-  — alongside new date/time display preferences: date format (`YYYY-MM-DD` default, plus
-  `MM/DD/YYYY`, `DD/MM/YYYY`, `DD-MM-YYYY`, `Mon D, YYYY`, `D Mon YYYY`), time format (24-hour
-  default, or 12-hour AM/PM), and a "Multi-test display format" section with independent
-  absolute-vs-relative pickers for in-progress tests (defaults to relative — "3 days ago",
-  emphasizing how stale an unfinished job is) and completed tests (defaults to absolute — an exact
-  date, better suited to a historical record). Every option shows a live example next to it. These
-  settings now drive the one existing date-formatting function used across the app (the PA/Iron
-  saved-results picker labels and each run's "Date" detail field), which previously had a single
-  hardcoded `YYYY-MM-DD HH:MM` format.
-- **Filament tab legend redesigned: one row per state, covering all three colors.** Previously
-  showed paired PA/Iron example buttons for grey and orange only (blue/done had no example, just
-  text), all crammed onto one wrapping line. Now a single "Test" example button per state — grey,
-  orange, blue — each on its own line, with orange's and blue's explanations covering what the
-  `(N)` count suffix means for that state.
-- **Scope dropdown auto-locks when a choice would be a no-op.** With exactly one printer that has
-  exactly one nozzle, every Scope value behaves identically, so the whole dropdown locks to "This
-  printer + nozzle" and the help tooltip says why. With two or more printers but none of them
-  having a second nozzle, "This printer (any nozzle)" specifically locks (relabeled in place to
-  explain), since it can never differ from "This printer + nozzle" for whatever's selected — both
-  checks are fleet-wide, not based on the currently-selected printer alone, so switching between
-  printers you already have can never flip the lock out from under you; it only reacts to your
-  printer/nozzle roster actually changing. If a stored scope of "printer" becomes unselectable this
-  way, it snaps down to "nozzle" automatically (the visible filament list doesn't change either
-  way, since the two were already equivalent).
-- **`tools/smoke.js` jsdom smoke test** (~228 assertions over the whole app), carried over from
-  dev tooling and reconciled with current behavior: fixed references to the removed Select
-  buttons, the retired PA in-progress section, the Results→PA/Iron button split, and the
-  temporarily-disabled Basic mode dropdown option.
-- **Ironing Test attribution.** README now documents the Ironing Test feature (it had no
-  section at all) and both README and the in-app Ironing tab credit
-  [LeoganPro's Top Surface Ironing Test](https://www.printables.com/model/1247198) (CC0) as
-  the model this feature is built on.
-- **Deleting a printer, nozzle, or filament now cleans up its saved/planned runs.** Previously a
-  run referencing a deleted printer/nozzle/filament just sat in `pa_data.json` forever, invisible
-  from the UI. Removing a printer or nozzle now warns with a count when it would delete
-  associated filament tests; removing any of the three cascades to prune matching PA and Ironing
-  runs immediately. `pa_data.json`'s `migrate()` step also sweeps any run already orphaned this
-  way (e.g. from an older export or a hand-edited file) on every load.
-- **Filament tab: Scope control for the PA/Iron buttons.** A new "Scope" dropdown (This printer +
-  nozzle / This printer, any nozzle / All printers) decides how much of the current selection a
-  run has to match to count toward a filament's PA/Iron button color and count. Filaments always
-  show both buttons now — grey when nothing matches at the current Scope, orange while a matching
-  run is in progress, blue with a count once done — instead of hiding the button entirely when
-  there was nothing to show. Defaults to the tightest scope (this exact printer + nozzle).
-- **Basic PA test mode's Mode dropdown option is now visible but disabled** ("Basic — Coming
-  Soon™") instead of fully removed — signals it's on the roadmap without being reachable, as part
-  of the filament-modal-rework branch. Still advanced-only until Basic mode's own rework lands.
-- **A printer must be selected before leaving the Printers tab.** Nozzle selection, filament
-  matching, and PA/Ironing test setup all assume a printer is active, so navigating anywhere else
-  without one now bounces back with an explanation. The Filament tab is disabled outright until
-  then, with its subtitle swapped for a red "no" symbol and "Select a Printer".
 - **PA Test and Ironing Test are now modals opened from a filament's PA/Iron button, not nav
-  tabs.** The nav is down to Printer + Filament. A filament's PA/Iron button is always clickable
-  now — grey opens a fresh test for that filament instead of sitting inert, orange resumes the
-  in-progress run, blue opens its saved results (same color logic as before, just no longer paired
-  with a `disabled` state). Closing either modal (Close button or clicking its backdrop) guards on
-  unsaved changes exactly like the old tab-switch did; Ironing now has its own independent dirty
-  flag (previously only PA tracked this) and the two share one guard dialog, worded for whichever
-  modal is open.
+  tabs.** The nav is down to Printer + Filament. A filament's PA/Iron button is always
+  clickable — grey opens a fresh test, orange resumes the in-progress run, blue opens saved
+  results. Closing either modal (Close button or clicking its backdrop) guards on unsaved
+  changes; Ironing now tracks its own dirty state independently of PA.
+- **A printer must be selected before leaving the Printers tab** — Nozzle, Filament, and both
+  test modals all assume an active printer, so the Filament tab is disabled with an
+  explanation until one's chosen.
+- **Filament cards get a Scope control (This printer + nozzle / This printer, any nozzle /
+  All printers)** deciding how much of the current selection counts toward a filament's
+  PA/Iron button color and count — grey/orange/blue, always shown. The dropdown auto-locks
+  when a choice would be a no-op for your current printer/nozzle roster.
+- **Basic PA test mode is visible but disabled** ("Coming Soon™") instead of removed outright.
+- **Settings modal** (new gear icon in the header): Theme and `DEBUG: Clear data` relocated
+  here, plus new date/time display preferences (date format, 12/24h, and independent
+  relative/absolute styles for in-progress vs. completed tests).
+- **Deleting a printer, nozzle, or filament now cleans up its saved/planned runs** instead of
+  leaving orphaned entries invisible in `pa_data.json` forever; warns with a count first.
+- **Direct "Abandon this run" button** for an in-flight PA run, matching Ironing's existing one.
+- **A multi-instance printer's selected unit now shows in the nav tab subtitle and both
+  saved-results modals** (e.g. "Voron Trident 350 AWD (Trident 2)").
 
 ### Changed
-- **The "Single PA (non-adaptive)" value now matches the Adaptive PA model block's presentation**:
-  a small title above a boxed value, with a copy-to-clipboard icon immediately after the value
-  itself (previously the label, value, and fit note were all just plain inline text with no way
-  to copy it). Applies both live in the PA Test modal and in the saved-results view.
+- **Single PA output now matches the Adaptive PA model block's layout**, and sits above it
+  (mirroring Orca's own field order): label + copy icon on one line, the value unboxed on its
+  own line below, and the "(fit at mid-point; median entry = …)" note with a tooltip below
+  that. Applies live and in the saved-results view.
+- **A run now stores the actual result, not a rendering of it.** Single PA is stored as the
+  raw `singlePaValue`/`singlePaMedian` numbers instead of baked HTML; the dead `analysis` fit
+  coefficients (write-only, never read back) are dropped from storage entirely and
+  recomputed fresh at view time. `formatVersion` bumps to 2.1, with automatic migration and
+  backfill for older runs and files.
+- **Saved PA results view** gains read-only Data table and Plot & Analysis sections
+  (previously only visible mid-test), reorders Results to the very top, and restructures the
+  title into printer/nozzle + filament rows matching the nav tabs.
+- **Ironing's saved-results view gets the same title restructure and reorder as PA's** —
+  results stay fully editable, though, since ironing calls are subjective and there's no
+  in-flight/lock concept to mirror.
+- **Resuming an in-flight PA run now locks the settings that shaped its results table**, with
+  an "In-Flight · Settings locked" badge; the separate "Run in progress" popup is gone since
+  the badge already explains it.
+- **PA and Ironing Test modals: the printer/nozzle/filament context card is now part of the
+  fixed header**, instead of scrolling out of view.
+- **Export filename now includes the time** (`HHMM`), not just the date.
+- **`pa_data.json` no longer stores picker geometry** (`gcodeCache`, formatVersion 2.0) — it's
+  regenerated on demand from a run's stored settings. Old files migrate automatically.
 
 ### Fixed
-- **Resuming an in-progress PA run and closing it right back up (no edits made) no longer
-  prompts to save/abandon.** `openRun()` was unconditionally marking the job dirty the moment a
-  planned run was resumed, before anything was actually touched — resuming an already-saved run
-  isn't itself an unsaved change. The guard now only fires once you actually edit a field, same
-  as it always has for a brand-new test.
-- **Filament list-view action buttons (Select/Edit/Clone/PA/Iron/trash) are now sized to match
-  card view.** List rows had no button-size override, so they silently fell back to the larger
-  base button size instead of the compact sizing card view already used — same buttons, same
-  row, two different sizes depending on which view was active.
-- **Settings gear button is now a proper square, matching the height of the other header
-  buttons (Export, etc.).** It was inheriting the compact `.iconbtn` padding used for small
-  in-card icon buttons (trashcans), which made it noticeably shorter and wider than its
-  toolbar neighbors.
-- **Restricting the currently-selected filament away from the currently-selected printer now
-  clears the selection.** Previously the filament's card would vanish from the list (correctly
-  hidden by the pin filter) but `lastFilamentId` stayed pointed at it, so the PA/Ironing test
-  context kept silently referencing a filament the user could no longer see or reach.
-- **The pattern picker no longer opens behind the PA Test modal.** Both are `.modal` elements at
-  the same `z-index`, and with no nested stacking context the tie resolves by DOM order — the
-  picker was declared near the top of `<body>` (from before PA Test was a modal at all), so it
-  rendered underneath instead of on top. Moved its markup to after `</main>`, alongside the other
-  floating modals (coverage prompt, run-in-progress, nozzle-seed) that already stacked correctly.
-- **Custom filament nicknames now actually save.** The optional "Filament name" field (shown as
-  the card title) was read from the form but never copied into the saved filament record, so
-  anything typed there was silently discarded on both create and edit.
-- **One in-flight run per printer+nozzle+filament combo is now actually enforced, for both PA
-  and Ironing.** Previously this was only a soft UI convention for PA (the orange button jumped
-  to the right run, but nothing stopped `savePlanned()` from silently creating a second in-flight
-  run for the same combo if you didn't resume the first one), and Ironing's own existing
-  find-and-update guard was missing nozzle from its match key entirely (so switching nozzles on
-  the same printer could find/overwrite the wrong in-flight run). Saving again for the exact same
-  combo now updates the existing in-flight run in place instead of duplicating it; a different
-  nozzle on the same printer is treated as a genuinely separate combo with its own in-flight run.
-
-### Changed
-- **PA Test modal: the printer/nozzle/filament card is now part of the fixed header**, not the
-  first thing in the scrolling body — it used to scroll out of view once you got into the
-  settings below, making it easy to lose track of which combo a test was actually running against.
-- **Ironing Test modal gets the same fixed-header context card as PA Test**, for the same reason
-  and the same fix.
-- **Export filename now includes the time** (`pa_data_YYYY-MM-DD_HHMM.json`, was date-only) —
-  multiple exports on the same day no longer look identical in Downloads.
-- **`pa_data.json` no longer stores picker geometry (`formatVersion: "2.0"`).** `gcodeCache` was
-  ~96% of a typical export's real data (~267 KB/run) — machine-only noise in a file meant to be
-  human-readable. Picker geometry is fully reproducible from a run's stored settings
-  (`js/pattern.js`), so it's now regenerated on demand when a saved run is reopened, for both
-  "recommended" and imported-from-gcode runs. Old-format files (has `gcodeCache`, or missing
-  `formatVersion: "2.0"`) migrate automatically on load/import/connect — dropped cache, stamped
-  version, no data loss, connected files rewrite to disk immediately.
-
-### Fixed
-- **Resuming a run could crash instead of scrolling** — `entrySec.scrollIntoView()` was called
-  unconditionally; environments that don't implement it (older browsers, embedded webviews, and
-  jsdom) throw instead of no-op'ing. Now guarded like the app's three other `scrollIntoView`
-  call sites. Caught by the new smoke test.
+- A multi-instance printer's own card now **remembers its own last-picked unit**, independent
+  of which printer is globally active, instead of visually snapping back to the first unit.
+- **Picking a unit on a multi-instance printer's card now selects that printer first** if it
+  wasn't already active.
+- A multi-instance printer's unit **could show its raw internal id instead of its label** —
+  fixed with a proper `instanceLabel()` lookup used everywhere a unit is displayed.
+- **Opening a saved PA or Ironing run could land scrolled partway down** the modal instead of
+  at the top.
+- **Saved-results modal title rows were stacking icon-above-text** instead of sitting in a
+  row, from a leftover CSS rule that unintentionally matched the new title markup too.
+- **Resuming an in-progress PA run and closing it right back up (no edits) no longer prompts**
+  to save or abandon.
+- Filament **list-view action buttons now sized to match card view**.
+- **Settings gear button is now a proper square**, matching the other header buttons.
+- **Restricting the selected filament away from the selected printer now clears the
+  selection**, instead of silently keeping a reference to a filament you can no longer see.
+- **The pattern picker no longer opens behind the PA Test modal.**
+- **Custom filament nicknames now actually save** (previously read from the form but never
+  persisted).
+- **One in-flight run per printer+nozzle+filament combo is now actually enforced**, for both
+  PA and Ironing (was a soft UI convention for PA, and Ironing's own guard was missing nozzle
+  from its match key).
+- Resuming a run **could crash instead of scrolling** in environments without
+  `scrollIntoView` (older browsers, jsdom).
 
 ## [0.2.32] "Put a hot rock on it" — 2026-07-15
 Ironing Test joins PA Test as a full calibration workflow, and filament cards get a shared,
