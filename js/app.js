@@ -2,12 +2,43 @@
 (function () {
   "use strict";
   const P = window.PA_PRESETS, Store = window.PAStore;
-  let data = Store.load();
   // migration: "Dual Color" formulation was renamed to "Multi-Color"
-  (data.filaments || []).forEach(f => {
-    if (Array.isArray(f.formulation)) f.formulation = f.formulation.map(v => v === "Dual Color" ? "Multi-Color" : v);
-    else if (f.formulation === "Dual Color") f.formulation = "Multi-Color";
-  });
+  function migrateFormulationNames(d) {
+    (d.filaments || []).forEach(f => {
+      if (Array.isArray(f.formulation)) f.formulation = f.formulation.map(v => v === "Dual Color" ? "Multi-Color" : v);
+      else if (f.formulation === "Dual Color") f.formulation = "Multi-Color";
+    });
+  }
+  // migration: old runs stored a fully-rendered `singlePaText` HTML snapshot instead of the actual
+  // result — storage.js's migrate() already drops that dead field (formatVersion 2.1), but recomputing
+  // the real numbers needs the fit math below, which only lives here, not in storage.js. Recovered
+  // straight from each run's own `results` rows, so nothing is lost. Called after every point `data`
+  // gets (re)loaded — not just the initial page load — so importing an old file mid-session, or
+  // reconnecting an old file on disk, also backfills correctly.
+  function backfillSinglePaResults(d) {
+    (d.runs || []).forEach(r => {
+      if (r.singlePaValue != null || !r.results || !r.results.length) return;
+      if ((r.mode || "advanced") === "basic") {
+        const v = r.results[0] && r.results[0].bestPA;
+        if (v != null) { r.singlePaValue = v; r.singlePaMedian = null; }
+        return;
+      }
+      const rows = r.results.map(x => ({ x: x.x, accel: x.accel, bestPA: x.bestPA })).filter(x => x.x != null && x.bestPA != null && x.accel != null);
+      if (!rows.length) return;
+      const ys = rows.map(x => x.bestPA).slice().sort((a, b) => a - b), median = ys[Math.floor(ys.length / 2)];
+      let single = median;
+      if (rows.length >= 3) {
+        const { fit } = computeFitAnalysis(rows);
+        const midX = (Math.min(...rows.map(x => x.x)) + Math.max(...rows.map(x => x.x))) / 2;
+        const accs = rows.map(x => x.accel).sort((a, b) => a - b), midA = accs[Math.floor(accs.length / 2)];
+        single = fit.type === "mlr" ? fit.predict(midX, midA) : fit.predict(midX);
+      }
+      r.singlePaValue = single.toFixed(4); r.singlePaMedian = median;
+    });
+  }
+  let data = Store.load();
+  migrateFormulationNames(data);
+  backfillSinglePaResults(data);
 
   const $ = (id) => document.getElementById(id);
   const el = (t, cls) => { const e = document.createElement(t); if (cls) e.className = cls; return e; };
@@ -71,7 +102,7 @@
   const PALETTE = ["#4aa8ff", "#37c98b", "#ffb84a", "#c98bff", "#5de0e6", "#ff8f5d", "#8bff9e"];
 
   // ---- session state ----
-  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, ironDirty = false, pendingModal = null, importPlates = [], coverageMissing = [], accelListAuto = true, speedListAuto = true, accelPtsAuto = true, speedPtsAuto = true, maxFlowConfirmed = false, testFormLocked = false;
+  let currentSettings = null, lastFit = null, currentRunId = null, editingPrinterId = null, editingFilamentId = null, lastBasicMethod = P.basicDefault, gcodeImported = false, gcodeBlocks = null, jobDirty = false, ironDirty = false, pendingModal = null, importPlates = [], coverageMissing = [], accelListAuto = true, speedListAuto = true, accelPtsAuto = true, speedPtsAuto = true, maxFlowConfirmed = false, testFormLocked = false, lastSinglePa = null;
   let ironSpeedListAuto = true, ironFlowListAuto = true, ironingLoaded = false;
   const PA_FACTORS = ["toolhead", "extruder", "drive", "hotend"];
   const FILAMENT_PA_FACTORS = ["material", "formulation", "fiber", "fiberName", "fiberPct", "hardness", "diameter"];
@@ -1695,25 +1726,33 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   // label line (not next to the value), with the value on its own line below.
   const copyIcon = (val) => ` <button class="copybtn" data-copy="${val}" title="Copy to clipboard" aria-label="Copy">⧉</button>`;
   const HELP_SINGLE_PA = "A single constant PA value, for slicers/firmware that don't support adaptive (flow-based) PA. It's the fitted model evaluated at the midpoint of your tested flow and accel range — or, before a fit exists yet, the median of your entered Best PA values.";
+  // Builds the Single PA markup from the stored RESULT (value + median), never from presentation
+  // state — so a saved run always renders with whatever the current app version's format is,
+  // live and in the saved-results view alike. singlePa: {value, median} — median null/omitted for
+  // basic mode (no fit, so no fit-note line).
+  function renderSinglePaHTML(singlePa) {
+    if (!singlePa || singlePa.value == null) return "";
+    const label = singlePa.median != null ? "Single PA (non-adaptive)" : "Set this PA value in Orca";
+    let html = '<label class="blocklabel">' + label + copyIcon(singlePa.value) + '</label><div class="out"><b>' + singlePa.value + '</b></div>';
+    if (singlePa.median != null) html += '<p class="hint">(fit at mid-point; median entry = ' + singlePa.median + ') <span class="help" title="' + HELP_SINGLE_PA + '">?</span></p>';
+    return html;
+  }
   function exportModel() {
     if (isBasic()) {
       const pa = num($("basicBestPA").value);
-      $("singlePaOut").innerHTML = pa != null
-        ? '<label class="blocklabel">Set this PA value in Orca' + copyIcon(pa) + '</label><div class="out"><b>' + pa + '</b></div>'
-        : "Enter your best PA above.";
+      lastSinglePa = pa != null ? { value: pa, median: null } : null;
+      $("singlePaOut").innerHTML = lastSinglePa ? renderSinglePaHTML(lastSinglePa) : "Enter your best PA above.";
       $("modelOut").value = ""; syncModelBlock(); return;
     }
     const rows = readResults().filter(r => r.x != null && r.bestPA != null).sort((a, b) => (a.x - b.x) || ((a.accel || 0) - (b.accel || 0)));
-    if (!rows.length) { $("modelOut").value = ""; syncModelBlock(); $("singlePaOut").textContent = "Enter some results first."; return; }
+    if (!rows.length) { $("modelOut").value = ""; syncModelBlock(); $("singlePaOut").textContent = "Enter some results first."; lastSinglePa = null; return; }
     $("modelOut").value = rows.map(r => `${r.bestPA}, ${r.x.toFixed(2)}, ${r.accel != null ? r.accel : ""}`).join("\n");
     syncModelBlock();
     const ys = rows.map(r => r.bestPA).slice().sort((a, b) => a - b), median = ys[Math.floor(ys.length / 2)];
     let single = median;
     if (lastFit) { const midX = (Math.min(...rows.map(r => r.x)) + Math.max(...rows.map(r => r.x))) / 2; const accs = rows.map(r => r.accel).filter(a => a != null).sort((a, b) => a - b); const midA = accs.length ? accs[Math.floor(accs.length / 2)] : 0; single = lastFit.type === "mlr" ? lastFit.predict(midX, midA) : lastFit.predict(midX); }
-    const singleStr = single.toFixed(4);
-    $("singlePaOut").innerHTML = '<label class="blocklabel">Single PA (non-adaptive)' + copyIcon(singleStr) + '</label>' +
-      '<div class="out"><b>' + singleStr + '</b></div>' +
-      '<p class="hint">(fit at mid-point; median entry = ' + median + ') <span class="help" title="' + HELP_SINGLE_PA + '">?</span></p>';
+    lastSinglePa = { value: single.toFixed(4), median };
+    $("singlePaOut").innerHTML = renderSinglePaHTML(lastSinglePa);
   }
 
   // ---- run lifecycle ----
@@ -1737,8 +1776,13 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       nozzle, nozzleId: data.lastNozzleId, mode: $("testMode").value, basicMethod: $("basicMethod").value,
       unit: $("unitMode").value, layerH: num($("layerH").value), lineW: num($("lineW").value), maxFlow: num($("maxFlow").value),
       settings: currentSettings || null, results,
-      analysis: lastFit ? (lastFit.type === "mlr" ? { fit: { b0: lastFit.b0, b1: lastFit.b1, b2: lastFit.b2, r2: lastFit.r2 } } : { fit: { slope: lastFit.slope, intercept: lastFit.intercept, r2: lastFit.r2 } }) : null,
-      modelText: $("modelOut").value || null, singlePaText: $("singlePaOut").innerHTML || null, shareCommunity: false
+      // Only the actual result — the number(s) you'd paste into Orca — is stored, not a rendering of
+      // it and not the fit math that produced it. Fit coefficients are scratch work; recomputed fresh
+      // from `results` at view-open time if/when the Plot & Analysis section needs them.
+      modelText: $("modelOut").value || null,
+      singlePaValue: lastSinglePa ? lastSinglePa.value : null,
+      singlePaMedian: lastSinglePa && lastSinglePa.median != null ? lastSinglePa.median : null,
+      shareCommunity: false
     };
   }
   function upsertRun(run) { const i = data.runs.findIndex(r => r.id === run.id); if (i >= 0) data.runs[i] = run; else data.runs.unshift(run); }
@@ -1857,7 +1901,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       ["Speeds (mm/s)", (s.speeds || []).join(", ")]
     ];
     let orca = "";
-    if (run.singlePaText) orca += run.singlePaText;   // already carries its own label + boxed value (see exportModel)
+    if (run.singlePaValue != null) orca += renderSinglePaHTML({ value: run.singlePaValue, median: run.singlePaMedian });
     if (run.modelText) orca += `<label class="blocklabel">Adaptive PA model — paste into Orca${copy(run.modelText)}</label><pre class="resultblock">${esc(run.modelText)}</pre>`;
     if (!orca) orca = '<p class="hint">No exported values were saved for this run.</p>';
     // Section order below Results mirrors the in-flight PA Test tab's own order (settings, then
@@ -1958,7 +2002,8 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     if (r.lineW != null) $("lineW").value = r.lineW;
     if (r.maxFlow != null) $("maxFlow").value = r.maxFlow;
     $("modelOut").value = r.modelText || ""; syncModelBlock();     // restore the stored Orca export text
-    $("singlePaOut").innerHTML = r.singlePaText || "";
+    lastSinglePa = r.singlePaValue != null ? { value: r.singlePaValue, median: r.singlePaMedian != null ? r.singlePaMedian : null } : null;
+    $("singlePaOut").innerHTML = renderSinglePaHTML(lastSinglePa);
     currentSettings = r.settings || null;
     updateUnitUI();
     const s = r.settings || {};
@@ -2593,7 +2638,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("coverageImport").addEventListener("click", () => { $("coverageModal").hidden = true; $("gcodeInputAdd").click(); });
     $("coverageContinue").addEventListener("click", () => { $("coverageModal").hidden = true; });
     window.PA_parseGcode = parsePaGcode;
-    window.PA_test = { importGcode, addPlate, resetGcode, buildPaBlocks, colorList, colorFill, suggestAccelPts, suggestSpeedPts, beadArea, selectFilament, savePlanned, loadGrid };   // test hooks (jsdom smoke)
+    window.PA_test = { importGcode, addPlate, resetGcode, buildPaBlocks, colorList, colorFill, suggestAccelPts, suggestSpeedPts, beadArea, selectFilament, savePlanned, loadGrid, backfillSinglePaResults };   // test hooks (jsdom smoke)
     $("loadPointsBtn").addEventListener("click", (e) => { loadGrid(e.target._points || []); sortResults(); markJobDirty(); });
     $("resultSort").addEventListener("change", sortResults);
     $("savePlannedBtn").addEventListener("click", savePlanned);
@@ -2658,7 +2703,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     // this tab can't later export a stale in-memory copy. Skip while mid-edit so we don't clobber work.
     window.addEventListener("storage", (e) => {
       if (e.key !== Store.key || !e.newValue || jobDirty || ironDirty) return;
-      data = Store.load(); rebuildForms(); reloadAll();
+      data = Store.load(); migrateFormulationNames(data); backfillSinglePaResults(data); rebuildForms(); reloadAll();
     });
     // Auto-seeded default nozzle prompt (after saving a new printer)
     $("nozzleSeedOk").addEventListener("click", () => { $("nozzleSeedModal").hidden = true; });
@@ -2725,13 +2770,13 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       setStatus();
     });
     $("importBtn").addEventListener("click", () => $("importInput").click());
-    $("importInput").addEventListener("change", async (e) => { if (e.target.files[0]) { data = await Store.importJSON(e.target.files[0]); printerForm = buildForm($("printerForm"), PRINTER_FIELDS); nozzleForm = buildForm($("nozzleForm"), NOZZLE_FIELDS); filamentForm = buildForm($("filamentForm"), FILAMENT_FIELDS); initPrinterDefaults(); updateFilamentConditionals(); reloadAll(); } });
+    $("importInput").addEventListener("change", async (e) => { if (e.target.files[0]) { data = await Store.importJSON(e.target.files[0]); migrateFormulationNames(data); backfillSinglePaResults(data); printerForm = buildForm($("printerForm"), PRINTER_FIELDS); nozzleForm = buildForm($("nozzleForm"), NOZZLE_FIELDS); filamentForm = buildForm($("filamentForm"), FILAMENT_FIELDS); initPrinterDefaults(); updateFilamentConditionals(); reloadAll(); } });
     $("connectFileBtn").addEventListener("click", async () => {
       try {
         if (!Store.supportsFS()) { alert("Your browser can't open a file directly (need Chrome/Edge/Brave on https or localhost). Use Import/Export instead."); return; }
         const open = confirm("OK = open an existing pa_data.json.\nCancel = create a new one.");
         const loaded = await Store.connectFile(open);
-        if (loaded) { data = loaded; printerForm = buildForm($("printerForm"), PRINTER_FIELDS); nozzleForm = buildForm($("nozzleForm"), NOZZLE_FIELDS); filamentForm = buildForm($("filamentForm"), FILAMENT_FIELDS); initPrinterDefaults(); updateFilamentConditionals(); reloadAll(); } else { persist(); }
+        if (loaded) { data = loaded; migrateFormulationNames(data); backfillSinglePaResults(data); printerForm = buildForm($("printerForm"), PRINTER_FIELDS); nozzleForm = buildForm($("nozzleForm"), NOZZLE_FIELDS); filamentForm = buildForm($("filamentForm"), FILAMENT_FIELDS); initPrinterDefaults(); updateFilamentConditionals(); reloadAll(); } else { persist(); }
         setStatus();
       } catch (err) { /* cancelled */ }
     });

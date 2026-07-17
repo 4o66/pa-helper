@@ -566,7 +566,7 @@ ok($("tab-test").hidden === true, "…and the modal actually closes, no guard in
 click("exportBtn");
 let dex = readData();
 ok(typeof dex.lastExportedAt === "string" && dex.lastExportedAt.length > 10, "export stamps lastExportedAt");
-ok(dex.formatVersion === "2.0", "export includes formatVersion 2.0");
+ok(dex.formatVersion === "2.1", "export includes formatVersion 2.1");
 ok(!("gcodeCache" in dex), "export omits gcodeCache entirely");
 ok(/exported/.test($("dataStatus").textContent) && !$("dataStatus").classList.contains("stale"), "status shows a fresh (not stale) export");
 tickClock();
@@ -1244,25 +1244,52 @@ ok($("jobGuardModal").hidden === true, "no guard once the job is cleared (nothin
   clickEl("coverageImport");
   ok($("coverageModal").hidden === true, "'import additional plate' closes the prompt");
 
-  // ---- formatVersion 2.0 migration: old-format import drops gcodeCache, stamps 2.0,
-  // and sweeps any run left pointing at a printer/nozzle/filament that no longer exists ----
+  // ---- formatVersion 2.1 migration: old-format import drops gcodeCache and each run's dead
+  // `analysis`/old `singlePaText` fields, stamps 2.1, and sweeps any run left pointing at a
+  // printer/nozzle/filament that no longer exists ----
   {
     const oldFormat = window.PAStore.defaultData();
-    delete oldFormat.formatVersion;   // simulate a pre-2.0 export
+    delete oldFormat.formatVersion;   // simulate a pre-2.1 export
     oldFormat.gcodeCache = { legacy: { byKey: {} } };
     oldFormat.printers = [{ id: "p1", maker: "Test", model: "X", nozzles: [{ id: "n1", maker: "Generic", material: "Brass", diameter: 0.4 }] }];
     oldFormat.filaments = [{ id: "f1", maker: "Test", material: "PLA", printers: [] }];
     oldFormat.runs = [
-      { id: "r1", status: "complete", printerId: "p1", nozzleId: "n1", filamentId: "f1", settings: {} },
+      {
+        id: "r1", status: "complete", printerId: "p1", nozzleId: "n1", filamentId: "f1", settings: {},
+        analysis: { fit: { b0: 0.03, b1: -0.0001, b2: 0, r2: 0.9 } },
+        singlePaText: 'Single PA (non-adaptive): <b>0.0259</b> <span class="muted">(fit at mid-point; median entry = 0.025)</span>'
+      },
       { id: "r2", status: "complete", printerId: "ghost-printer", nozzleId: "n1", filamentId: "f1", settings: {} },
       { id: "r3", status: "planned", printerId: "p1", nozzleId: "ghost-nozzle", filamentId: "f1", settings: {} },
       { id: "r4", status: "complete", printerId: "p1", nozzleId: "n1", filamentId: "ghost-filament", settings: {} }
     ];
     const fakeOldFile = { text: () => Promise.resolve(JSON.stringify(oldFormat)) };
     const migrated = await window.PAStore.importJSON(fakeOldFile);
-    ok(migrated.formatVersion === "2.0", "old-format import stamps formatVersion 2.0");
+    ok(migrated.formatVersion === "2.1", "old-format import stamps formatVersion 2.1");
     ok(!("gcodeCache" in migrated), "old-format import drops gcodeCache");
     ok(migrated.runs.length === 1 && migrated.runs[0].id === "r1", "runs orphaned by a deleted printer/nozzle/filament are swept on migration, valid run survives");
+    ok(!("analysis" in migrated.runs[0]) && !("singlePaText" in migrated.runs[0]), "storage-level migration drops the dead analysis field and the old baked singlePaText field");
+  }
+
+  // ---- app.js-level backfill: recomputes singlePaValue/singlePaMedian straight from a run's own
+  // `results` for old runs that predate those fields — this is the piece storage.js can't do itself
+  // (needs the fit math), and it runs on every (re)load, not just the very first one, so importing
+  // an old file mid-session backfills too, not just the initial page load ----
+  {
+    const d = {
+      runs: [
+        { id: "basic1", mode: "basic", results: [{ x: null, accel: null, bestPA: 0.021, notes: "" }] },
+        { id: "adv1", mode: "advanced", results: [{ x: 5, accel: 2000, bestPA: 0.02, notes: "" }, { x: 10, accel: 2000, bestPA: 0.03, notes: "" }] },
+        { id: "already", mode: "advanced", singlePaValue: "0.0400", singlePaMedian: 0.04, results: [{ x: 5, accel: 2000, bestPA: 0.09, notes: "" }] },
+        { id: "empty", mode: "advanced", results: [] }
+      ]
+    };
+    window.PA_test.backfillSinglePaResults(d);
+    const byId = (id) => d.runs.find(r => r.id === id);
+    ok(byId("basic1").singlePaValue === 0.021 && byId("basic1").singlePaMedian === null, "backfill: basic-mode run recovers its single entered value, no median");
+    ok(byId("adv1").singlePaValue === "0.0300" && byId("adv1").singlePaMedian === 0.03, "backfill: advanced-mode run with <3 points falls back to the median (no fit possible)");
+    ok(byId("already").singlePaValue === "0.0400" && byId("already").singlePaMedian === 0.04, "backfill: a run that already has singlePaValue is left untouched");
+    ok(byId("empty").singlePaValue === undefined, "backfill: a run with no results is left alone");
   }
 
   // ---- Settings modal: gear button, relocated theme/debug controls, date/time format + ----

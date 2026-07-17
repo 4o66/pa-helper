@@ -24,9 +24,12 @@ window.PAStore = (function () {
     return {
       version: 2,
       // Document-format revision WITHIN the v2 schema/storage key — bumped when the *shape* of
-      // what's exported changes in a way old files need migrating for. 2.0 = gcodeCache removed
-      // (see migrate() below); a file missing this (or with an older value) is old-format.
-      formatVersion: "2.0",
+      // what's exported changes in a way old files need migrating for. 2.0 = gcodeCache removed;
+      // 2.1 = a run's `analysis` (fit coefficients — scratch math, never read back, recomputed at
+      // view-open time) and `singlePaText` (a baked HTML rendering, replaced by the actual result:
+      // `singlePaValue`/`singlePaMedian`) are dropped (see migrate() below). A file missing this
+      // (or with an older value) is old-format.
+      formatVersion: "2.1",
       theme: "system",              // system | light | dark
       dateFormat: "YYYY-MM-DD",     // YYYY-MM-DD | MM/DD/YYYY | DD/MM/YYYY | DD-MM-YYYY | "Mon D, YYYY" | "D Mon YYYY"
       timeFormat: "24h",            // 24h | 12h
@@ -76,14 +79,17 @@ window.PAStore = (function () {
     return d;
   }
 
-  // Old-format files (has gcodeCache, or missing/pre-2.0 formatVersion) migrate in memory here:
-  // drop gcodeCache, stamp the current formatVersion, and sweep orphaned runs. No other data is
-  // touched or lost. Every load path (load/connectFile/importJSON) routes through merge(), so
-  // this always runs on read.
+  // Old-format files (has gcodeCache, or missing/pre-2.1 formatVersion) migrate in memory here:
+  // drop gcodeCache and each run's dead `analysis`/old `singlePaText` fields, stamp the current
+  // formatVersion, and sweep orphaned runs. Recomputing `singlePaValue`/`singlePaMedian` for runs
+  // that predate them needs the PA fit math, which lives in app.js (not here) — see the migration
+  // pass right after `Store.load()` there. No other data is touched or lost. Every load path
+  // (load/connectFile/importJSON) routes through merge(), so this always runs on read.
   function migrate(d) {
-    if (d.gcodeCache || d.formatVersion !== "2.0") {
+    if (d.gcodeCache || d.formatVersion !== "2.1") {
       delete d.gcodeCache;
-      d.formatVersion = "2.0";
+      (d.runs || []).forEach(r => { delete r.analysis; delete r.singlePaText; });
+      d.formatVersion = "2.1";
     }
     pruneOrphans(d);
     return d;

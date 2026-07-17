@@ -12,6 +12,21 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 
 ## [Unreleased]
 
+### Changed
+- **A run now stores the actual result — not a rendering of it.** `singlePaText` (a baked HTML
+  snapshot of the Single PA line) is replaced with `singlePaValue`/`singlePaMedian`, the two real
+  numbers; the label/box/tooltip markup is built from those at render time, live and in the saved
+  view, so a saved run always displays with the current format instead of freezing whatever HTML
+  existed the moment it was saved. `analysis` (fit coefficients) is dropped from storage entirely —
+  it was write-only (never read back anywhere), and the saved view already recomputes its own fit
+  fresh from `results` when Plot & Analysis is opened, so persisting a stale copy served no purpose.
+  `formatVersion` bumps to 2.1: `analysis`/`singlePaText` are stripped from every run on load
+  (`js/storage.js`), and `singlePaValue`/`singlePaMedian` are backfilled for any run that predates
+  them straight from its own stored `results` (`js/app.js` — the fit math storage.js can't do
+  itself). Runs newly reachable via later imports/reconnects get the same backfill, not just the
+  very first load. `modelText` (the Adaptive PA CSV table) is untouched — it was already a plain
+  value, never presentation markup, so nothing about it could go stale.
+
 ### Added
 - **Direct "Abandon this run" button for an in-flight PA run.** Previously the only way to discard
   a resumed planned run was to dirty some field first (so the unsaved-job guard would even offer
