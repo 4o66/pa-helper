@@ -517,7 +517,14 @@
         const sel = el("select");
         p.instances.forEach(inst => { const o = el("option"); o.value = inst.id; o.textContent = inst.label; sel.append(o); });
         if (p.id === data.lastPrinterId && data.lastInstanceId) sel.value = data.lastInstanceId;
-        sel.addEventListener("change", () => { data.lastInstanceId = sel.value; persist(); updateTestContext(); updateIroningContext(); });
+        // Picking a unit on a printer that ISN'T the currently-selected one used to silently set
+        // lastInstanceId while leaving some other printer as data.lastPrinterId — the sticky
+        // context card would then show the wrong printer entirely. Select this printer first.
+        sel.addEventListener("change", () => {
+          const chosen = sel.value;
+          if (data.lastPrinterId !== p.id) selectPrinter(p.id);
+          data.lastInstanceId = chosen; persist(); updateTestContext(); updateIroningContext(); updateTabLabels();
+        });
         const iw = el("div", "meta"); iw.append(document.createTextNode("Unit: ")); iw.append(sel); card.append(iw);
       }
       const actions = el("div", "actions");

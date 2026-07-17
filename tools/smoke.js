@@ -1424,12 +1424,25 @@ ok($("jobGuardModal").hidden === true, "no guard once the job is cleared (nothin
 
     // a genuinely different printer still lands on ITS own units — switching away and back to the
     // multi printer resets to unit A, same boundary as nozzle selection (no cross-printer memory)
-    const otherCard = () => [...document.querySelectorAll("#printerList .card")].find(c => c.textContent.includes("Trident 350") && !c.textContent.includes("Multi"));
+    // Whatever other printer still exists at this point in the suite (fixture printers created and
+    // removed earlier vary run to run) — anything that isn't our own disposable multi printer works.
+    const otherCard = () => [...document.querySelectorAll("#printerList .card")].find(c => !c.textContent.includes("Multi Unit Test"));
     if (otherCard()) {
       otherCard().dispatchEvent(new window.Event("click", { bubbles: true }));
       mpCard().dispatchEvent(new window.Event("click", { bubbles: true }));
       ok(readData().lastInstanceId === mp.instances[0].id, "switching to a different printer and back resets to unit A (same boundary as nozzle selection)");
       unitSel().value = mp.instances[1].id; ev(unitSel(), "change");   // back to unit B for the rest of this block
+    }
+
+    // picking a unit on a DIFFERENT (not-currently-selected) printer's own card must select that
+    // printer too — it used to just quietly set lastInstanceId while some other printer stayed
+    // selected, so the sticky context card showed the wrong printer entirely
+    if (otherCard()) {
+      otherCard().dispatchEvent(new window.Event("click", { bubbles: true }));   // select some other printer, NOT the multi printer
+      ok(readData().lastPrinterId !== mp.id, "a different printer is now selected");
+      unitSel().value = mp.instances[1].id; ev(unitSel(), "change");   // pick unit B directly on the multi printer's own (not-selected) card
+      ok(readData().lastPrinterId === mp.id, "picking a unit on a non-selected printer's card selects that printer (bug fix)");
+      ok(readData().lastInstanceId === mp.instances[1].id, "...and the specific unit chosen (unit B) is the one that ends up selected");
     }
 
     setFieldKey($("filamentForm"), "maker", "Test");

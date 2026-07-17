@@ -19,6 +19,10 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   run was actually made on (`run.instanceId`), not whatever unit happens to be selected live.
 
 ### Fixed
+- **Picking a unit on a multi-instance printer's card didn't select that printer** if some other
+  printer was currently active — it silently set `lastInstanceId` while leaving the other printer
+  as `lastPrinterId`, so the sticky context card would show the wrong printer entirely alongside a
+  unit that didn't belong to it. Choosing a unit now selects its printer first if it wasn't already.
 - **A multi-instance printer's unit could show its raw internal id instead of its label** (e.g.
   "unit mroptprum5hsh") in the PA Test / Ironing sticky context header. Real UI-created units
   always have `id === label` (the instances textarea sets both to the same text), which masked the
