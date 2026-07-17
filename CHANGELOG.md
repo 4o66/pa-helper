@@ -13,6 +13,14 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 ## [Unreleased]
 
 ### Changed
+- **Ironing's saved-results view gets the same title restructure and reorder as PA's.** The title
+  bar is now two rows — printer/nozzle (with the printer's maker icon) on top, filament (with its
+  color swatch) below — instead of a single generic "Saved ironing tests" heading with just a color
+  swatch. Results moves to the very top, above Printer/Filament/Test settings, since it's what
+  you're most likely here to read. Unlike PA, ironing results stay fully editable from this view —
+  there's no in-flight/lock concept to mirror (a run is complete the moment it's saved), and
+  ironing results are a subjective call rather than a measurement, so renaming samples after the
+  fact remains a feature, not a data-integrity risk.
 - **A run now stores the actual result — not a rendering of it.** `singlePaText` (a baked HTML
   snapshot of the Single PA line) is replaced with `singlePaValue`/`singlePaMedian`, the two real
   numbers; the label/value/tooltip markup is built from those at render time, live and in the saved

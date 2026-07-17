@@ -983,6 +983,22 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
   fNozCard(fNozA).dispatchEvent(new window.Event("click", { bubbles: true }));
   click("ironingSaveBtn");
   ok(ironForNoz(fNozA).length === 1, "Iron: first incomplete run for the combo saved");
+  // saveIroningRun() lands straight on the saved-results view for this filament — same title
+  // restructure (printer/nozzle row + filament row) and Results-at-top reorder as the PA view,
+  // but results stay fully editable here (no lock concept — ironing results are subjective).
+  ok($("ironResultsModal").hidden === false, "saving an ironing run opens its saved-results view");
+  ok($("ironResultsPrinterRow").textContent.length > 0, "Ironing saved-results view: printer/nozzle title row is populated");
+  ok($("ironResultsFilamentRow").textContent.length > 0, "Ironing saved-results view: filament title row is populated");
+  {
+    const ironBody = $("ironResultsBodyView");
+    const h3 = ironBody.querySelector("h3.rsec-static");
+    ok(!!h3 && /Results/.test(h3.textContent), "Ironing saved-results view: Results heading is present");
+    ok(ironBody.firstElementChild === h3, "Ironing saved-results view: Results sits at the top, above Printer/Filament/Test settings");
+    const summaries = [...ironBody.querySelectorAll("details.rsec summary")].map(s => s.textContent);
+    ok(/^Printer/.test(summaries[0]) && /^Filament/.test(summaries[1]) && summaries[2] === "Test settings", "Ironing saved-results view: Printer, Filament, Test settings follow Results, collapsed");
+    ok(ironBody.querySelector("button[data-iron-picker-open]") !== null, "Ironing saved-results view: a Change-results/Name-samples button is still present (stays editable)");
+  }
+  click("ironResultsClose");
   fpCard().dispatchEvent(new window.Event("click", { bubbles: true }));
   fNozCard(fNozA).dispatchEvent(new window.Event("click", { bubbles: true }));
   click("ironingSaveBtn");   // same combo again — should update in place, not duplicate

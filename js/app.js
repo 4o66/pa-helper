@@ -2252,10 +2252,6 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     .sort((a, b) => String(b.created || b.date || "").localeCompare(String(a.created || a.date || "")));   // newest first
   function openIronResults(fid) {
     const runs = completedIroningRunsFor(fid); if (!runs.length) return;
-    const fil = getFilament(fid);
-    $("ironResultsTitle").textContent = filamentLabel(fil);
-    const sw = $("ironResultsSwatch"); const fill = fil ? colorFill(fil) : null;   // colour swatch in the title bar
-    if (sw) { sw.style.background = fill || ""; sw.classList.toggle("nocolor", !fill); }
     const pick = $("ironResultsPick"); pick.innerHTML = "";
     runs.forEach(r => { const o = el("option"); o.value = r.id; o.textContent = printerLabel(getPrinter(r.printerId)) + " · " + fmtDateTime(r.created || r.date, !(r.namedResults && r.namedResults.length)); pick.append(o); });
     $("ironResultsPickWrap").hidden = runs.length < 2;
@@ -2270,6 +2266,10 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const esc = (v) => String(v == null ? "" : v).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
     const copy = (val) => (val != null && String(val) !== "") ? ` <button class="copybtn" data-copy="${esc(val)}" title="Copy to clipboard" aria-label="Copy">⧉</button>` : "";
     const dl = (rows) => '<dl class="results-dl">' + rows.filter(r => r[1] != null && String(r[1]) !== "").map(([k, v, c]) => `<dt>${esc(k)}</dt><dd>${esc(v)}${c != null ? copy(c) : ""}</dd>`).join("") + "</dl>";
+    // Title bar: printer/nozzle (with maker icon) on top, filament (with color swatch) below — same
+    // icon+two-line pattern the Printer/Filament nav tabs (and the PA saved-results view) use.
+    tabSel($("ironResultsPrinterRow"), p ? makerFavicon(p.maker) : null, p ? printerLabel(p) : "(deleted printer)", nz ? nozzleLabel(nz) : "");
+    tabSel($("ironResultsFilamentRow"), f ? colorSquare(f, "colorsq tabsw") : null, f ? filLine1(f) : "(deleted filament)", f ? filLine2(f) : "");
     const bed = p && p.bed ? (p.bed.shape === "round" ? (p.bed.diameter + " mm ø") : (p.bed.x + "×" + p.bed.y + " mm")) : "";
     const printer = p ? [["Maker", p.maker], ["Model", p.model], ["Toolhead", p.toolhead], ["Extruder", (p.extruder || "") + (p.drive ? " (" + p.drive + ")" : "")], ["Hotend", p.hotend], ["Nozzle", nz ? nozzleLabel(nz) : ""], ["Bed", bed]] : [["Status", "(deleted)"]];
     const fil = f ? [["Maker", f.maker], ["Material", f.material], ["Formulation", formText(f)], ["Color", f.color], ["Diameter", f.diameter ? f.diameter + " mm" : ""], ["Fiber", fiberTag(f)], ["Hardness", f.hardness]] : [["Status", "(deleted)"]];
@@ -2284,16 +2284,20 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     ];
     const sec = (title, body) => `<details class="rsec"><summary>${esc(title)}</summary>${body}</details>`;
     const named = run.namedResults || [];
+    // Still fully editable here (no lock, unlike PA's saved data) — ironing results are a judgment
+    // call, not a measurement, so re-naming samples after the fact is a feature, not a data-integrity risk.
     const resultsBody = named.length
       ? '<table><thead><tr><th>Sample</th><th>Speed</th><th>Flow</th></tr></thead><tbody>' +
           named.map(n => `<tr><td>${esc(n.name)}</td><td>${esc(n.speed)} mm/s</td><td>${esc(n.flow)}%</td></tr>`).join("") +
         '</tbody></table><div class="actions"><button class="secondary" data-iron-picker-open="' + esc(run.id) + '">Change results</button></div>'
       : '<p class="hint">No named results yet.</p><div class="actions"><button data-iron-picker-open="' + esc(run.id) + '">Name samples</button></div>';
+    // Results moves to the top, same as the PA saved-results view — it's the thing you most likely
+    // came here to read, everything else (printer/filament/settings) collapses below it.
     $("ironResultsBodyView").innerHTML =
+      `<h3 class="rsec-static">Results</h3>${resultsBody}` +
       sec("Printer - " + (p ? printerLabel(p) : "(deleted)"), dl(printer)) +
       sec("Filament - " + (f ? filamentLabel(f) : "(deleted)"), dl(fil)) +
-      sec("Test settings", dl(settings)) +
-      `<h3 class="rsec-static">Results</h3>${resultsBody}`;
+      sec("Test settings", dl(settings));
   }
   function closeIronResults() { $("ironResultsModal").hidden = true; ironResultsRunId = null; }
   function cloneFromIroningRun(id) {   // load a saved ironing test's settings back into the tab for a re-run
