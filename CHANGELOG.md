@@ -13,6 +13,19 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 ## [Unreleased]
 
 ### Added
+- **Direct "Abandon this run" button for an in-flight PA run.** Previously the only way to discard
+  a resumed planned run was to dirty some field first (so the unsaved-job guard would even offer
+  an Abandon choice), then close the modal. Now a red "Abandon this run" button sits right next to
+  Save at the bottom whenever a run is actually in-flight (same visibility as the titlebar badge),
+  deleting it immediately (with a confirm prompt) — no field to twiddle first.
+
+### Changed
+- **Saved-results modal title: icon/swatch now sits to the right of the printer/nozzle and
+  filament text**, not the left (both rows, purely a layout flip — same content).
+- **The separate "Run in progress" popup for PA is gone.** The titlebar's "In-Flight · Settings
+  locked" badge (added alongside the settings-lock feature) already explains why the form is
+  greyed out, so the extra modal on top of it was redundant. Ironing's own equivalent popup is
+  unchanged for now.
 - **Saved PA results view: read-only Data table and Plot & Analysis sections, reordered and
   retitled.** The saved-results modal now shows the full results grid (Flow/Accel/Best PA/Notes)
   and the fit plot + analysis text — previously only visible while a test was in progress —

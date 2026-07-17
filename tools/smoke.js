@@ -501,12 +501,13 @@ const paResumeBtn = [...plaCardResume.querySelectorAll(".actions button")].find(
 ok(paResumeBtn && paResumeBtn.classList.contains("warn"), "PA button is orange while a run is in progress");
 paResumeBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
 ok($("tab-test").hidden === false, "clicking the in-progress PA button resumes the run (opens the PA modal)");
-ok($("runInProgressModal").hidden === false, "in-progress explainer modal shown");
+ok($("runInProgressModal").hidden === true, "no separate in-progress popup for PA anymore — the titlebar badge covers it");
 ok(/Resumed planned run/.test($("recommendOut").textContent), "resume populated test tab");
 // resuming a saved in-flight (planned) run locks every setting that shaped its results table —
 // only the table itself (plus Analyze/Export/Save and the view-only sort) stays usable.
 {
   ok($("testInFlightBadge").hidden === false && /In-Flight/.test($("testInFlightBadge").textContent) && /settings locked/i.test($("testInFlightBadge").textContent), "titlebar shows an In-Flight / settings-locked badge while resumed");
+  ok($("abandonRunBtn").hidden === false, "Abandon button appears alongside the badge, no popup needed to explain why");
   ["maxFlow", "maxFlowConfirm", "testMode", "basicMethod", "layerH", "flowPoints", "speedList", "accelPoints", "accelList", "recommendBtn", "loadPointsBtn", "importGcodeBtn", "pvStart", "pvEnd", "pvStep", "pvFlows", "pvAccels", "pvLoadBtn"].forEach(id => {
     ok($(id).disabled === true, "resuming an in-flight run disables #" + id);
   });
@@ -535,8 +536,6 @@ ok(/Resumed planned run/.test($("recommendOut").textContent), "resume populated 
   ok($("patternSvg").querySelectorAll("line").length > 5, "resumed run's picker renders geometry regenerated from settings, not a cache");
   $("patternModal").hidden = true;
 }
-$("runInProgressOk").dispatchEvent(new window.Event("click", { bubbles: true }));
-ok($("runInProgressModal").hidden === true, "OK dismisses the explainer modal");
 // resuming an already-saved planned run is NOT itself an unsaved change — closing right back up
 // with no edits made must NOT prompt the guard (previously it always did: openRun() used to mark
 // the job dirty unconditionally on resume, regardless of whether anything was actually touched).
@@ -550,7 +549,6 @@ ok($("tab-test").hidden === true, "…and the modal actually closes, no guard in
   const plaCardResume2 = [...$("filamentList").querySelectorAll(".card,.frow")].find(c => c.textContent.includes("PLA") && !c.textContent.includes("(copy)"));
   const paResumeBtn2 = [...plaCardResume2.querySelectorAll(".actions button")].find(b => /^PA/.test(b.textContent));
   paResumeBtn2.dispatchEvent(new window.Event("click", { bubbles: true }));
-  $("runInProgressOk").dispatchEvent(new window.Event("click", { bubbles: true }));
   ev($("resultsBody"), "input");   // simulate actually entering a result
   click("paModalClose");
   ok($("jobGuardModal").hidden === false, "closing the PA modal after a real edit prompts the unsaved guard");
@@ -572,19 +570,18 @@ ok($("dataStatus").classList.contains("stale") && /newer than/.test($("dataStatu
 // that savePlanned() call is only here to exercise the stale-flag check, but it's a real save —
 // it leaves a fresh planned run sitting on PLA. savePlanned's own resetTestTab() already clears
 // currentRunId back to null (by design — "leave the tab fresh for the next run"), so resume it
-// properly first (same as the earlier cleanup) so currentRunId points at it again. Resuming alone
-// no longer marks the job dirty, so make a real edit before closing — otherwise there's nothing
-// for the guard to catch and the run would be left dangling into the "saved results modal"
-// section further down.
+// properly first (same as the earlier cleanup) so currentRunId points at it again. This time,
+// clean up with the direct "Abandon this run" button instead of the dirty-edit-then-guard dance —
+// exercising the whole point of that button: no field to twiddle first.
 {
   const plaCardAgain = [...$("filamentList").querySelectorAll(".card,.frow")].find(c => c.textContent.includes("PLA") && !c.textContent.includes("(copy)"));
   const paBtnAgain = [...plaCardAgain.querySelectorAll(".actions button")].find(b => /^PA/.test(b.textContent));
   paBtnAgain.dispatchEvent(new window.Event("click", { bubbles: true }));   // resumes + sets currentRunId
-  $("runInProgressOk").dispatchEvent(new window.Event("click", { bubbles: true }));
-  ev($("resultsBody"), "input");   // simulate actually entering a result, so there's something to abandon
-  click("paModalClose");
-  $("jobGuardAbandon").dispatchEvent(new window.Event("click", { bubbles: true }));
-  ok(!readData().runs.some(r => r.status === "planned" && r.filamentId === pla.id), "side-effect planned run from the stale-flag check is cleaned up");
+  ok($("abandonRunBtn").hidden === false, "Abandon button is offered directly on a resumed in-flight run");
+  click("abandonRunBtn");   // confirm() is mocked true — and nothing was dirtied first, that's the point
+  ok(!readData().runs.some(r => r.status === "planned" && r.filamentId === pla.id), "Abandon button removes the run immediately, with no edit required first");
+  ok($("tab-test").hidden === true, "Abandon button also closes the PA modal");
+  ok($("abandonRunBtn").hidden === true, "Abandon button hides itself again once there's no in-flight run open");
 }
 ok(typeof window.PAStore.key === "string" && window.PAStore.key.length > 0, "storage key exposed for cross-tab sync");
 
@@ -910,9 +907,7 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
   nozCardS(sNozA).dispatchEvent(new window.Event("click", { bubbles: true }));
   $("filamentScope").value = "nozzle"; ev($("filamentScope"), "change");
   scopeBtn().dispatchEvent(new window.Event("click", { bubbles: true }));   // resumes the run
-  $("runInProgressOk").dispatchEvent(new window.Event("click", { bubbles: true }));
-  click("paModalClose");
-  $("jobGuardAbandon").dispatchEvent(new window.Event("click", { bubbles: true }));
+  click("abandonRunBtn");   // confirm() is mocked true
   ok(!readData().runs.some(r => r.filamentId === scopeFil.id), "scope-test run cleaned up");
   const spRemoveBtn = () => [...spCard().querySelectorAll(".actions button")].find(b => b.title === "Remove");
   spRemoveBtn().dispatchEvent(new window.Event("click", { bubbles: true }));
@@ -1102,6 +1097,7 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
   // a brand-new (not resumed) test is fully unlocked — no leftover lock state from a previously
   // resumed run elsewhere in the suite, and no in-flight badge
   ok($("testInFlightBadge").hidden === true, "no in-flight badge on a fresh test");
+  ok($("abandonRunBtn").hidden === true, "no Abandon button on a fresh test either — nothing to abandon");
   ok($("maxFlow").disabled !== true && $("testMode").disabled !== true && $("pvStart").disabled !== true, "a fresh test's settings are fully editable, not locked");
   // backdrop click closes a clean modal outright (nothing dirty to guard)
   $("tab-test").dispatchEvent(new window.Event("click", { bubbles: true }));

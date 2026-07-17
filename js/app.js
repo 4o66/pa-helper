@@ -343,6 +343,9 @@
     document.querySelectorAll('input[name="recUnit"], input[name="pvUnit"]').forEach(r => { r.disabled = locked; });
     document.querySelectorAll("#resultsBody .ovchk").forEach(c => { c.disabled = locked; });
     if ($("testInFlightBadge")) $("testInFlightBadge").hidden = !locked;
+    // Abandoning used to require dirtying some field first just to reach the unsaved-job guard's
+    // Abandon button — offer it directly whenever there's an actual in-flight run sitting here.
+    if ($("abandonRunBtn")) $("abandonRunBtn").hidden = !locked;
   }
   function applyTab(name) {
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
@@ -668,7 +671,9 @@
     pa.addEventListener("click", () => {
       // An in-progress run takes priority over the history view — jump straight to it instead
       // of the results modal, since that's what needs finishing before anything else can happen.
-      if (paPlanned) { resumeRun(paPlanned.id); showRunInProgressModal("You have a run in progress. To start a new run, enter results on the open run and save, or delete the in progress run."); }
+      // The "In-Flight · Settings locked" titlebar badge (see setTestFormLocked) already explains
+      // why the settings are greyed out — a separate popup on top of it was redundant.
+      if (paPlanned) { resumeRun(paPlanned.id); }
       else if (paRuns.length) openResults(f.id);
       // No runs at the current Scope yet — the button opens the PA modal fresh so a first test
       // can be started, rather than sitting inert forever.
@@ -1767,6 +1772,23 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("tab-test").hidden = true;   // …close the PA modal…
     resetTestTab();                // …and leave it fresh for the next run
   }
+  // Abandoning a run is never recoverable, so it's deleted outright rather than soft-flagged
+  // (matches ironing runs and the results modal's own delete). Shared by the direct "Abandon this
+  // run" button (skipConfirm=false — nothing else has confirmed yet) and the unsaved-job guard's
+  // own Abandon (skipConfirm=true — choosing Abandon there already was the confirmation).
+  function abandonPaRun(skipConfirm) {
+    if (!skipConfirm && !confirm("Abandon this in-progress run? This can't be undone.")) return;
+    // currentRunId can legitimately be null here (e.g. a clone-in-progress, which is deliberately
+    // detached from the run it was cloned from) — there's just nothing to delete from storage in
+    // that case, but the tab still needs to reset and the modal still needs to close either way.
+    if (currentRunId) {
+      const i = data.runs.findIndex(x => x.id === currentRunId);
+      if (i >= 0) data.runs.splice(i, 1);
+    }
+    currentRunId = null; loadGrid([]); clearJobDirty(); persist(); renderFilaments();
+    setTestFormLocked(false);   // nothing in-flight anymore — drop the badge/abandon-button/locked fields
+    $("tab-test").hidden = true;
+  }
   function saveRun() {
     if (!data.lastPrinterId || !getSelectedNozzle() || !data.lastFilamentId) { alert("Select a printer, nozzle and filament first."); return; }
     adoptExistingPlannedRun();   // completing shouldn't leave a stale planned duplicate for this combo behind
@@ -2623,17 +2645,12 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
         clearIronDirty(); persist(); renderFilaments(); updateIroningContext();
         $("jobGuardModal").hidden = true; $("tab-ironing").hidden = true;
       } else {
-        // Abandoned runs aren't recoverable, so there's no reason to keep them around — delete
-        // outright rather than soft-flagging (matches how ironing runs and the results modal work).
-        if (currentRunId) {
-          const i = data.runs.findIndex(x => x.id === currentRunId);
-          if (i >= 0) data.runs.splice(i, 1);
-        }
-        currentRunId = null; loadGrid([]); clearJobDirty(); persist(); renderFilaments();
-        $("jobGuardModal").hidden = true; $("tab-test").hidden = true;
+        abandonPaRun(true);   // choosing Abandon here was already the confirmation
+        $("jobGuardModal").hidden = true;
       }
     });
     $("jobGuardCancel").addEventListener("click", () => { $("jobGuardModal").hidden = true; pendingModal = null; });
+    $("abandonRunBtn").addEventListener("click", () => abandonPaRun());
     window.addEventListener("beforeunload", (e) => { if (jobDirty || ironDirty) { e.preventDefault(); e.returnValue = ""; } });
     // Cross-tab sync: if PA-Helper is open in another tab and it saves, pick up the change here so
     // this tab can't later export a stale in-memory copy. Skip while mid-edit so we don't clobber work.
