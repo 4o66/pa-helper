@@ -206,6 +206,14 @@ footer a{color:var(--accent)}
 .modal-box.plain{border-color:var(--line)}
 .modal-box.plain h3{color:var(--accent)}
 .modal-box.wide{max-width:min(900px,95vw);width:100%}
+#settingsModal .modal-box{display:flex;flex-direction:column;gap:.7rem}
+.settings-row{display:flex;flex-direction:column;gap:.25rem;font-size:.9rem}
+.settings-row select{width:100%}
+.settings-example{margin:0}
+.settings-subtitle{margin:.6rem 0 0;font-size:.9rem;color:var(--ink)}
+#settingsModal > .settings-subtitle + p.hint{margin-top:0}
+.settings-danger-zone{margin-top:.4rem;padding-top:.7rem;border-top:1px solid var(--line)}
+.settings-danger-zone button{width:100%}
 /* results modal: fixed title bar (top) + scrollable body + fixed button bar (bottom) */
 .results-box{max-width:min(720px,95vw);width:100%;max-height:88vh;text-align:left;padding:0;overflow:hidden;display:flex;flex-direction:column}
 /* PA/Ironing Test modals: wider than the plain results box (many side-by-side row fields) */

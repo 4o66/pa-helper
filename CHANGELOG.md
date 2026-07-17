@@ -13,6 +13,18 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 ## [Unreleased]
 
 ### Added
+- **Settings modal**, opened via a new gear-icon button in the header (to the right of Export).
+  Consolidates the Theme picker and the `DEBUG: Clear data` button — both removed from the main
+  toolbar and relocated here (Theme at the top; Clear data at the bottom, in its own danger zone)
+  — alongside new date/time display preferences: date format (`YYYY-MM-DD` default, plus
+  `MM/DD/YYYY`, `DD/MM/YYYY`, `DD-MM-YYYY`, `Mon D, YYYY`, `D Mon YYYY`), time format (24-hour
+  default, or 12-hour AM/PM), and a "Multi-test display format" section with independent
+  absolute-vs-relative pickers for in-progress tests (defaults to relative — "3 days ago",
+  emphasizing how stale an unfinished job is) and completed tests (defaults to absolute — an exact
+  date, better suited to a historical record). Every option shows a live example next to it. These
+  settings now drive the one existing date-formatting function used across the app (the PA/Iron
+  saved-results picker labels and each run's "Date" detail field), which previously had a single
+  hardcoded `YYYY-MM-DD HH:MM` format.
 - **Filament tab legend redesigned: one row per state, covering all three colors.** Previously
   showed paired PA/Iron example buttons for grey and orange only (blue/done had no example, just
   text), all crammed onto one wrapping line. Now a single "Test" example button per state — grey,

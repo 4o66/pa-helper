@@ -677,6 +677,7 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
   ok($("resultsModal").hidden === false, "Results opens the modal over a dimmed backdrop");
   const body = $("resultsBodyView").textContent;
   ok(/Printer/.test(body) && /Filament/.test(body) && /Test settings/.test(body) && /Results/.test(body), "modal shows printer, filament, settings and results sections");
+  ok(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(body), "a completed run's Date field renders in the default YYYY-MM-DD HH:MM (24h, absolute) format");
   // title bar: no "Results —" prefix, plus a colour swatch
   ok($("resultsTitle").textContent.length > 0 && !/Results\s*[—-]/.test($("resultsTitle").textContent), "modal title drops the 'Results —' prefix (just the filament)");
   ok(!!$("resultsSwatch"), "modal title bar has a colour swatch");
@@ -1164,6 +1165,78 @@ ok($("jobGuardModal").hidden === true, "no guard once the job is cleared (nothin
     ok(migrated.formatVersion === "2.0", "old-format import stamps formatVersion 2.0");
     ok(!("gcodeCache" in migrated), "old-format import drops gcodeCache");
     ok(migrated.runs.length === 1 && migrated.runs[0].id === "r1", "runs orphaned by a deleted printer/nozzle/filament are swept on migration, valid run survives");
+  }
+
+  // ---- Settings modal: gear button, relocated theme/debug controls, date/time format + ----
+  // ---- in-progress/completed display-style pickers, and their live example previews ----
+  {
+    ok($("settingsModal").hidden === true, "settings modal starts closed");
+    ok($("themeSel").closest(".modal-box") !== null, "theme select now lives inside a modal, not the header toolbar");
+    ok($("debugClearBtn").closest(".modal-box").id !== "debugModal", "DEBUG: Clear data button now lives in the Settings modal, not the header");
+    click("settingsBtn");
+    ok($("settingsModal").hidden === false, "gear button opens the Settings modal");
+    // defaults, per the user's stated + confirmed choices
+    ok($("dateFormatSel").value === "YYYY-MM-DD", "date format defaults to YYYY-MM-DD");
+    ok($("timeFormatSel").value === "24h", "time format defaults to 24-hour");
+    ok($("inProgressStyleSel").value === "relative", "in-progress test dates default to relative");
+    ok($("completedStyleSel").value === "absolute", "completed test dates default to absolute");
+    ok(/^\d{4}-\d{2}-\d{2}$/.test($("dateFormatExample").textContent), "date format example reflects the current selection (YYYY-MM-DD)");
+    ok(/^\d{2}:\d{2}$/.test($("timeFormatExample").textContent), "time format example reflects 24h");
+    ok(/ago$|^Today|^Yesterday/.test($("inProgressStyleExample").textContent), "in-progress example shows a relative string by default");
+    ok(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test($("completedStyleExample").textContent), "completed example shows an absolute string by default");
+
+    // switching date format updates its own example live
+    $("dateFormatSel").value = "DD/MM/YYYY"; ev($("dateFormatSel"), "change");
+    ok(/^\d{2}\/\d{2}\/\d{4}$/.test($("dateFormatExample").textContent), "date format example updates to DD/MM/YYYY");
+    ok(readData().dateFormat === "DD/MM/YYYY", "date format choice persists to storage");
+    $("dateFormatSel").value = "Mon D, YYYY"; ev($("dateFormatSel"), "change");
+    ok(/^[A-Z][a-z]{2} \d{1,2}, \d{4}$/.test($("dateFormatExample").textContent), "date format example updates to 'Mon D, YYYY'");
+
+    // switching time format updates its own example live
+    $("timeFormatSel").value = "12h"; ev($("timeFormatSel"), "change");
+    ok(/^\d{1,2}:\d{2} (AM|PM)$/.test($("timeFormatExample").textContent), "time format example updates to 12-hour AM/PM");
+    ok(readData().timeFormat === "12h", "time format choice persists to storage");
+
+    // flipping in-progress to absolute, and completed to relative, swaps each example's shape
+    $("inProgressStyleSel").value = "absolute"; ev($("inProgressStyleSel"), "change");
+    ok(/\d{1,2}:\d{2} (AM|PM)/.test($("inProgressStyleExample").textContent), "in-progress example switches to absolute (honoring the 12h time format)");
+    ok(readData().inProgressDateStyle === "absolute", "in-progress style choice persists to storage");
+    $("completedStyleSel").value = "relative"; ev($("completedStyleSel"), "change");
+    ok(/ago$|^Today|^Yesterday/.test($("completedStyleExample").textContent), "completed example switches to relative");
+    ok(readData().completedDateStyle === "relative", "completed style choice persists to storage");
+
+    // restore defaults so the rest of the suite (and any dependent assertions above) aren't
+    // affected by this block's format changes
+    $("dateFormatSel").value = "YYYY-MM-DD"; ev($("dateFormatSel"), "change");
+    $("timeFormatSel").value = "24h"; ev($("timeFormatSel"), "change");
+    $("inProgressStyleSel").value = "relative"; ev($("inProgressStyleSel"), "change");
+    $("completedStyleSel").value = "absolute"; ev($("completedStyleSel"), "change");
+
+    // theme select still works from its new home inside the modal
+    $("themeSel").value = "dark"; ev($("themeSel"), "change");
+    ok(document.documentElement.dataset.theme === "dark", "theme select still switches theme from inside the Settings modal");
+    $("themeSel").value = "light"; ev($("themeSel"), "change");   // restore to match the earlier theme assertion
+
+    // DEBUG: Clear data still opens its confirmation modal from its new home
+    click("debugClearBtn");
+    ok($("debugModal").hidden === false, "DEBUG: Clear data still opens the danger-zone confirmation modal from inside Settings");
+    $("debugModal").hidden = true;   // dismiss without clearing anything
+
+    // close via the Close button, and via backdrop click
+    click("settingsCloseBtn");
+    ok($("settingsModal").hidden === true, "Close button closes the Settings modal");
+    click("settingsBtn");
+    $("settingsModal").dispatchEvent(new window.Event("click", { bubbles: true }));
+    ok($("settingsModal").hidden === true, "backdrop click closes the Settings modal");
+  }
+
+  // relative-date formatter: the Settings preview's fixed reference point is 3 days before "now",
+  // so with the in-progress style back to its default (relative), the example should read exactly
+  // "3 days ago" — a direct check on the day-bucketing boundary logic.
+  {
+    click("settingsBtn");
+    ok(/^3 days ago$/.test($("inProgressStyleExample").textContent), "relative example correctly buckets a 3-day-old reference as '3 days ago'");
+    click("settingsCloseBtn");
   }
 
   console.log(`\n${pass} passed, ${fail} failed`);

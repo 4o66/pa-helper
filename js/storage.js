@@ -28,6 +28,10 @@ window.PAStore = (function () {
       // (see migrate() below); a file missing this (or with an older value) is old-format.
       formatVersion: "2.0",
       theme: "system",              // system | light | dark
+      dateFormat: "YYYY-MM-DD",     // YYYY-MM-DD | MM/DD/YYYY | DD/MM/YYYY | DD-MM-YYYY | "Mon D, YYYY" | "D Mon YYYY"
+      timeFormat: "24h",            // 24h | 12h
+      inProgressDateStyle: "relative",  // relative | absolute — style for tests still waiting on results
+      completedDateStyle: "absolute",   // relative | absolute — style for finished tests
       customOptions: {
         printerMaker: [], printerModel: [], toolhead: [], extruder: [], hotend: [],
         nozzleMaker: [], nozzleModel: [], nozzleMaterial: [],

@@ -15,16 +15,58 @@
   const num = (v) => { const n = parseFloat(v); return isNaN(n) ? null : n; };
   const parseList = (s) => (s || "").split(",").map(x => num(x)).filter(x => x != null);
   const today = () => new Date().toISOString().slice(0, 10);
-  // Local date + time, compact and sortable-looking, for telling same-day runs apart (e.g. the
-  // ironing run picker). Falls back gracefully to just a date string for older records that
-  // predate the `created` timestamp field.
-  const fmtDateTime = (iso) => {
+  // Date/time display — configurable via the Settings modal (dateFormat, timeFormat, and
+  // in-progress-vs-completed relative/absolute style). Falls back gracefully to a plain string
+  // for anything that doesn't parse (e.g. very old records missing a `created` timestamp).
+  const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function fmtDate(d, fmt) {
+    const p = (n) => String(n).padStart(2, "0");
+    const y = d.getFullYear(), m = d.getMonth() + 1, day = d.getDate();
+    switch (fmt) {
+      case "MM/DD/YYYY": return `${p(m)}/${p(day)}/${y}`;
+      case "DD/MM/YYYY": return `${p(day)}/${p(m)}/${y}`;
+      case "DD-MM-YYYY": return `${p(day)}-${p(m)}-${y}`;
+      case "Mon D, YYYY": return `${MONTH_ABBR[m - 1]} ${day}, ${y}`;
+      case "D Mon YYYY": return `${day} ${MONTH_ABBR[m - 1]} ${y}`;
+      default: return `${y}-${p(m)}-${p(day)}`;   // YYYY-MM-DD
+    }
+  }
+  function fmtTime(d, fmt) {
+    const p = (n) => String(n).padStart(2, "0");
+    if (fmt === "12h") {
+      let h = d.getHours() % 12; if (h === 0) h = 12;
+      return `${h}:${p(d.getMinutes())} ${d.getHours() < 12 ? "AM" : "PM"}`;
+    }
+    return `${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+  // Absolute timestamp per the current Settings (used directly, and as the >1yr/edge-case
+  // fallback for the relative style below).
+  function fmtAbsolute(iso) {
     if (!iso) return "";
     const d = new Date(iso);
     if (isNaN(d.getTime())) return String(iso);
-    const p = (n) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
-  };
+    return fmtDate(d, data.dateFormat) + " " + fmtTime(d, data.timeFormat);
+  }
+  function fmtRelative(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso);
+    const startOfDay = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const diffDays = Math.round((startOfDay(new Date()) - startOfDay(d)) / 86400000);
+    if (diffDays === 0) return "Today " + fmtTime(d, data.timeFormat);
+    if (diffDays === 1) return "Yesterday " + fmtTime(d, data.timeFormat);
+    if (diffDays > 1 && diffDays < 7) return diffDays + " days ago";
+    if (diffDays >= 7 && diffDays < 31) { const w = Math.round(diffDays / 7); return w + (w === 1 ? " week ago" : " weeks ago"); }
+    if (diffDays >= 31 && diffDays < 365) { const mo = Math.round(diffDays / 30.4); return mo + (mo === 1 ? " month ago" : " months ago"); }
+    return fmtAbsolute(iso);   // a year+ old, or a future/clock-skew timestamp — just show the date
+  }
+  // The single entry point used at every "when was this run" call site: `inProgress` picks which
+  // of the two Settings styles (relative/absolute) applies. Kept under the old name so none of
+  // the existing call sites needed to change shape, just gain a second argument.
+  function fmtDateTime(iso, inProgress) {
+    const style = inProgress ? data.inProgressDateStyle : data.completedDateStyle;
+    return style === "relative" ? fmtRelative(iso) : fmtAbsolute(iso);
+  }
   function linspace(a, b, n) { if (n < 2) return [a]; const out = []; for (let i = 0; i < n; i++) out.push(a + (b - a) * i / (n - 1)); return out; }
   const PALETTE = ["#4aa8ff", "#37c98b", "#ffb84a", "#c98bff", "#5de0e6", "#ff8f5d", "#8bff9e"];
 
@@ -388,6 +430,7 @@
   }
   // Icon-only red "Remove" button (trashcan). Meaning is clear from the glyph; keeps card rows compact.
   const TRASH_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+  const GEAR_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>';
   function removeButton(onClick) {
     const b = el("button", "danger iconbtn"); b.type = "button"; b.title = "Remove"; b.setAttribute("aria-label", "Remove");
     b.innerHTML = TRASH_SVG; b.addEventListener("click", onClick); return b;
@@ -1684,7 +1727,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const sw = $("resultsSwatch"); const fill = fil ? colorFill(fil) : null;   // colour swatch in the title bar
     if (sw) { sw.style.background = fill || ""; sw.classList.toggle("nocolor", !fill); }
     const pick = $("resultsPick"); pick.innerHTML = "";
-    runs.forEach(r => { const o = el("option"); o.value = r.id; o.textContent = printerLabel(getPrinter(r.printerId)) + " · " + fmtDateTime(r.created || r.date); pick.append(o); });
+    runs.forEach(r => { const o = el("option"); o.value = r.id; o.textContent = printerLabel(getPrinter(r.printerId)) + " · " + fmtDateTime(r.created || r.date, r.status === "planned"); pick.append(o); });
     $("resultsPickWrap").hidden = runs.length < 2;
     pick.value = runs[0].id;
     renderResultsRun(runs[0]);
@@ -1702,7 +1745,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const fil = f ? [["Maker", f.maker], ["Material", f.material], ["Formulation", formText(f)], ["Color", f.color], ["Diameter", f.diameter ? f.diameter + " mm" : ""], ["Fiber", fiberTag(f)], ["Hardness", f.hardness]] : [["Status", "(deleted)"]];
     const settings = [
       ["Mode", (run.mode || "advanced") + (run.basicMethod ? " (" + run.basicMethod + ")" : "")],
-      ["Date", fmtDateTime(run.created || run.date)],
+      ["Date", fmtDateTime(run.created || run.date, run.status === "planned")],
       ["Max volumetric speed", run.maxFlow != null ? run.maxFlow + " mm³/s" : ""],
       ["Layer × line width", (run.layerH != null && run.lineW != null) ? (run.layerH + " × " + run.lineW + " mm") : ""],
       ["Start PA", s.paStart], ["End PA", s.paEnd], ["PA step", s.paStep],
@@ -2015,7 +2058,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const sw = $("ironResultsSwatch"); const fill = fil ? colorFill(fil) : null;   // colour swatch in the title bar
     if (sw) { sw.style.background = fill || ""; sw.classList.toggle("nocolor", !fill); }
     const pick = $("ironResultsPick"); pick.innerHTML = "";
-    runs.forEach(r => { const o = el("option"); o.value = r.id; o.textContent = printerLabel(getPrinter(r.printerId)) + " · " + fmtDateTime(r.created || r.date); pick.append(o); });
+    runs.forEach(r => { const o = el("option"); o.value = r.id; o.textContent = printerLabel(getPrinter(r.printerId)) + " · " + fmtDateTime(r.created || r.date, !(r.namedResults && r.namedResults.length)); pick.append(o); });
     $("ironResultsPickWrap").hidden = runs.length < 2;
     pick.value = runs[0].id;
     renderIronResultsRun(runs[0]);
@@ -2032,7 +2075,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const printer = p ? [["Maker", p.maker], ["Model", p.model], ["Toolhead", p.toolhead], ["Extruder", (p.extruder || "") + (p.drive ? " (" + p.drive + ")" : "")], ["Hotend", p.hotend], ["Nozzle", nz ? nozzleLabel(nz) : ""], ["Bed", bed]] : [["Status", "(deleted)"]];
     const fil = f ? [["Maker", f.maker], ["Material", f.material], ["Formulation", formText(f)], ["Color", f.color], ["Diameter", f.diameter ? f.diameter + " mm" : ""], ["Fiber", fiberTag(f)], ["Hardness", f.hardness]] : [["Status", "(deleted)"]];
     const settings = [
-      ["Date", fmtDateTime(run.created || run.date)],
+      ["Date", fmtDateTime(run.created || run.date, !(run.namedResults && run.namedResults.length))],
       ["Speed range", (s.speedMin != null && s.speedMax != null) ? (s.speedMin + "–" + s.speedMax + " mm/s (" + (s.speedPoints || "") + " pts)") : ""],
       ["Speed list", s.speedList],
       ["Flow range", (s.flowMin != null && s.flowMax != null) ? (s.flowMin + "–" + s.flowMax + "% (" + (s.flowPoints || "") + " pts)") : ""],
@@ -2276,6 +2319,25 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("debugModal").hidden = true;
   }
   function reloadAll() { renderPrinters(); renderNozzles(); renderFilaments(); renderFilamentPrinterPicker(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); setStatus(); updateTabLabels(); $("themeSel").value = data.theme || "system"; applyTheme(data.theme); }
+  // Settings modal: selects always reflect `data` on open (in case Import/Export changed it
+  // underneath), and each example line recomputes off a fixed reference moment so switching
+  // date/time format or relative-vs-absolute updates the preview live.
+  function populateSettingsModal() {
+    $("themeSel").value = data.theme || "system";
+    $("dateFormatSel").value = data.dateFormat || "YYYY-MM-DD";
+    $("timeFormatSel").value = data.timeFormat || "24h";
+    $("inProgressStyleSel").value = data.inProgressDateStyle || "relative";
+    $("completedStyleSel").value = data.completedDateStyle || "absolute";
+    updateSettingsExamples();
+  }
+  function updateSettingsExamples() {
+    const now = new Date();
+    $("dateFormatExample").textContent = fmtDate(now, $("dateFormatSel").value);
+    $("timeFormatExample").textContent = fmtTime(now, $("timeFormatSel").value);
+    const threeDaysAgo = new Date(now.getTime() - 3 * 86400000).toISOString();
+    $("inProgressStyleExample").textContent = $("inProgressStyleSel").value === "relative" ? fmtRelative(threeDaysAgo) : fmtAbsolute(threeDaysAgo);
+    $("completedStyleExample").textContent = $("completedStyleSel").value === "relative" ? fmtRelative(threeDaysAgo) : fmtAbsolute(threeDaysAgo);
+  }
 
   function init() {
     applyTheme(data.theme);
@@ -2488,6 +2550,20 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("debugClearBtn").addEventListener("click", () => { $("debugModal").hidden = false; });
     $("debugModal").addEventListener("click", (e) => { if (e.target === $("debugModal")) $("debugModal").hidden = true; });
     $("debugModal").querySelectorAll("button[data-clear]").forEach(b => b.addEventListener("click", () => doClear(b.dataset.clear)));
+    $("settingsBtn").innerHTML = GEAR_SVG;
+    $("settingsBtn").addEventListener("click", () => { populateSettingsModal(); $("settingsModal").hidden = false; });
+    $("settingsCloseBtn").addEventListener("click", () => { $("settingsModal").hidden = true; });
+    $("settingsModal").addEventListener("click", (e) => { if (e.target === $("settingsModal")) $("settingsModal").hidden = true; });
+    ["dateFormatSel", "timeFormatSel", "inProgressStyleSel", "completedStyleSel"].forEach(id => {
+      $(id).addEventListener("change", () => {
+        data.dateFormat = $("dateFormatSel").value;
+        data.timeFormat = $("timeFormatSel").value;
+        data.inProgressDateStyle = $("inProgressStyleSel").value;
+        data.completedDateStyle = $("completedStyleSel").value;
+        persist();
+        updateSettingsExamples();
+      });
+    });
     $("exportBtn").addEventListener("click", () => {
       persist();
       data.lastExportedAt = Store.exportJSON(data);   // stamp when we last wrote a file
