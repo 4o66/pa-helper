@@ -77,6 +77,10 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   modal is open.
 
 ### Fixed
+- **Settings gear button is now a proper square, matching the height of the other header
+  buttons (Export, etc.).** It was inheriting the compact `.iconbtn` padding used for small
+  in-card icon buttons (trashcans), which made it noticeably shorter and wider than its
+  toolbar neighbors.
 - **Restricting the currently-selected filament away from the currently-selected printer now
   clears the selection.** Previously the filament's card would vanish from the list (correctly
   hidden by the pin filter) but `lastFilamentId` stayed pointed at it, so the PA/Ironing test

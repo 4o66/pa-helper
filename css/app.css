@@ -27,6 +27,9 @@ h1 .sub{font-size:.8rem;color:var(--muted);font-weight:400;margin-left:.5rem}
 h2{font-size:1.1rem;margin:0 0 .3rem;color:var(--accent)}
 h3{font-size:.95rem;margin:.2rem 0 .4rem}
 .toolbar{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
+/* Settings gear: match the toolbar text buttons' height exactly, then square it up (rather than
+   the smaller/wider .iconbtn padding used for compact icon buttons elsewhere, e.g. card trashcans). */
+#settingsBtn{height:2.43rem;width:2.43rem;padding:0;flex:0 0 auto}
 .status{font-size:.8rem;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:.15rem .5rem}
 .status.file{color:var(--accent2);border-color:var(--accent2)}
 .status.stale{color:#e8a13a;border-color:#e8a13a}
