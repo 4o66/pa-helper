@@ -21,7 +21,8 @@ Phase B (planned): optional self-hosted backend for accounts (social login) and 
 **opt-in, anonymized community PA dataset**. See [Roadmap](#roadmap).
 
 ## What it does (Phase A)
-Four tabs, plus system/light/dark theming:
+Two tabs — Printer and Filament — plus system/light/dark theming and a Settings modal (gear
+icon: theme, and date/time display preferences for run history):
 
 1. **Printers** — a library of your machines. A printer's identity is its maker/model,
    toolhead, **extruder + drive (direct/bowden)** and **hotend** — the things that
@@ -29,33 +30,36 @@ Four tabs, plus system/light/dark theming:
    (remove confirms; it can't be undone). A **"multiple copies of this machine"** toggle
    reveals per-unit tracking by serial/asset ID for print farms; home users never see
    it. All fields remember and offer *Custom…*.
-2. **Filaments** — a library of spools (maker/material/formulation/color/diameter).
-   Runs you've started but not finished are **pinned at the top** to resume or abandon
-   (abandoning keeps the filament).
-3. **PA Test** — pick a printer + filament, set the per-run **nozzle** (swaps often, so
-   it's per run), then choose **Advanced** (adaptive PA across a flow × accel grid —
-   recommended) or **Basic** (a single PA value via a **tower** — recommended — or
-   **line** test). It recommends a PA range + test points (per material and drive,
-   bowden scaled up), or you can **provide the settings you already ran**. Enter results
-   in flow (mm³/s) *or* speed (mm/s — what you type into Orca; converted via layer
-   height × line width). It plots, fits a trend (two-variable when multiple accels are
-   present), flags outliers, and exports the Orca adaptive-PA model text (or the single
-   PA for Basic).
-
-4. **Ironing Test** — pick a printer + filament, sweep **ironing speed** (mm/s) and
-   **ironing flow** (%) across a grid, and generate an OrcaSlicer **3MF project** (not
-   g-code — Orca still does the real slicing) with per-pad overrides already set, sized
-   and brimmed to fit your printer's real bed. Print it, then **name each pad**
-   (Glossy/Matte/Other) in a picker matching the physical grid — no measuring or
-   guessing which pad is which. Saved tests keep a full history per printer+filament,
-   same as PA Test. Based on [LeoganPro](https://www.printables.com/@LeoganPro)'s
+2. **Filaments** — a library of spools (maker/material/formulation/color/diameter). Each
+   filament card shows separate **PA** and **Iron** buttons: grey when nothing matches your
+   current selection, orange while a run is in progress (click to resume), blue once one's
+   done (click for saved results, with a count). A **Scope** dropdown controls how strictly
+   "matching" is judged — this printer + nozzle, this printer any nozzle, or all printers.
+3. **PA Test** — click a filament's PA button to open it as a modal: set the per-run
+   **nozzle** (swaps often, so it's per run), then choose **Advanced** (adaptive PA across a
+   flow × accel grid — recommended) or **Basic** (a single PA value — currently disabled
+   pending its own rework; see Roadmap). It recommends a PA range + test points (per
+   material and drive, bowden scaled up), or you can **provide the settings you already
+   ran**. Enter results in flow (mm³/s) *or* speed (mm/s — what you type into Orca;
+   converted via layer height × line width). It plots, fits a trend (two-variable when
+   multiple accels are present), flags outliers, and exports the Orca adaptive-PA model
+   text (or the single PA for Basic).
+4. **Ironing Test** — click a filament's Iron button to open it as a modal: sweep
+   **ironing speed** (mm/s) and **ironing flow** (%) across a grid, and generate an
+   OrcaSlicer **3MF project** (not g-code — Orca still does the real slicing) with per-pad
+   overrides already set, sized and brimmed to fit your printer's real bed. Print it, then
+   **name each pad** (Glossy/Matte/Other) in a picker matching the physical grid — no
+   measuring or guessing which pad is which. Based on
+   [LeoganPro](https://www.printables.com/@LeoganPro)'s
    [Top Surface Ironing Test](https://www.printables.com/model/1247198) (CC0) — this
    feature exists because of that model; PA-Helper only automates generating and
    reading it for your own printer/filament library.
 
-**Run lifecycle:** save a **planned** run before you print, come back later, find it
-pinned under Filaments, **Resume** it, enter results, and save it **complete**. Every
-run is stored in `pa_data.json`; your last printer/filament/nozzle are pre-selected.
+**Run lifecycle:** save a **planned** run before you print, come back later, its filament's
+PA/Iron button shows **orange** — click it to **resume**, enter results, and save it
+**complete** (button turns blue). Only one in-flight run is allowed per
+printer+nozzle+filament combo, for both PA and Ironing. Every run is stored in
+`pa_data.json`; your last printer/filament/nozzle are pre-selected.
 
 ## Running it
 - **Easiest:** host the folder as a static site (GitHub Pages, or any static server)
@@ -83,6 +87,22 @@ Shipped, in the order they were completed:
    results (with copy buttons), **Rerun with these settings** (clone into a fresh run), or delete a
    saved run — for re-running a job or recovering PA value(s) to re-enter in Orca after wiping the
    slicer config.
+3. **Save & return.** Saving a run (planned or complete) returns you to the Filament page instead
+   of a confirmation popup — the run shows up right where you'd expect it, under its filament —
+   and the PA Test tab resets for the next run.
+4. **Ironing Test**, as a full second calibration workflow alongside PA — see "What it does" above.
+   Filament cards got a shared grey/orange/blue PA/Iron button pattern (nothing to show / in
+   progress / done with a count), replacing the old pinned-runs list.
+5. **PA/Ironing tests became modals opened from the Filament tab, not their own nav tabs.** The
+   nav is down to Printer + Filament; a filament's PA/Iron button is always clickable and takes
+   you straight to a fresh test, the in-progress one, or saved results. Added alongside it: a
+   Scope control for how strictly a run has to match your current printer+nozzle to count, one
+   in-flight run actually enforced per printer+nozzle+filament combo (PA and Ironing), and a
+   Settings modal consolidating Theme/debug-clear plus date/time display preferences.
+6. **Saved-results views rebuilt for both PA and Ironing** — read-only Data table and Plot &
+   Analysis sections, Results moved to the top, two-row printer/nozzle + filament titles matching
+   the nav tabs. A run now stores the actual Single PA result (raw values) instead of a baked
+   rendering of it, and dead scratch-math fields were dropped from storage entirely.
 
 ## Roadmap
 Ordered by priority.
@@ -93,11 +113,12 @@ Ordered by priority.
    value. These should be created and labelled as **tuning runs** (distinct from a fresh test), so the
    in-progress/history list shows they descend from an earlier run. Pairs with the range now shown on
    the in-progress cards and the range-edge ⚠ flag (both already done).
-2. **Basic PA Pattern / Line pickers** — the basic (single accel/speed) methods currently only
-   capture one best-PA value; they have no visual picker yet. Before building this, **search first**
-   for documentation of people actually running basic single-value PA pattern/line calibrations (how
-   they do it, whether they use Orca's Line method's `generate_test` at all), so we match real
-   practice rather than guessing. Advanced (adaptive) already has the full pattern picker. Includes the
+2. **Basic PA mode rework.** Basic is currently disabled ("Basic — Coming Soon™" in the Mode
+   dropdown) pending this work — the old single-accel/speed methods only ever captured one
+   best-PA value with no visual picker. Before rebuilding it, **search first** for documentation
+   of people actually running basic single-value PA pattern/line calibrations (how they do it,
+   whether they use Orca's Line method's `generate_test` at all), so we match real practice
+   rather than guessing. Advanced (adaptive) already has the full pattern picker. Includes the
    parked **Basic PA Tower** design: start at 0, a measured-height input, and shown-work
    `PA = Start + Step × height_mm` (no matrix).
 3. **`paRanges` are heuristic, not sourced.** The per-material PA sweep ranges in `js/presets.js`
