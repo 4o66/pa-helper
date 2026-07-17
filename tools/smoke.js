@@ -435,10 +435,15 @@ ok($("modelBlock").hidden === false, "Adaptive-PA model block appears once Gener
 ok(/Single PA/.test($("singlePaOut").innerHTML), "single PA produced");
 ok($("singlePaOut").querySelector("label.blocklabel") !== null, "single PA shows a small title, matching the Adaptive PA model block's style");
 {
-  const singleCopyBtn = $("singlePaOut").querySelector(".copybtn");
-  ok(!!singleCopyBtn, "single PA value has its own copy-to-clipboard icon");
-  ok(!!singleCopyBtn && singleCopyBtn.previousElementSibling && singleCopyBtn.previousElementSibling.tagName === "B", "copy icon sits immediately after the value element (not after the title)");
-  ok(singleCopyBtn.getAttribute("data-copy") === singleCopyBtn.previousElementSibling.textContent, "copy icon copies the exact value shown");
+  const label = $("singlePaOut").querySelector("label.blocklabel");
+  const singleCopyBtn = label ? label.querySelector(".copybtn") : null;
+  ok(!!singleCopyBtn, "single PA copy-to-clipboard icon sits in the label, matching the Adaptive PA model block's format");
+  const valBox = $("singlePaOut").querySelector(".out b");
+  ok(!!valBox, "single PA value sits in its own boxed line below the label");
+  ok(!!singleCopyBtn && valBox && singleCopyBtn.getAttribute("data-copy") === valBox.textContent, "copy icon copies the exact value shown");
+  const hint = $("singlePaOut").querySelector("p.hint");
+  ok(!!hint && /fit at mid-point/.test(hint.textContent), "fit-note sits on its own line below the value");
+  ok(!!hint && hint.querySelector("span.help") !== null, "fit-note has an explanatory tooltip icon");
 }
 
 // save completed run
@@ -718,10 +723,17 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
   ok(/Printer/.test(body) && /Filament/.test(body) && /Test settings/.test(body) && /Results/.test(body), "modal shows printer, filament, settings and results sections");
   ok(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(body), "a completed run's Date field renders in the default YYYY-MM-DD HH:MM (24h, absolute) format");
   // Single PA carries over into the saved-results view the same way it looked live: a small
-  // title outside the box, and the box isn't double-wrapped in a second .out div.
+  // title (with its copy icon) outside the box, the value on its own line below, and the
+  // fit-note on its own line below that; the box isn't double-wrapped in a second .out div.
   ok(/Single PA/.test(body), "saved-results view shows the Single PA value");
   ok($("resultsBodyView").querySelectorAll(".out .out").length === 0, "Single PA box isn't nested inside a second .out wrapper in the saved-results view");
   ok($("resultsBodyView").querySelector("label.blocklabel + div.out b") !== null, "saved-results view: Single PA title sits right before its boxed value, same as live");
+  ok($("resultsBodyView").querySelector("label.blocklabel .copybtn") !== null, "saved-results view: Single PA copy icon sits in the label, not next to the value");
+  ok($("resultsBodyView").querySelector("p.hint span.help") !== null, "saved-results view: Single PA fit-note keeps its tooltip");
+  {
+    const orcaIdx = body.indexOf("Single PA"), adaptiveIdx = body.indexOf("Adaptive PA model");
+    ok(orcaIdx >= 0 && adaptiveIdx >= 0 && orcaIdx < adaptiveIdx, "saved-results view: Single PA renders above Adaptive PA model, mirroring Orca's own order");
+  }
   // title bar: printer/nozzle row (with maker icon) on top, filament row (with swatch) below —
   // instead of the old single filament-name title
   ok($("resultsPrinterRow").textContent.length > 0 && !/deleted/.test($("resultsPrinterRow").textContent), "title's printer/nozzle row is populated");

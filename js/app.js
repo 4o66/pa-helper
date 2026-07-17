@@ -1691,15 +1691,15 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   // The Adaptive-PA model box (label + textarea + copy) only appears once there's something to show,
   // so an un-generated Export section is just the Generate button.
   function syncModelBlock() { const mb = $("modelBlock"); if (mb) mb.hidden = !($("modelOut").value || "").trim(); }
-  // Same presentation as the Adaptive PA model block: a small title, then a boxed value with a
-  // copy-to-clipboard icon immediately after it (and any extra context, like the basic-mode unit
-  // hint or the advanced-mode fit note, trailing after that).
+  // Same presentation as the Adaptive PA model block: the copy icon sits inline at the end of the
+  // label line (not next to the value), with the value on its own line below.
   const copyIcon = (val) => ` <button class="copybtn" data-copy="${val}" title="Copy to clipboard" aria-label="Copy">⧉</button>`;
+  const HELP_SINGLE_PA = "A single constant PA value, for slicers/firmware that don't support adaptive (flow-based) PA. It's the fitted model evaluated at the midpoint of your tested flow and accel range — or, before a fit exists yet, the median of your entered Best PA values.";
   function exportModel() {
     if (isBasic()) {
       const pa = num($("basicBestPA").value);
       $("singlePaOut").innerHTML = pa != null
-        ? '<label class="blocklabel">Set this PA value in Orca</label><div class="out"><b>' + pa + '</b>' + copyIcon(pa) + '</div>'
+        ? '<label class="blocklabel">Set this PA value in Orca' + copyIcon(pa) + '</label><div class="out"><b>' + pa + '</b></div>'
         : "Enter your best PA above.";
       $("modelOut").value = ""; syncModelBlock(); return;
     }
@@ -1711,7 +1711,9 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     let single = median;
     if (lastFit) { const midX = (Math.min(...rows.map(r => r.x)) + Math.max(...rows.map(r => r.x))) / 2; const accs = rows.map(r => r.accel).filter(a => a != null).sort((a, b) => a - b); const midA = accs.length ? accs[Math.floor(accs.length / 2)] : 0; single = lastFit.type === "mlr" ? lastFit.predict(midX, midA) : lastFit.predict(midX); }
     const singleStr = single.toFixed(4);
-    $("singlePaOut").innerHTML = '<label class="blocklabel">Single PA (non-adaptive)</label><div class="out"><b>' + singleStr + '</b>' + copyIcon(singleStr) + ' <span class="muted">(fit at mid-point; median entry = ' + median + ')</span></div>';
+    $("singlePaOut").innerHTML = '<label class="blocklabel">Single PA (non-adaptive)' + copyIcon(singleStr) + '</label>' +
+      '<div class="out"><b>' + singleStr + '</b></div>' +
+      '<p class="hint">(fit at mid-point; median entry = ' + median + ') <span class="help" title="' + HELP_SINGLE_PA + '">?</span></p>';
   }
 
   // ---- run lifecycle ----
@@ -1855,8 +1857,8 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       ["Speeds (mm/s)", (s.speeds || []).join(", ")]
     ];
     let orca = "";
-    if (run.modelText) orca += `<label class="blocklabel">Adaptive PA model — paste into Orca${copy(run.modelText)}</label><pre class="resultblock">${esc(run.modelText)}</pre>`;
     if (run.singlePaText) orca += run.singlePaText;   // already carries its own label + boxed value (see exportModel)
+    if (run.modelText) orca += `<label class="blocklabel">Adaptive PA model — paste into Orca${copy(run.modelText)}</label><pre class="resultblock">${esc(run.modelText)}</pre>`;
     if (!orca) orca = '<p class="hint">No exported values were saved for this run.</p>';
     // Section order below Results mirrors the in-flight PA Test tab's own order (settings, then
     // the data table, then Analyze) — Results itself is the one exception, pulled to the top since

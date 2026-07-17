@@ -27,6 +27,11 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   `flex-direction:column` and `justify-content:center` into each row.
 
 ### Changed
+- **Single PA (non-adaptive) output now matches the Adaptive PA model block's layout exactly**, and
+  sits above it (mirroring Orca's own field order). The copy icon moved from beside the value into
+  the label line itself; the value now sits on its own boxed line below the label; and the
+  "(fit at mid-point; median entry = …)" note is its own line below the value, with a "?" tooltip
+  explaining what the number means. Applies both live (PA Test tab) and in the saved-results view.
 - **The separate "Run in progress" popup for PA is gone.** The titlebar's "In-Flight · Settings
   locked" badge (added alongside the settings-lock feature) already explains why the form is
   greyed out, so the extra modal on top of it was redundant. Ironing's own equivalent popup is
