@@ -1388,6 +1388,42 @@ ok($("jobGuardModal").hidden === true, "no guard once the job is cleared (nothin
     click("settingsCloseBtn");
   }
 
+  // ---- selectPrinter must not reset a multi-instance printer's chosen unit when reselecting the
+  // same printer's own card (it used to, unconditionally, snapping back to unit 1 every time) ----
+  {
+    setFieldKey($("printerForm"), "maker", "Voron");
+    setFieldKey($("printerForm"), "model", "Multi Unit Test");
+    $("printerMulti").checked = true;
+    $("instancesInput").value = "Unit A, Unit B";
+    click("savePrinterBtn");
+    if ($("nozzleSeedModal").hidden === false) click("nozzleSeedOk");
+    const mp = readData().printers.find(p => p.model === "Multi Unit Test");
+    ok(mp && mp.multi && mp.instances.length === 2, "multi-instance printer saved with its 2 units");
+    ok(readData().lastInstanceId === mp.instances[0].id, "new multi printer defaults to unit A");
+
+    const mpCard = () => [...document.querySelectorAll("#printerList .card")].find(c => c.textContent.includes("Multi Unit Test"));
+    const unitSel = () => mpCard().querySelector("select");
+    unitSel().value = mp.instances[1].id; ev(unitSel(), "change");
+    ok(readData().lastInstanceId === mp.instances[1].id, "picking unit B via the card's own dropdown updates lastInstanceId");
+
+    // the reported bug: re-clicking the already-selected printer's own card snapped it back to unit A
+    mpCard().dispatchEvent(new window.Event("click", { bubbles: true }));
+    ok(readData().lastInstanceId === mp.instances[1].id, "re-clicking the already-selected multi printer's own card preserves unit B (bug fix)");
+
+    // a genuinely different printer still lands on ITS own units — switching away and back to the
+    // multi printer resets to unit A, same boundary as nozzle selection (no cross-printer memory)
+    const otherCard = () => [...document.querySelectorAll("#printerList .card")].find(c => c.textContent.includes("Trident 350") && !c.textContent.includes("Multi"));
+    if (otherCard()) {
+      otherCard().dispatchEvent(new window.Event("click", { bubbles: true }));
+      mpCard().dispatchEvent(new window.Event("click", { bubbles: true }));
+      ok(readData().lastInstanceId === mp.instances[0].id, "switching to a different printer and back resets to unit A (same boundary as nozzle selection)");
+    }
+
+    // cleanup
+    const rmBtn = [...mpCard().querySelectorAll(".actions button")].find(b => b.title === "Remove");
+    rmBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 })();

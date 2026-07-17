@@ -45,6 +45,12 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   deleting it immediately (with a confirm prompt) — no field to twiddle first.
 
 ### Fixed
+- **Selecting a multi-instance printer's already-selected card snapped its unit back to the first
+  one.** `selectPrinter()` unconditionally reset `lastInstanceId` to `instances[0]` every time it
+  ran — including a re-click on the printer you already had open, or returning to it after
+  selecting a different printer — silently discarding whichever unit you'd picked. Now mirrors the
+  nozzle-selection guard right below it: the stored instance is only reset if it doesn't actually
+  belong to the printer being selected.
 - **Opening a saved PA (or ironing) run could land already scrolled partway down the modal**,
   instead of at the top. Replacing `#resultsBodyView`'s (or `#ironResultsBodyView`'s) `innerHTML`
   doesn't reset its own `scrollTop` — it's the same scrollable element, just with new children — so

@@ -521,7 +521,12 @@
   function selectPrinter(id) {
     data.lastPrinterId = id;
     const p = getPrinter(id);
-    data.lastInstanceId = (p && p.multi && p.instances && p.instances.length) ? p.instances[0].id : null;
+    // Only default to the first unit if the currently-stored instance doesn't actually belong to
+    // this printer — otherwise re-clicking the already-selected printer's own card (or returning to
+    // it) silently threw away whatever unit you'd picked, snapping back to unit 1 every time.
+    if (!(p && p.multi && p.instances && p.instances.some(inst => inst.id === data.lastInstanceId))) {
+      data.lastInstanceId = (p && p.multi && p.instances && p.instances.length) ? p.instances[0].id : null;
+    }
     if (!(p && p.nozzles && p.nozzles.some(n => n.id === data.lastNozzleId))) data.lastNozzleId = (p && p.nozzles && p.nozzles.length) ? p.nozzles[0].id : null;
     persist(); renderPrinters(); renderNozzles(); renderFilaments(); deriveGeometryFromNozzle(); updateTestContext(); updateIroningContext(); resetMaxFlowForCombo(); updateTabLabels();
   }
