@@ -19,6 +19,13 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   Save at the bottom whenever a run is actually in-flight (same visibility as the titlebar badge),
   deleting it immediately (with a confirm prompt) — no field to twiddle first.
 
+### Fixed
+- **Saved-results modal title rows (printer/nozzle, filament) were stacking icon-above-text and
+  centering, instead of sitting icon-then-text in a row like the Printer/Filament nav tabs.** An
+  older rule (`.results-title>div`, written for the previous single-line title) also matched the
+  new title rows since they're direct children of `.results-title` too, silently injecting
+  `flex-direction:column` and `justify-content:center` into each row.
+
 ### Changed
 - **The separate "Run in progress" popup for PA is gone.** The titlebar's "In-Flight · Settings
   locked" badge (added alongside the settings-lock feature) already explains why the form is
