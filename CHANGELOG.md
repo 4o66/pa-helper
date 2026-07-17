@@ -45,6 +45,11 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   deleting it immediately (with a confirm prompt) — no field to twiddle first.
 
 ### Fixed
+- **Opening a saved PA (or ironing) run could land already scrolled partway down the modal**,
+  instead of at the top. Replacing `#resultsBodyView`'s (or `#ironResultsBodyView`'s) `innerHTML`
+  doesn't reset its own `scrollTop` — it's the same scrollable element, just with new children — so
+  whatever scroll position was left over from a previous view carried straight into the next one.
+  Both the render functions now explicitly reset scroll to the top.
 - **Saved-results modal title rows (printer/nozzle, filament) were stacking icon-above-text and
   centering, instead of sitting icon-then-text in a row like the Printer/Filament nav tabs.** An
   older rule (`.results-title>div`, written for the previous single-line title) also matched the

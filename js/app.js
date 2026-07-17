@@ -1924,6 +1924,10 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       sec("Test settings", dl(settings)) +
       (hasGrid ? sec("Data table", dataTableShell) : "") +
       (hasGrid ? sec("Plot & Analysis", plotShell) : "");
+    // Replacing innerHTML doesn't reset the container's own scrollTop — it's the same scrollable
+    // element, just with new children — so without this, opening a run (or switching the run
+    // picker) can land already scrolled partway down from wherever a previous view was left.
+    $("resultsBodyView").scrollTop = 0;
     if (hasGrid) { renderViewResultsTable(run); renderViewAnalysis(run); }
   }
   // Read-only Data table: same look as the live results grid, minus Override/Delete — nothing here
@@ -2298,6 +2302,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       sec("Printer - " + (p ? printerLabel(p) : "(deleted)"), dl(printer)) +
       sec("Filament - " + (f ? filamentLabel(f) : "(deleted)"), dl(fil)) +
       sec("Test settings", dl(settings));
+    $("ironResultsBodyView").scrollTop = 0;   // same fix as the PA saved-results view — see there
   }
   function closeIronResults() { $("ironResultsModal").hidden = true; ironResultsRunId = null; }
   function cloneFromIroningRun(id) {   // load a saved ironing test's settings back into the tab for a re-run

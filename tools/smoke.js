@@ -783,6 +783,14 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
     ok($("patternModal").hidden === true, "OK just closes the read-only picker");
     ok(firstPickBtn.closest("tr").querySelector('input[data-key="bestPA"]').value === bestPaBefore, "OK does not write anything back in read-only mode");
   }
+  // scroll position: replacing #resultsBodyView's innerHTML doesn't reset its own scrollTop on its
+  // own (same scrollable element, just new children) — verify the explicit reset actually fires
+  {
+    $("resultsBodyView").scrollTop = 500;   // simulate a leftover scroll position from a previous view
+    click("resultsClose");
+    resBtn().dispatchEvent(new window.Event("click", { bubbles: true }));
+    ok($("resultsBodyView").scrollTop === 0, "reopening a saved run resets scroll to the top, even if the last view was left scrolled down");
+  }
   ok($("resultsClone").textContent === "Rerun with these settings", "run-clone button relabelled 'Rerun with these settings'");
   const copyBtns = [...$("resultsBodyView").querySelectorAll(".copybtn")];
   ok(copyBtns.length > 0, "results expose copy buttons for the Orca-bound values");
