@@ -239,9 +239,7 @@ footer a{color:var(--accent)}
 /* Saved-results modal title: printer/nozzle (with maker icon) on one row, filament (with color
    swatch) on the next — built with the same icon+two-line tabSel() helper the nav tabs use. */
 .results-title-stacked{flex-direction:column;align-items:stretch;gap:.3rem}
-/* Icon/swatch sits after the text now, not before — flex-direction reversed, DOM order unchanged
-   (so tabSel()'s shared icon+text-building logic didn't need touching just for this modal). */
-.results-title-stacked .ts-row{display:flex;flex-direction:row-reverse;align-items:center;gap:.5rem;min-width:0}
+.results-title-stacked .ts-row{display:flex;align-items:center;gap:.5rem;min-width:0}
 .results-title-stacked .favicon{width:22px;height:22px;margin-right:0;flex:0 0 auto}
 .results-title-stacked .tstext{min-width:0;display:flex;flex-direction:column}
 .results-title-stacked .tsname{font-weight:700;font-size:.95rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

@@ -20,8 +20,6 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   deleting it immediately (with a confirm prompt) — no field to twiddle first.
 
 ### Changed
-- **Saved-results modal title: icon/swatch now sits to the right of the printer/nozzle and
-  filament text**, not the left (both rows, purely a layout flip — same content).
 - **The separate "Run in progress" popup for PA is gone.** The titlebar's "In-Flight · Settings
   locked" badge (added alongside the settings-lock feature) already explains why the form is
   greyed out, so the extra modal on top of it was redundant. Ironing's own equivalent popup is
