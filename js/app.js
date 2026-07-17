@@ -1831,7 +1831,11 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     maxFlowConfirmed = true;   // a saved run's max flow is trusted — don't re-gate it
     renderPrinters(); renderNozzles(); renderFilaments(); updateTestContext(); updateIroningContext();
     openPaModal();
-    persist(); markJobDirty();
+    // Resuming an already-saved planned run isn't itself an unsaved change — jobDirty should stay
+    // false until something is actually edited (the existing input listeners on the results table
+    // / basic fields handle that). cloneFromRun() marks dirty itself right after calling this, since
+    // a clone genuinely is a fresh unsaved run.
+    persist();
     // Land on the actual data-entry screen, not just the top of the tab — the results table
     // (advanced) / result fields (basic) sit below the setup sections, so resuming without this
     // leaves the user staring at "Recommend settings" with the thing they came to do off-screen.

@@ -514,17 +514,27 @@ ok(/Resumed planned run/.test($("recommendOut").textContent), "resume populated 
 }
 $("runInProgressOk").dispatchEvent(new window.Event("click", { bubbles: true }));
 ok($("runInProgressModal").hidden === true, "OK dismisses the explainer modal");
-// clean up: the PA button now prioritizes an in-progress run over history (same as Iron), so
-// later "completed run" tests need this outstanding planned run gone first. Resuming already
-// marked the job dirty; abandon it via the unsaved-job guard (full delete, same path tested
-// again further down for a different job). Closing the modal (not switching the underlying
-// Printers/Filaments tab, which no longer carries a dirty-guard of its own — the modal's backdrop
-// covers the tab nav in the real UI) is what now triggers the guard.
+// resuming an already-saved planned run is NOT itself an unsaved change — closing right back up
+// with no edits made must NOT prompt the guard (previously it always did: openRun() used to mark
+// the job dirty unconditionally on resume, regardless of whether anything was actually touched).
 click("paModalClose");
-ok($("jobGuardModal").hidden === false, "closing the PA modal on an unsaved job prompts the unsaved guard");
-$("jobGuardAbandon").dispatchEvent(new window.Event("click", { bubbles: true }));
-ok(!readData().runs.some(r => r.status === "planned" && r.filamentId === pla.id), "abandoning the resumed job deletes it (no more planned run for PLA)");
-ok($("tab-test").hidden === true, "abandon also closes the PA modal");
+ok($("jobGuardModal").hidden === true, "closing a freshly-resumed run with no edits does not prompt the guard");
+ok($("tab-test").hidden === true, "…and the modal actually closes, no guard in the way");
+// clean up: the PA button now prioritizes an in-progress run over history (same as Iron), so
+// later "completed run" tests need this outstanding planned run gone first. Re-open it, make a
+// real edit this time (so there's something genuinely unsaved), then abandon via the guard.
+{
+  const plaCardResume2 = [...$("filamentList").querySelectorAll(".card,.frow")].find(c => c.textContent.includes("PLA") && !c.textContent.includes("(copy)"));
+  const paResumeBtn2 = [...plaCardResume2.querySelectorAll(".actions button")].find(b => /^PA/.test(b.textContent));
+  paResumeBtn2.dispatchEvent(new window.Event("click", { bubbles: true }));
+  $("runInProgressOk").dispatchEvent(new window.Event("click", { bubbles: true }));
+  ev($("resultsBody"), "input");   // simulate actually entering a result
+  click("paModalClose");
+  ok($("jobGuardModal").hidden === false, "closing the PA modal after a real edit prompts the unsaved guard");
+  $("jobGuardAbandon").dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(!readData().runs.some(r => r.status === "planned" && r.filamentId === pla.id), "abandoning the resumed job deletes it (no more planned run for PLA)");
+  ok($("tab-test").hidden === true, "abandon also closes the PA modal");
+}
 
 // export robustness: stamps lastExportedAt, status reflects freshness, later edits go stale
 click("exportBtn");
@@ -538,15 +548,17 @@ window.PA_test.savePlanned();   // any save bumps lastModifiedAt past the export
 ok($("dataStatus").classList.contains("stale") && /newer than/.test($("dataStatus").textContent), "status flags saved changes newer than the last export");
 // that savePlanned() call is only here to exercise the stale-flag check, but it's a real save —
 // it leaves a fresh planned run sitting on PLA. savePlanned's own resetTestTab() already clears
-// currentRunId back to null (by design — "leave the tab fresh for the next run"), so dirty+abandon
-// would have nothing to delete; resume it properly first (same as the earlier cleanup) so
-// currentRunId points at it again, then abandon, so it doesn't dangle into the "saved results
-// modal" section further down.
+// currentRunId back to null (by design — "leave the tab fresh for the next run"), so resume it
+// properly first (same as the earlier cleanup) so currentRunId points at it again. Resuming alone
+// no longer marks the job dirty, so make a real edit before closing — otherwise there's nothing
+// for the guard to catch and the run would be left dangling into the "saved results modal"
+// section further down.
 {
   const plaCardAgain = [...$("filamentList").querySelectorAll(".card,.frow")].find(c => c.textContent.includes("PLA") && !c.textContent.includes("(copy)"));
   const paBtnAgain = [...plaCardAgain.querySelectorAll(".actions button")].find(b => /^PA/.test(b.textContent));
   paBtnAgain.dispatchEvent(new window.Event("click", { bubbles: true }));   // resumes + sets currentRunId
   $("runInProgressOk").dispatchEvent(new window.Event("click", { bubbles: true }));
+  ev($("resultsBody"), "input");   // simulate actually entering a result, so there's something to abandon
   click("paModalClose");
   $("jobGuardAbandon").dispatchEvent(new window.Event("click", { bubbles: true }));
   ok(!readData().runs.some(r => r.status === "planned" && r.filamentId === pla.id), "side-effect planned run from the stale-flag check is cleaned up");

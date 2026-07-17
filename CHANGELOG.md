@@ -83,6 +83,11 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   to copy it). Applies both live in the PA Test modal and in the saved-results view.
 
 ### Fixed
+- **Resuming an in-progress PA run and closing it right back up (no edits made) no longer
+  prompts to save/abandon.** `openRun()` was unconditionally marking the job dirty the moment a
+  planned run was resumed, before anything was actually touched — resuming an already-saved run
+  isn't itself an unsaved change. The guard now only fires once you actually edit a field, same
+  as it always has for a brand-new test.
 - **Filament list-view action buttons (Select/Edit/Clone/PA/Iron/trash) are now sized to match
   card view.** List rows had no button-size override, so they silently fell back to the larger
   base button size instead of the compact sizing card view already used — same buttons, same
