@@ -1,17 +1,21 @@
 # OrcaSlicer method provenance
 
-PA-Helper reproduces the geometry of OrcaSlicer's **PA Pattern** calibration so the picker matches
-what physically prints. We do **not** copy OrcaSlicer code; `js/pattern.js` is an original
-re-implementation of the *method*. OrcaSlicer and PA-Helper are both **AGPL-3.0**, so this is
-license-compatible; attribution is preserved here and in `js/pattern.js`.
+PA-Helper reproduces the behavior of OrcaSlicer's **PA Pattern** and **PA Tower** calibrations so
+what we show the user matches what physically prints. We do **not** copy OrcaSlicer code;
+`js/pattern.js` (Pattern) and the Tower recommendation/read-back logic are original
+re-implementations of the *method*. OrcaSlicer and PA-Helper are both **AGPL-3.0**, so this is
+license-compatible; attribution is preserved here and in the relevant source files.
 
 This file is the **checklist for the monthly upstream tripwire**: each month, diff the OrcaSlicer
 `main` **and** `dev` branches for changes to the items below. Any change here means our replica may
 need updating.
 
-Upstream source: `SoftFever/OrcaSlicer` — `src/libslic3r/calib.cpp` and `src/libslic3r/calib.hpp`.
-Last reviewed against `main`: **2026-07-14**. Geometry has been stable since the pattern was
-introduced (2023-07-22, commit `777c7c68f9`).
+Upstream source: `SoftFever/OrcaSlicer` (mirrored at `OrcaSlicer/OrcaSlicer`) —
+`src/libslic3r/calib.cpp`/`.hpp` (Pattern), `src/slic3r/GUI/Plater.cpp`, `src/libslic3r/GCode.cpp`,
+`src/libslic3r/GCodeWriter.cpp`, and `src/slic3r/GUI/calib_dlg.cpp` (Tower).
+Pattern last reviewed against `main`: **2026-07-14** — geometry has been stable since the pattern
+was introduced (2023-07-22, commit `777c7c68f9`). Tower last reviewed against `main`:
+**2026-07-17**.
 
 ## Derived line width (`src/libslic3r/Flow.cpp`)
 
@@ -91,3 +95,67 @@ Monthly tripwire: confirm `auto_extrusion_width` still returns `1.125×` for the
     **printed flow/accel/PA labels** (which we render), not by a synthetic plate map. Imported g-code is
     fine — it carries the real positions. ⚠ Monthly tripwire: if `_calib_pa_pattern` stops using
     `arrangement::arrange`, or the `test_idx` speed/accel decomposition flips, revisit this.
+
+## Tower method (`CalibMode::Calib_PA_Tower`)
+
+Unlike Pattern, Tower has **no bespoke geometry-generating class** — `calib.hpp` only declares
+`CalibPressureAdvanceLine` and `CalibPressureAdvancePattern`. Verified by reading
+`Plater::_calib_pa_tower()` (`src/slic3r/GUI/Plater.cpp`, ~line 13823) and the `Calib_PA_Tower`
+case in `GCode::change_layer` (`src/libslic3r/GCode.cpp`, ~line 5467) verbatim, in full, not just a
+summary.
+
+**What prints.** A single fixed mesh, `resources/calib/pressure_advance/tower_with_seam.drc`
+(Draco-compressed geometry, no embedded config — confirmed via `src/libslic3r/Format/DRC.cpp`),
+cropped with `cut_horizontal(0, 0, new_height, KeepLower)` to:
+
+`tower_height_mm = ceil((end − start) / step) + 1`
+
+Fixed object/print overrides alongside the crop: 2 perimeters (`wall_loops`), 0% infill, no
+top/bottom shells, seam forced to rear, brim type "ears," `max_volumetric_extrusion_rate_slope`
+disabled, `slow_down_layer_time` forced to `1.0`. One tower, one object — not a matrix, not
+multiple copies, not multiple plates.
+
+**How PA actually ramps.** There is no per-height config override (no `layer_config_ranges`
+usage — checked directly) and nothing is drawn on the model (no digit/number glyphs, unlike
+Pattern/Line). Every layer change, `GCode::change_layer` emits a **live firmware PA command**,
+recomputed from the current print height:
+
+```cpp
+case CalibMode::Calib_PA_Tower:
+    gcode += writer().set_pressure_advance(print.calib_params().start
+             + static_cast<int>(print_z) * print.calib_params().step);
+    break;
+```
+
+`GCodeWriter::set_pressure_advance()` (`src/libslic3r/GCodeWriter.cpp`, ~line 419) then flavors
+this per firmware: `M900 K<pa> L1000 M10` (Bambu), `SET_PRESSURE_ADVANCE ADVANCE=<pa>` (Klipper),
+`M572 D0 S<pa>` (RepRapFirmware), `M233 X<pa> Y<pa>` (Repetier), or `M900 K<pa>` (default/Marlin).
+The `static_cast<int>(print_z)` truncation means **each band is always exactly 1 whole mm**,
+unconditionally, regardless of the numeric PA step chosen — a coarser step shortens the tower for
+a given start/end range, it does not thicken the bands. The identical per-layer-gcode-by-mode
+pattern is used for Orca's other calibration towers (Temp, VFA, Volumetric Speed, Retraction) —
+this is the general tower mechanism, not something PA-specific.
+
+**Formula for reading a result:** `PA = start + step × measured_height_mm`, where
+`measured_height_mm` must be a whole number in `[0, tower_height_mm − 1]`. There is no printed
+scale or label on the tower — the user measures physically (ruler/calipers) and finds the
+best-quality transition by eye. The OrcaSlicer wiki's worked example (`0 + 0.002 × 8 = 0.016`)
+matches this formula exactly.
+
+**Orca's own dialog defaults** (`PA_Calibration_Dlg::reset_params()`,
+`src/slic3r/GUI/calib_dlg.cpp`) — direct-drive: start `0.0`, end `0.1`, step `0.002`; Bowden: end
+`1.0`, step `0.02` (Pattern's own Bowden step is `0.05`, for comparison). **PA-Helper does not
+reuse these flat defaults** — the existing per-material `paRanges` table (`js/presets.js`) already
+gives better-tuned `[start, end, step]` triples (already bowden-scaled via `bowdenScale`), and
+Tower's recommendation reuses that table directly rather than introducing Tower-specific numbers.
+
+**This must be visible to the user, not just documented here.** Anyone who's read the OrcaSlicer
+wiki or used Orca's own Tower dialog will expect the stock `0 / 0.1 / 0.002` (direct-drive)
+defaults; PA-Helper's per-material range will usually differ (e.g. PLA comes out `0.010 / 0.070 /
+0.005`). The Tower UI needs its own explicit callout — not just a tooltip buried elsewhere — that
+these are PA-Helper's own recommended range, not Orca's stock default, so a user comparing against
+the wiki doesn't think something's wrong. Carry this into the mockup.
+
+⚠ **Monthly tripwire:** if `_calib_pa_tower()` starts touching `layer_config_ranges` or per-object
+config instead of a fixed mesh + live per-layer firmware command, or if `GCode::change_layer`'s
+`Calib_PA_Tower` case changes its formula or truncation, this section is stale.
