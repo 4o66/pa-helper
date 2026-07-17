@@ -438,8 +438,9 @@ ok($("singlePaOut").querySelector("label.blocklabel") !== null, "single PA shows
   const label = $("singlePaOut").querySelector("label.blocklabel");
   const singleCopyBtn = label ? label.querySelector(".copybtn") : null;
   ok(!!singleCopyBtn, "single PA copy-to-clipboard icon sits in the label, matching the Adaptive PA model block's format");
-  const valBox = $("singlePaOut").querySelector(".out b");
-  ok(!!valBox, "single PA value sits in its own boxed line below the label");
+  ok(!$("singlePaOut").querySelector(".out"), "single PA value isn't boxed — plain text like the Adaptive PA model block");
+  const valBox = $("singlePaOut").querySelector(".resultblock b");
+  ok(!!valBox, "single PA value sits on its own line below the label, unboxed");
   ok(!!singleCopyBtn && valBox && singleCopyBtn.getAttribute("data-copy") === valBox.textContent, "copy icon copies the exact value shown");
   const hint = $("singlePaOut").querySelector("p.hint");
   ok(!!hint && /fit at mid-point/.test(hint.textContent), "fit-note sits on its own line below the value");
@@ -723,11 +724,10 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
   ok(/Printer/.test(body) && /Filament/.test(body) && /Test settings/.test(body) && /Results/.test(body), "modal shows printer, filament, settings and results sections");
   ok(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(body), "a completed run's Date field renders in the default YYYY-MM-DD HH:MM (24h, absolute) format");
   // Single PA carries over into the saved-results view the same way it looked live: a small
-  // title (with its copy icon) outside the box, the value on its own line below, and the
-  // fit-note on its own line below that; the box isn't double-wrapped in a second .out div.
+  // title (with its copy icon) outside the box, the value unboxed on its own line below (same
+  // plain-text presentation as the Adaptive PA model block), and the fit-note below that.
   ok(/Single PA/.test(body), "saved-results view shows the Single PA value");
-  ok($("resultsBodyView").querySelectorAll(".out .out").length === 0, "Single PA box isn't nested inside a second .out wrapper in the saved-results view");
-  ok($("resultsBodyView").querySelector("label.blocklabel + div.out b") !== null, "saved-results view: Single PA title sits right before its boxed value, same as live");
+  ok($("resultsBodyView").querySelector("label.blocklabel + div.resultblock b") !== null, "saved-results view: Single PA title sits right before its unboxed value, same as live");
   ok($("resultsBodyView").querySelector("label.blocklabel .copybtn") !== null, "saved-results view: Single PA copy icon sits in the label, not next to the value");
   ok($("resultsBodyView").querySelector("p.hint span.help") !== null, "saved-results view: Single PA fit-note keeps its tooltip");
   {

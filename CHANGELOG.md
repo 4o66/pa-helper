@@ -15,9 +15,11 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 ### Changed
 - **A run now stores the actual result — not a rendering of it.** `singlePaText` (a baked HTML
   snapshot of the Single PA line) is replaced with `singlePaValue`/`singlePaMedian`, the two real
-  numbers; the label/box/tooltip markup is built from those at render time, live and in the saved
+  numbers; the label/value/tooltip markup is built from those at render time, live and in the saved
   view, so a saved run always displays with the current format instead of freezing whatever HTML
-  existed the moment it was saved. `analysis` (fit coefficients) is dropped from storage entirely —
+  existed the moment it was saved. The value itself now sits unboxed on its own line — plain text,
+  same presentation as the Adaptive PA model block below it, not a highlighted box.
+  `analysis` (fit coefficients) is dropped from storage entirely —
   it was write-only (never read back anywhere), and the saved view already recomputes its own fit
   fresh from `results` when Plot & Analysis is opened, so persisting a stale copy served no purpose.
   `formatVersion` bumps to 2.1: `analysis`/`singlePaText` are stripped from every run on load

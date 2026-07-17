@@ -1733,7 +1733,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   function renderSinglePaHTML(singlePa) {
     if (!singlePa || singlePa.value == null) return "";
     const label = singlePa.median != null ? "Single PA (non-adaptive)" : "Set this PA value in Orca";
-    let html = '<label class="blocklabel">' + label + copyIcon(singlePa.value) + '</label><div class="out"><b>' + singlePa.value + '</b></div>';
+    let html = '<label class="blocklabel">' + label + copyIcon(singlePa.value) + '</label><div class="resultblock"><b>' + singlePa.value + '</b></div>';
     if (singlePa.median != null) html += '<p class="hint">(fit at mid-point; median entry = ' + singlePa.median + ') <span class="help" title="' + HELP_SINGLE_PA + '">?</span></p>';
     return html;
   }
