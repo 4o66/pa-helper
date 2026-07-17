@@ -433,6 +433,13 @@ click("exportBtnModel");
 ok($("modelOut").value.split("\n").length === 15, "model has 15 lines");
 ok($("modelBlock").hidden === false, "Adaptive-PA model block appears once Generate has produced output");
 ok(/Single PA/.test($("singlePaOut").innerHTML), "single PA produced");
+ok($("singlePaOut").querySelector("label.blocklabel") !== null, "single PA shows a small title, matching the Adaptive PA model block's style");
+{
+  const singleCopyBtn = $("singlePaOut").querySelector(".copybtn");
+  ok(!!singleCopyBtn, "single PA value has its own copy-to-clipboard icon");
+  ok(!!singleCopyBtn && singleCopyBtn.previousElementSibling && singleCopyBtn.previousElementSibling.tagName === "B", "copy icon sits immediately after the value element (not after the title)");
+  ok(singleCopyBtn.getAttribute("data-copy") === singleCopyBtn.previousElementSibling.textContent, "copy icon copies the exact value shown");
+}
 
 // save completed run
 click("saveRunBtn");
@@ -678,6 +685,11 @@ ok(d.filaments.some(f => (f.color || "").includes("(copy)")), "filament clone ma
   const body = $("resultsBodyView").textContent;
   ok(/Printer/.test(body) && /Filament/.test(body) && /Test settings/.test(body) && /Results/.test(body), "modal shows printer, filament, settings and results sections");
   ok(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(body), "a completed run's Date field renders in the default YYYY-MM-DD HH:MM (24h, absolute) format");
+  // Single PA carries over into the saved-results view the same way it looked live: a small
+  // title outside the box, and the box isn't double-wrapped in a second .out div.
+  ok(/Single PA/.test(body), "saved-results view shows the Single PA value");
+  ok($("resultsBodyView").querySelectorAll(".out .out").length === 0, "Single PA box isn't nested inside a second .out wrapper in the saved-results view");
+  ok($("resultsBodyView").querySelector("label.blocklabel + div.out b") !== null, "saved-results view: Single PA title sits right before its boxed value, same as live");
   // title bar: no "Results —" prefix, plus a colour swatch
   ok($("resultsTitle").textContent.length > 0 && !/Results\s*[—-]/.test($("resultsTitle").textContent), "modal title drops the 'Results —' prefix (just the filament)");
   ok(!!$("resultsSwatch"), "modal title bar has a colour swatch");

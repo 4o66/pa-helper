@@ -76,6 +76,12 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   flag (previously only PA tracked this) and the two share one guard dialog, worded for whichever
   modal is open.
 
+### Changed
+- **The "Single PA (non-adaptive)" value now matches the Adaptive PA model block's presentation**:
+  a small title above a boxed value, with a copy-to-clipboard icon immediately after the value
+  itself (previously the label, value, and fit note were all just plain inline text with no way
+  to copy it). Applies both live in the PA Test modal and in the saved-results view.
+
 ### Fixed
 - **Filament list-view action buttons (Select/Edit/Clone/PA/Iron/trash) are now sized to match
   card view.** List rows had no button-size override, so they silently fell back to the larger

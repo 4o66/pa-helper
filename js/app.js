@@ -1614,10 +1614,16 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
   // The Adaptive-PA model box (label + textarea + copy) only appears once there's something to show,
   // so an un-generated Export section is just the Generate button.
   function syncModelBlock() { const mb = $("modelBlock"); if (mb) mb.hidden = !($("modelOut").value || "").trim(); }
+  // Same presentation as the Adaptive PA model block: a small title, then a boxed value with a
+  // copy-to-clipboard icon immediately after it (and any extra context, like the basic-mode unit
+  // hint or the advanced-mode fit note, trailing after that).
+  const copyIcon = (val) => ` <button class="copybtn" data-copy="${val}" title="Copy to clipboard" aria-label="Copy">⧉</button>`;
   function exportModel() {
     if (isBasic()) {
       const pa = num($("basicBestPA").value);
-      $("singlePaOut").innerHTML = pa != null ? 'Set this PA value in Orca: <b>' + pa + '</b>' : "Enter your best PA above.";
+      $("singlePaOut").innerHTML = pa != null
+        ? '<label class="blocklabel">Set this PA value in Orca</label><div class="out"><b>' + pa + '</b>' + copyIcon(pa) + '</div>'
+        : "Enter your best PA above.";
       $("modelOut").value = ""; syncModelBlock(); return;
     }
     const rows = readResults().filter(r => r.x != null && r.bestPA != null).sort((a, b) => (a.x - b.x) || ((a.accel || 0) - (b.accel || 0)));
@@ -1627,7 +1633,8 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const ys = rows.map(r => r.bestPA).slice().sort((a, b) => a - b), median = ys[Math.floor(ys.length / 2)];
     let single = median;
     if (lastFit) { const midX = (Math.min(...rows.map(r => r.x)) + Math.max(...rows.map(r => r.x))) / 2; const accs = rows.map(r => r.accel).filter(a => a != null).sort((a, b) => a - b); const midA = accs.length ? accs[Math.floor(accs.length / 2)] : 0; single = lastFit.type === "mlr" ? lastFit.predict(midX, midA) : lastFit.predict(midX); }
-    $("singlePaOut").innerHTML = 'Single PA (non-adaptive): <b>' + single.toFixed(4) + '</b> <span class="muted">(fit at mid-point; median entry = ' + median + ')</span>';
+    const singleStr = single.toFixed(4);
+    $("singlePaOut").innerHTML = '<label class="blocklabel">Single PA (non-adaptive)</label><div class="out"><b>' + singleStr + '</b>' + copyIcon(singleStr) + ' <span class="muted">(fit at mid-point; median entry = ' + median + ')</span></div>';
   }
 
   // ---- run lifecycle ----
@@ -1754,7 +1761,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     ];
     let orca = "";
     if (run.modelText) orca += `<label class="blocklabel">Adaptive PA model — paste into Orca${copy(run.modelText)}</label><pre class="resultblock">${esc(run.modelText)}</pre>`;
-    if (run.singlePaText) orca += `<div class="out">${run.singlePaText}</div>`;
+    if (run.singlePaText) orca += run.singlePaText;   // already carries its own label + boxed value (see exportModel)
     if (!orca) orca = '<p class="hint">No exported values were saved for this run.</p>';
     // Printer / Filament / Test settings collapse (collapsed by default); Results stays open/static.
     const sec = (title, body) => `<details class="rsec"><summary>${esc(title)}</summary>${body}</details>`;
@@ -2538,6 +2545,11 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     $("analyzeBtn").addEventListener("click", analyze);
     $("exportBtnModel").addEventListener("click", exportModel);
     $("copyModelBtn").addEventListener("click", () => { navigator.clipboard && navigator.clipboard.writeText($("modelOut").value); });
+    $("singlePaOut").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-copy]"); if (!b) return;
+      if (navigator.clipboard) navigator.clipboard.writeText(b.getAttribute("data-copy"));
+      b.classList.add("copied"); setTimeout(() => b.classList.remove("copied"), 1300);
+    });
     $("saveRunBtn").addEventListener("click", saveRun);
 
     $("patternOk").addEventListener("click", () => { if (patternTr && patternSel != null) { const inp = patternTr.querySelector('input[data-key="bestPA"]'); inp.value = patternSel; inp.dispatchEvent(new window.Event("input", { bubbles: true })); } $("patternModal").hidden = true; });
