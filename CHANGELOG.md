@@ -33,6 +33,10 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   field (now read-only for Tower) so saving/exporting reuse all the existing Single-PA plumbing
   unchanged. The height itself isn't a new stored field — like Single PA's own schema, it's derived
   back from the saved PA value and the run's start/step on resume, not persisted redundantly.
+  (The schematic's real footprint is ~70mm wide but only 13–51mm tall across PA-Helper's actual
+  `paRanges`, which at true 1:1 scale read as a flat, squat wedge for short towers and crowded
+  overlapping tick labels — fixed with a fixed real-pixel scale plus a height-only visual
+  exaggeration, so every tower reads as tower-shaped and labels never balloon or overlap.)
 
 ## [0.3.1] "Open Sesame" — 2026-07-17
 PA and Ironing tests move out of the nav bar and into modals triggered straight from a

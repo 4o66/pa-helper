@@ -1103,21 +1103,34 @@
     [-34.551, -34.8], [-0.083, -34.8], [34.717, 0], [-0.083, 34.8], [-34.551, 34.8]
   ];
   // True isometric projection (verticals stay vertical) — real 3D→2D math, not a hand-drawn trick.
-  function towerIso(u, v, z) { return [(u - v) * Math.cos(Math.PI / 6), (u + v) * Math.sin(Math.PI / 6) - z]; }
-  // Shared projection + viewBox-fit math for a given tower height (in whole-mm bands), used by
-  // both the one-time schematic build and the per-edit highlight-band update so they always
-  // agree on where everything landed.
+  // Two constants tune how the real geometry reads as a schematic rather than a literal scale
+  // model: the footprint is genuinely ~70mm wide but only 13–51mm tall across PA-Helper's actual
+  // paRanges, which projects as a short, flat wedge at true 1:1 proportions — legible for a tall
+  // DDE-style tower but not for a short one. TOWER_Z_STRETCH exaggerates height only (the
+  // footprint's own width is never touched) so every tower still reads as tower-shaped; taller
+  // settings still render visibly taller than shorter ones, just not at literal real-world scale.
+  // TOWER_PX_PER_UNIT is a FIXED px-per-unit scale applied once, here, rather than re-fit to a
+  // target display size per render — re-fitting per render (an earlier version of this code) let
+  // a short tower's small bounding box get blown back up to the same display height as a tall
+  // one, which also blew up the "11px" tick-label text by the same factor, badly overlapping it.
+  // A fixed scale means text always renders at its literal size; only the tower's own on-screen
+  // height still legitimately varies with band count.
+  const TOWER_Z_STRETCH = 4, TOWER_PX_PER_UNIT = 1.2;
+  function towerIso(u, v, z) { return [(u - v) * Math.cos(Math.PI / 6), (u + v) * Math.sin(Math.PI / 6) - z * TOWER_Z_STRETCH]; }
+  // Shared projection + fixed-scale layout math for a given tower height (in whole-mm bands),
+  // used by both the one-time schematic build and the per-edit highlight-band update so they
+  // always agree on where everything landed.
   function towerGeom(count) {
-    const fp = TOWER_FOOTPRINT;
+    const fp = TOWER_FOOTPRINT, s = TOWER_PX_PER_UNIT;
     const top = fp.map(([u, v]) => towerIso(u, v, count));
     const bot = fp.map(([u, v]) => towerIso(u, v, 0));
     const all = top.concat(bot);
     const minX = Math.min(...all.map(p => p[0])), maxX = Math.max(...all.map(p => p[0]));
     const minY = Math.min(...all.map(p => p[1])), maxY = Math.max(...all.map(p => p[1]));
-    const pad = 14, tickPad = 22;
-    const w = maxX - minX + pad * 2 + tickPad, h = maxY - minY + pad * 2;
+    const pad = 14, tickPad = 24;
+    const w = (maxX - minX + pad * 2 + tickPad) * s, h = (maxY - minY + pad * 2) * s;
     const ox = -minX + pad + tickPad, oy = -minY + pad;
-    const tx = (p) => p[0] + ox, ty = (p) => p[1] + oy;
+    const tx = (p) => (p[0] + ox) * s, ty = (p) => (p[1] + oy) * s;
     const pt = (p) => `${tx(p).toFixed(2)},${ty(p).toFixed(2)}`;
     return { fp, top, bot, w, h, tx, ty, pt };
   }
@@ -1134,13 +1147,19 @@
       bands += `<polyline points="${pt(p2)} ${pt(p3)} ${pt(p4)}" style="fill:none;stroke:var(--line);stroke-width:${i % 4 === 0 ? 1 : .5}"></polyline>`;
       if (i % 4 === 0 || count <= 8) ticks += `<text x="${(tx(p4) - 6).toFixed(2)}" y="${(ty(p4) + 3).toFixed(2)}" text-anchor="end" style="font-size:11px;fill:var(--muted)">${i}</text>`;
     }
-    ticks += `<text x="${(tx(top[4]) - 6).toFixed(2)}" y="${(ty(top[4]) + 3).toFixed(2)}" text-anchor="end" style="font-size:11px;fill:var(--muted)">${count}</text>`;
-    // Fixed display height, proportional width — a short/coarse-step tower reads as short and
-    // squat, a tall/fine-step one as tall and narrow, matching how the real print would look.
-    const displayH = 260, scale = displayH / g.h;
+    // Skip the top-of-tower label when it'd land right on top of the last regular tick (e.g.
+    // count=13 puts "12" and "13" within a single mm of each other) — the roofline itself already
+    // marks the top, so the label would only crowd, not add information.
+    const lastLabeled = count <= 8 ? count - 1 : Math.floor((count - 1) / 4) * 4;
+    if (count - lastLabeled >= 2) {
+      ticks += `<text x="${(tx(top[4]) - 6).toFixed(2)}" y="${(ty(top[4]) + 3).toFixed(2)}" text-anchor="end" style="font-size:11px;fill:var(--muted)">${count}</text>`;
+    }
+    // viewBox and width/height attributes use the SAME numbers (1 user unit = 1 real px) — no
+    // extra viewBox-to-viewport scale, so text stays true size; only the drawing itself (already
+    // fixed-scale from towerGeom) gets taller for a taller tower, shorter for a shorter one.
     svg.setAttribute("viewBox", `0 0 ${g.w.toFixed(0)} ${g.h.toFixed(0)}`);
-    svg.setAttribute("width", (g.w * scale).toFixed(0));
-    svg.setAttribute("height", displayH);
+    svg.setAttribute("width", g.w.toFixed(0));
+    svg.setAttribute("height", g.h.toFixed(0));
     svg.innerHTML =
       `<g>${ticks}</g>
        <polygon points="${silhouette}" style="fill:var(--panel2);stroke:var(--ink);stroke-width:.9"></polygon>
