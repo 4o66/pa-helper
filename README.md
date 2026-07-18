@@ -37,9 +37,14 @@ icon: theme, and date/time display preferences for run history):
    "matching" is judged — this printer + nozzle, this printer any nozzle, or all printers.
 3. **PA Test** — click a filament's PA button to open it as a modal: set the per-run
    **nozzle** (swaps often, so it's per run), then choose **Advanced** (adaptive PA across a
-   flow × accel grid — recommended) or **Basic** (a single PA value — currently disabled
-   pending its own rework; see Roadmap). It recommends a PA range + test points (per
-   material and drive, bowden scaled up), or you can **provide the settings you already
+   flow × accel grid — recommended) or **Basic** (a single PA value, via one of three
+   methods — **Tower**, **Pattern**, or **Line**). Each Basic method gets its own recommend
+   card (material-specific PA range, flagged when it differs from Orca's own stock dialog
+   default) and an inline picker that mirrors the real OrcaSlicer geometry exactly — a
+   traced isometric tower, the chevron pattern, or stacked speed-transition lines with their
+   printed PA labels — so you click the cleanest result straight into Best PA, no measuring
+   ambiguity or guessing which one's which. Advanced recommends a PA range + test points
+   (per material and drive, bowden scaled up), or you can **provide the settings you already
    ran**. Enter results in flow (mm³/s) *or* speed (mm/s — what you type into Orca;
    converted via layer height × line width). It plots, fits a trend (two-variable when
    multiple accels are present), flags outliers, and exports the Orca adaptive-PA model
@@ -103,6 +108,13 @@ Shipped, in the order they were completed:
    Analysis sections, Results moved to the top, two-row printer/nozzle + filament titles matching
    the nav tabs. A run now stores the actual Single PA result (raw values) instead of a baked
    rendering of it, and dead scratch-math fields were dropped from storage entirely.
+7. **Basic mode complete — Tower, Pattern, and Line.** Each method gets a recommend card (the
+   material-specific PA range, flagged as PA-Helper's own vs. Orca's stock dialog default) and an
+   inline picker matching the real OrcaSlicer print geometry exactly: a schematic isometric tower
+   traced from a real Orca export (not a guessed box) with a measured-height input and shown-work
+   `PA = start + step × height`; the real chevron pattern; and stacked speed-transition test lines
+   with the real printed every-other-row PA labels. Click the cleanest result straight into Best
+   PA — no OCR, no guessing which one's which.
 
 ## Roadmap
 Ordered by priority.
@@ -113,45 +125,37 @@ Ordered by priority.
    value. These should be created and labelled as **tuning runs** (distinct from a fresh test), so the
    in-progress/history list shows they descend from an earlier run. Pairs with the range now shown on
    the in-progress cards and the range-edge ⚠ flag (both already done).
-2. **Basic PA mode rework.** Basic is currently disabled ("Basic — Coming Soon™" in the Mode
-   dropdown) pending this work — the old single-accel/speed methods only ever captured one
-   best-PA value with no visual picker. Before rebuilding it, **search first** for documentation
-   of people actually running basic single-value PA pattern/line calibrations (how they do it,
-   whether they use Orca's Line method's `generate_test` at all), so we match real practice
-   rather than guessing. Advanced (adaptive) already has the full pattern picker. Includes the
-   parked **Basic PA Tower** design: start at 0, a measured-height input, and shown-work
-   `PA = Start + Step × height_mm` (no matrix).
-3. **`paRanges` are heuristic, not sourced.** The per-material PA sweep ranges in `js/presets.js`
+2. **`paRanges` are heuristic, not sourced.** The per-material PA sweep ranges in `js/presets.js`
    (`paRanges`, e.g. PLA `0.010–0.070`) were hand-picked to bracket typical direct-drive optima, not
    taken from a dataset. Real run data (e.g. the PLA run: true optima ~0.045–0.065) confirms they're
    roughly right but should eventually be sourced from OrcaSlicer's own filament-profile default
    `pressure_advance` values and/or the Phase-B community dataset, then bracketed around those.
-4. **g-code ingest — refine.** First pass done: "Settings I already printed" has an Import .gcode
+3. **g-code ingest — refine.** First pass done: "Settings I already printed" has an Import .gcode
    button that best-effort-parses PA range, accelerations and speeds from the file's
    commands (heuristic; not a stable Orca format — needs tuning against real files).
-5. **Custom line-width override.** Line width is currently locked to Orca's derived value
+4. **Custom line-width override.** Line width is currently locked to Orca's derived value
    (`auto_extrusion_width` = 1.125× nozzle) because it isn't a PA-test input. A user whose Orca
    profile overrides `line_width` off auto prints at a different width, so a later "advanced override"
    toggle could let them enter their profile's real line width (feeds the speed↔flow conversion and
    generated geometry; ignored on imported g-code, where true flow is read from the extrusion).
-6. **Normal vs Expert modes.** *Normal* walks you through each step — where to click in
+5. **Normal vs Expert modes.** *Normal* walks you through each step — where to click in
    Orca, what to enter, in order. *Expert* shows minimal guidance with the advanced
    options tucked behind dropdowns.
-7. **Phase B backend** — PocketBase (self-hosted; MIT, so AGPLv3-compatible) for
+6. **Phase B backend** — PocketBase (self-hosted; MIT, so AGPLv3-compatible) for
    accounts via social OAuth and an opt-in, anonymized community dataset keyed on the
    hardware profile ("others with this extruder+hotend+filament landed near PA X").
    Community profile keys include toolhead / extruder (+drive) / hotend / nozzle.
-8. **Local ↔ server bridge (Phase B).** The hosted version's front page should import
+7. **Local ↔ server bridge (Phase B).** The hosted version's front page should import
    from a local `pa_data.json` and export back out, so offline/local runs move cleanly in
    and out of an account. (The community opt-in prompt also lives at first login, not before.)
-9. **Community-driven defaults (Phase B).** Each saved printer already carries a random
+8. **Community-driven defaults (Phase B).** Each saved printer already carries a random
    per-*printer* GUID (never per-user). With opt-in on first login, printer configs would
    seed a public dataset so the most common real-world combo per maker/model becomes the
    default for new users. (The offline app just stores the GUID for now.)
-10. **Phase C — full guided calibration.** Grow from PA-only into the whole
-    filament-calibration sequence, in Orca's menu order (temp tower → flow rate →
-    pressure advance → retraction → max volumetric speed → …), proposing values from
-    your history where available. PA is just the first module.
+9. **Phase C — full guided calibration.** Grow from PA-only into the whole
+   filament-calibration sequence, in Orca's menu order (temp tower → flow rate →
+   pressure advance → retraction → max volumetric speed → …), proposing values from
+   your history where available. PA is just the first module.
 
 ## Contributing & reporting bugs
 This is an early **testing preview**, so feedback is exactly what it needs right now.
