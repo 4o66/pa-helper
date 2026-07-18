@@ -342,7 +342,7 @@ ok($("gatedBody").hidden === true, "editing max flow hides the form again until 
   const lineOpt = [...$("basicMethod").options].find(o => o.value === "line");
   const patternOpt = [...$("basicMethod").options].find(o => o.value === "pattern");
   ok(!!lineOpt && lineOpt.disabled, "basic Line method is still disabled (Coming Soon)");
-  ok(!!patternOpt && patternOpt.disabled, "basic Pattern method is still disabled (Coming Soon)");
+  ok(!!patternOpt && !patternOpt.disabled, "basic Pattern method is selectable (implemented)");
 }
 {
   // Basic — Tower recommend card
@@ -379,6 +379,47 @@ ok($("gatedBody").hidden === true, "editing max flow hides the form again until 
   $("testMode").value = "advanced"; $("testMode").dispatchEvent(new window.Event("change", { bubbles: true }));
   ok($("basicMethod").disabled === true, "method control re-locked in advanced");
 }
+{
+  // Basic — Pattern recommend card + inline picker
+  $("testMode").value = "basic"; $("testMode").dispatchEvent(new window.Event("change", { bubbles: true }));
+  $("basicMethod").value = "pattern"; $("basicMethod").dispatchEvent(new window.Event("change", { bubbles: true }));
+  click("recommendBtn");
+  ok($("patternRecommendCard").hidden === false, "pattern recommend card shows for basic + pattern");
+  ok($("recommendOut").hidden === true, "generic recommend text is hidden for pattern (replaced by the card)");
+  ok($("towerRecommendCard").hidden === true, "tower's own recommend card is hidden while pattern is active");
+  ok(/Non-standard range/.test($("patternRecommendCard").textContent), "pattern card flags its range as non-standard");
+  ok(/blank/.test($("patternRecommendCard").textContent), "pattern card explains leaving Orca's accel/speed fields blank");
+  ok($("patternMat").textContent === "PLA", "pattern card shows the selected filament's material");
+  const s = parseFloat($("patternStart").textContent), e = parseFloat($("patternEnd").textContent), st = parseFloat($("patternStep").textContent);
+  ok(s === 0.01 && e === 0.07 && st === 0.005, "pattern card start/end/step come from PLA's paRanges entry (same table as Tower)");
+  // inline picker — no separate modal, no flow/accel/speed axis, click commits immediately
+  ok($("patternResultCard").hidden === false, "pattern result (picker) card shows once a pattern recommendation exists");
+  ok($("towerResultCard").hidden === true, "tower's own result card is hidden while pattern is active");
+  ok($("basicBestPA").readOnly === true, "best-PA field is read-only for pattern (picked, not typed)");
+  ok(/No line selected yet/.test($("patternResultSel").textContent), "no chevron selected initially");
+  const lines = [...$("patternResultSvg").querySelectorAll(".paline")];
+  const expectCount = Math.round((e - s) / st) + 1;
+  ok(lines.length === expectCount, "one clickable chevron per PA value in the range");
+  const target = lines[2];
+  target.dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(target.classList.contains("sel"), "clicked chevron gets the selected class");
+  ok(lines.filter(g => g.classList.contains("sel")).length === 1, "only one chevron selected at a time");
+  ok(Math.abs(parseFloat($("basicBestPA").value) - parseFloat(target.dataset.pa)) < 1e-4, "clicking a chevron writes its PA straight into Best PA");
+  ok($("patternResultSel").textContent === "Selected PA: " + target.dataset.pa, "selection text shows the picked PA");
+  // resume: the saved run's chevron should be pre-selected via closest-match (not exact-equality,
+  // since the stored value is rounded to 4 decimals and the picker recomputes to 5 — see
+  // renderPatternResultViz's comment)
+  window.PA_test.savePlanned();
+  ok(readData().runs.some(r => r.status === "planned" && r.mode === "basic" && r.basicMethod === "pattern"), "basic pattern run saved as an in-flight (planned) run");
+  const card = [...$("filamentList").querySelectorAll(".card,.frow")].find(c => c.textContent.includes("PLA"));
+  const resumeBtn = [...card.querySelectorAll(".actions button")].find(b => /^PA/.test(b.textContent));
+  resumeBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok($("patternResultCard").hidden === false, "resuming a saved pattern run reopens the inline picker");
+  const resumedSel = [...$("patternResultSvg").querySelectorAll(".paline.sel")];
+  ok(resumedSel.length === 1 && Math.abs(parseFloat(resumedSel[0].dataset.pa) - parseFloat(target.dataset.pa)) < 1e-4, "resuming re-selects the previously saved chevron");
+  $("abandonRunBtn").dispatchEvent(new window.Event("click", { bubbles: true }));
+  $("testMode").value = "advanced"; $("testMode").dispatchEvent(new window.Event("change", { bubbles: true }));   // restore state for later tests
+}
 // regression: applyMode() used to unconditionally set #basicMethod.disabled = false whenever the
 // Basic branch ran — openRun() calls setTestFormLocked(true) for a resumed in-flight ("planned")
 // run and THEN calls applyMode() to restore its mode, so the lock got stomped immediately for any
@@ -386,6 +427,7 @@ ok($("gatedBody").hidden === true, "editing max flow hides the form again until 
 // applyMode()'s advanced branch always disabled the dropdown regardless of lock state).
 {
   $("testMode").value = "basic"; $("testMode").dispatchEvent(new window.Event("change", { bubbles: true }));
+  $("basicMethod").value = "tower"; $("basicMethod").dispatchEvent(new window.Event("change", { bubbles: true }));   // explicit — lastBasicMethod may now be "pattern" from the block above
   click("recommendBtn");
   window.PA_test.savePlanned();
   ok(readData().runs.some(r => r.status === "planned" && r.mode === "basic" && r.basicMethod === "tower"), "basic tower run saved as an in-flight (planned) run");

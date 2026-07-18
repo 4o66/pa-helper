@@ -195,10 +195,10 @@
       <div class="subsec">
         <h3>Test type</h3>
         <div class="row">
-          <!-- Basic mode: Tower is implemented; Line and Pattern (basic) are still on the roadmap —
-               shown but unselectable so they're visible without being reachable. -->
+          <!-- Basic mode: Tower and Pattern are implemented; Line is still on the roadmap — shown
+               but unselectable so it's visible without being reachable. -->
           <label>Mode <select id="testMode"><option value="advanced">Advanced — adaptive PA (flow × accel)</option><option value="basic">Basic — single PA value</option></select></label>
-          <label>Method <select id="basicMethod"><option value="tower">Tower (recommended)</option><option value="line" disabled>Line — Coming Soon™</option><option value="pattern" disabled>Pattern — Coming Soon™</option></select></label>
+          <label>Method <select id="basicMethod"><option value="tower">Tower (recommended)</option><option value="line" disabled>Line — Coming Soon™</option><option value="pattern">Pattern</option></select></label>
         </div>
         <p class="hint" id="modeHint"></p>
       </div>
@@ -249,6 +249,21 @@
           </div>
           <p class="hint">Run Orca's Pressure Advance Tower test with that range. Prints as a
             <strong id="towerHeightOut"></strong> mm tower.</p>
+        </div>
+        <!-- Basic — Pattern recommend card. Reuses the .towercard/.towerwarn/.towerstats styling
+             (generic "Basic-method recommend card" look, not Tower-specific despite the name). -->
+        <div id="patternRecommendCard" class="towercard basic-only" hidden>
+          <p class="towerwarn"><strong>Non-standard range:</strong> this is PA-Helper's own recommended
+            range for <span id="patternMat"></span>, not OrcaSlicer's stock Pattern dialog default
+            (0 / 0.08 / 0.005 direct-drive). Expect it to differ from the wiki.</p>
+          <div class="towerstats">
+            <div class="towerstat"><span>Start</span><strong id="patternStart"></strong></div>
+            <div class="towerstat"><span>End</span><strong id="patternEnd"></strong></div>
+            <div class="towerstat"><span>Step</span><strong id="patternStep"></strong></div>
+          </div>
+          <p class="hint">Run Orca's Pressure Advance Pattern test with that range, leaving the
+            acceleration and speed fields blank — Orca then prints one block at your profile's own
+            settings (no override). Click the cleanest chevron below once it's printed.</p>
         </div>
         <pre id="recommendOut" class="out"></pre>
         <div class="row"><button id="loadPointsBtn" hidden>Load test points into the table ↓</button></div>
@@ -307,6 +322,17 @@
             aria-label="Schematic tower with the measured height band highlighted"></svg>
           <p class="towerformula" id="towerFormulaOut"></p>
         </div>
+      </div>
+
+      <!-- BASIC — Pattern: the picker inline, right here — not a second nested modal like Advanced's.
+           No flow/accel/speed axis to navigate (there's only one block), so no OK step either:
+           clicking a chevron commits it straight to Best PA, same immediacy as Tower's height input. -->
+      <div class="subsec basic-only" id="patternResultCard" hidden>
+        <h3>Pick the best line</h3>
+        <p class="hint">Click the line that printed cleanest (sharpest corners, no bulge/gap).</p>
+        <div id="patternResultSvgWrap"><svg id="patternResultSvg" xmlns="http://www.w3.org/2000/svg"
+          preserveAspectRatio="xMidYMid meet" role="img" aria-label="Pressure advance pattern — click the cleanest line"></svg></div>
+        <p id="patternResultSel" class="muted"></p>
       </div>
 
       <!-- BASIC result -->

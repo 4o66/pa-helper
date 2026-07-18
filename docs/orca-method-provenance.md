@@ -13,9 +13,10 @@ need updating.
 Upstream source: `SoftFever/OrcaSlicer` (mirrored at `OrcaSlicer/OrcaSlicer`) —
 `src/libslic3r/calib.cpp`/`.hpp` (Pattern), `src/slic3r/GUI/Plater.cpp`, `src/libslic3r/GCode.cpp`,
 `src/libslic3r/GCodeWriter.cpp`, and `src/slic3r/GUI/calib_dlg.cpp` (Tower).
-Pattern last reviewed against `main`: **2026-07-14** — geometry has been stable since the pattern
-was introduced (2023-07-22, commit `777c7c68f9`). Tower last reviewed against `main`:
-**2026-07-17**.
+Pattern last reviewed against `main`: **2026-07-18** — geometry has been stable since the pattern
+was introduced (2023-07-22, commit `777c7c68f9`); this pass added the Basic (single-block) mode
+section below, covering `calib_dlg.cpp`'s dialog behavior for blank accel/speed fields. Tower last
+reviewed against `main`: **2026-07-17**.
 
 ## Derived line width (`src/libslic3r/Flow.cpp`)
 
@@ -95,6 +96,24 @@ Monthly tripwire: confirm `auto_extrusion_width` still returns `1.125×` for the
     **printed flow/accel/PA labels** (which we render), not by a synthetic plate map. Imported g-code is
     fine — it carries the real positions. ⚠ Monthly tripwire: if `_calib_pa_pattern` stops using
     `arrangement::arrange`, or the `test_idx` speed/accel decomposition flips, revisit this.
+
+## Basic (single-block) Pattern — PA-Helper's own simplification
+
+Orca itself has **no distinct "Basic Pattern" mode** to mirror — verified in `calib_dlg.cpp`:
+the accel/speed list fields (`m_tiBMAccels`/`m_tiBMSpeeds`) are always shown and always enabled for
+Pattern (`reset_params()`, case 2), never gated behind an advanced/simple toggle. `on_start()` just
+does `ParseStringValues(m_tiBMAccels->GetTextCtrl()->GetValue().ToStdString(), m_params.accelerations)`
+— if the field was left blank, that's an empty vector, and `_calib_pa_pattern` applies no
+per-object `outer_wall_speed`/`outer_wall_acceleration` override at all in that case (the override
+only happens via the multi-object bin-packing path documented above, which needs a non-empty combo
+list). So "leave the fields blank" in real Orca means: print one block at whatever the active
+profile's speed/acceleration already are — nothing for Orca (or PA-Helper) to invent.
+
+PA-Helper's Basic — Pattern reuses `CalibPressureAdvancePattern`'s exact chevron/frame/PA-label
+geometry (`js/pattern.js: synthBlock()`) with `flow`/`accel` explicitly passed as null, which
+already skips drawing those two label rows entirely — matching what a real blank-fields print would
+actually show (PA labels only, no flow/accel numbers, since there's no meaningful override value to
+print). No new geometry, no invented single flow/accel point.
 
 ## Tower method (`CalibMode::Calib_PA_Tower`)
 

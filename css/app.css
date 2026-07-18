@@ -318,6 +318,11 @@ details.rsec>*:not(summary){padding:0 0 .7rem}
 .pmhead{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start}
 #patternSvgWrap{overflow:hidden;background:var(--bg);border:1px solid var(--line);border-radius:8px;margin:.5rem 0}
 #patternSvg{width:100%;height:auto;max-height:58vh;display:block}
+/* Basic — Pattern's inline picker: same .paline/.zig/.bgfill/.labtext/.tabfill classes as the
+   Advanced modal's picker (reused as-is), just a much smaller frame — there's only one block
+   here, not a grid to compare against a physical print, so the modal's large scale isn't needed. */
+#patternResultSvgWrap{overflow:hidden;background:var(--bg);border:1px solid var(--line);border-radius:8px;margin:.5rem 0;max-width:320px}
+#patternResultSvg{width:100%;height:auto;max-height:260px;display:block}
 .paline{cursor:pointer}
 .paline .zig{stroke:#808080;stroke-width:1.5;fill:none;vector-effect:non-scaling-stroke}
 .paline .hit{stroke:transparent;stroke-width:6;vector-effect:non-scaling-stroke}

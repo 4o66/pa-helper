@@ -13,8 +13,8 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 ## [Unreleased]
 
 ### Added
-- **Basic — Tower recommend screen.** Basic mode is selectable again (Tower method only; Line and
-  Pattern stay disabled, "Coming Soon™", pending their own visual pickers). Recommending settings
+- **Basic — Tower recommend screen.** Basic mode is selectable again (Tower method only at first;
+  Line stays disabled, "Coming Soon™", pending its own visual picker). Recommending settings
   for Tower shows a dedicated card instead of the old generic text block: the material's
   Start/End/Step (reusing the existing per-material `paRanges` table, same as Advanced — not
   OrcaSlicer's own flat Tower-dialog defaults), an explicit callout flagging that this range is
@@ -37,6 +37,19 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   `paRanges`, which at true 1:1 scale read as a flat, squat wedge for short towers and crowded
   overlapping tick labels — fixed with a fixed real-pixel scale plus a height-only visual
   exaggeration, so every tower reads as tower-shaped and labels never balloon or overlap.)
+- **Basic — Pattern.** The third Basic method, alongside Tower — recommends a PA range from the
+  same per-material `paRanges` table (with the same non-standard-range callout as Tower), then
+  shows the actual chevron picker inline, right in the test panel, rather than a second nested
+  modal: there's no flow/accel/speed grid to navigate for Basic (only one block), so clicking a
+  line commits its PA straight to Best PA, no separate OK step needed. Verified against
+  OrcaSlicer's real source that there's no distinct "Basic Pattern" mode to reproduce in the first
+  place — leaving Orca's own accel/speed fields blank just means no per-object override is applied,
+  so PA-Helper draws the same real chevron/frame geometry (`js/pattern.js`) with no flow/accel
+  label rows, matching what an actual blank-fields print shows. See
+  `docs/orca-method-provenance.md`'s new "Basic (single-block) Pattern" section. The Method
+  dropdown's Pattern option is enabled and correctly labeled everywhere now, including in Advanced
+  mode (previously stuck reading "Pattern — Coming Soon™" even while Advanced mode was actively
+  using it).
 
 ### Fixed
 - **Resuming an in-flight Basic run re-enabled the Method dropdown.** `applyMode()`'s Basic branch
