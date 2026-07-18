@@ -379,6 +379,23 @@ ok($("gatedBody").hidden === true, "editing max flow hides the form again until 
   $("testMode").value = "advanced"; $("testMode").dispatchEvent(new window.Event("change", { bubbles: true }));
   ok($("basicMethod").disabled === true, "method control re-locked in advanced");
 }
+// regression: applyMode() used to unconditionally set #basicMethod.disabled = false whenever the
+// Basic branch ran — openRun() calls setTestFormLocked(true) for a resumed in-flight ("planned")
+// run and THEN calls applyMode() to restore its mode, so the lock got stomped immediately for any
+// resumed BASIC run (the advanced-mode assertion elsewhere in this file never caught it, since
+// applyMode()'s advanced branch always disabled the dropdown regardless of lock state).
+{
+  $("testMode").value = "basic"; $("testMode").dispatchEvent(new window.Event("change", { bubbles: true }));
+  click("recommendBtn");
+  window.PA_test.savePlanned();
+  ok(readData().runs.some(r => r.status === "planned" && r.mode === "basic" && r.basicMethod === "tower"), "basic tower run saved as an in-flight (planned) run");
+  const card = [...$("filamentList").querySelectorAll(".card,.frow")].find(c => c.textContent.includes("PLA"));
+  const resumeBtn = [...card.querySelectorAll(".actions button")].find(b => /^PA/.test(b.textContent));
+  resumeBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok($("basicMethod").disabled === true, "resuming an in-flight BASIC run keeps the method dropdown disabled");
+  $("abandonRunBtn").dispatchEvent(new window.Event("click", { bubbles: true }));   // clean up before later tests
+  $("testMode").value = "advanced"; $("testMode").dispatchEvent(new window.Event("change", { bubbles: true }));   // restore state for the advanced-mode tests below
+}
 $("maxFlow").value = "20"; $("maxFlow").dispatchEvent(new window.Event("input", { bubbles: true }));
 $("maxFlowConfirm").dispatchEvent(new window.Event("click", { bubbles: true }));   // re-confirm for the recommend flow below
 $("speedList").value = "";   // the maxFlow inputs above auto-filled it; clear so recommend re-spaces from the count

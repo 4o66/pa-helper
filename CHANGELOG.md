@@ -38,6 +38,15 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   overlapping tick labels — fixed with a fixed real-pixel scale plus a height-only visual
   exaggeration, so every tower reads as tower-shaped and labels never balloon or overlap.)
 
+### Fixed
+- **Resuming an in-flight Basic run re-enabled the Method dropdown.** `applyMode()`'s Basic branch
+  unconditionally set `#basicMethod.disabled = false` every time it ran — including right after
+  `openRun()` locked it via `setTestFormLocked(true)` when reopening a saved in-flight ("planned")
+  run, since `openRun()` calls `applyMode()` immediately afterward to restore the run's mode. Now
+  respects the lock instead of blindly re-enabling. (Advanced mode was never affected — its branch
+  already disabled the dropdown unconditionally, for a different reason: there's only one Advanced
+  method.)
+
 ## [0.3.1] "Open Sesame" — 2026-07-17
 PA and Ironing tests move out of the nav bar and into modals triggered straight from a
 filament's card — with a full pass over saved-results views, run storage, and multi-instance

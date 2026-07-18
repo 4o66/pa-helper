@@ -1049,7 +1049,10 @@
       let v = lastBasicMethod || P.basicDefault;
       const opt = m.querySelector(`option[value="${v}"]`);
       if (!opt || opt.disabled) v = P.basicDefault;   // fall back if the remembered method is disabled (still on the roadmap)
-      m.disabled = false; m.value = v;
+      // Don't blindly re-enable — openRun() calls setTestFormLocked() for an in-flight ("planned")
+      // run BEFORE calling applyMode() to restore the resumed run's mode/method, and this used to
+      // stomp straight over that lock every time.
+      m.disabled = testFormLocked; m.value = v;
     }
     else { if (!m.disabled) lastBasicMethod = m.value; m.value = "pattern"; m.disabled = true; }
     updateModeHint();
