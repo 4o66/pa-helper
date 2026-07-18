@@ -5,6 +5,7 @@ headline feature. Newest first.
 
 | Version | Codename | Date | Headline |
 |---------|----------|------|----------|
+| v0.4.1 | All Systems Go | 2026-07-18 | Basic mode complete — Tower, Line, and Pattern all implemented alongside Advanced |
 | v0.3.1 | Open Sesame | 2026-07-17 | Filament-card-triggered PA/Iron test modals + saved-results & storage overhaul |
 | v0.2.32 | Put a hot rock on it | 2026-07-15 | Ironing Test tab + unified PA/Iron in-progress handling |
 | v0.2.31 | Clean Slate | 2026-07-15 | Saving a run returns you to the Filament page and resets the PA test tab |

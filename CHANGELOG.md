@@ -2,7 +2,7 @@
 
 All notable changes to PA-Helper are recorded here.
 
-**Versioning:** `v<major.minor>.<build>` (currently `0.3`). The build number increments on each
+**Versioning:** `v<major.minor>.<build>` (currently `0.4`). The build number increments on each
 stamped build (`node tools/stamp.js`) and resets to `1` when the minor version rolls; a minor bump
 marks a milestone. Commits are made **locally**; when a feature reaches a stable state we **push and
 release** — `git push origin main`, then `bash tools/release.sh` builds a `dist/pa-helper-v<version>.zip`
@@ -11,6 +11,11 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 [`RELEASES.md`](RELEASES.md). **v1.0** will mark the first "fully usable" release.
 
 ## [Unreleased]
+
+## [0.4.1] "All Systems Go" — 2026-07-18
+Basic mode is now feature-complete: all three simplified single-PA methods — Tower, Pattern, and
+Line — sit alongside Advanced (adaptive flow×accel), each with its own recommend card and inline
+picker matching the real OrcaSlicer print exactly.
 
 ### Added
 - **Basic — Tower recommend screen.** Basic mode is selectable again (Tower method only at first;
@@ -70,6 +75,10 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   respects the lock instead of blindly re-enabling. (Advanced mode was never affected — its branch
   already disabled the dropdown unconditionally, for a different reason: there's only one Advanced
   method.)
+- **Basic — Line's inline picker rendered every printed PA-label digit mirrored/upside-down.**
+  The picker mapped model-space Y straight into SVG Y, but gcode is Y-up and SVG is Y-down —
+  caught in review before release. The row lines themselves looked fine (they're flat, so a
+  vertical flip doesn't distort them), which is why only the digits gave it away.
 
 ## [0.3.1] "Open Sesame" — 2026-07-17
 PA and Ironing tests move out of the nav bar and into modals triggered straight from a
