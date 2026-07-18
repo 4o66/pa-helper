@@ -2,13 +2,74 @@
 
 All notable changes to PA-Helper are recorded here.
 
-**Versioning:** `v<major.minor>.<build>` (currently `0.2`). The build number increments on each
+**Versioning:** `v<major.minor>.<build>` (currently `0.3`). The build number increments on each
 stamped build (`node tools/stamp.js`) and resets to `1` when the minor version rolls; a minor bump
 marks a milestone. Commits are made **locally**; when a feature reaches a stable state we **push and
 release** — `git push origin main`, then `bash tools/release.sh` builds a `dist/pa-helper-v<version>.zip`
 (everything needed to run locally, plus a reminder link to the hosted build) to attach to a GitHub
 release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 [`RELEASES.md`](RELEASES.md). **v1.0** will mark the first "fully usable" release.
+
+## [Unreleased]
+
+### Added
+- **Basic — Tower recommend screen.** Basic mode is selectable again (Tower method only at first;
+  Line and Pattern followed in later entries below). Recommending settings
+  for Tower shows a dedicated card instead of the old generic text block: the material's
+  Start/End/Step (reusing the existing per-material `paRanges` table, same as Advanced — not
+  OrcaSlicer's own flat Tower-dialog defaults), an explicit callout flagging that this range is
+  PA-Helper's own and will likely differ from OrcaSlicer's wiki/dialog default (0 / 0.1 / 0.002
+  direct-drive), and the resulting tower's printed height in mm (`ceil((end-start)/step)+1`).
+  Verified against OrcaSlicer's real source (`Plater::_calib_pa_tower`, `GCode::change_layer`) —
+  see `docs/orca-method-provenance.md`'s new Tower section.
+- **Basic — Tower: measure-the-tower results screen.** A "Measured height (mm)" field replaces
+  typing a raw PA value for Tower — enter or scroll-wheel a whole-mm height (scrolling steps by 1
+  and clamps to what the tower actually printed, `0` to `tower_height_mm − 1`) and PA-Helper computes
+  `PA = start + step × height` for you, with the arithmetic shown, not just the result. A schematic
+  isometric tower — traced from a real OrcaSlicer Tower export's outer-wall g-code, not a guessed
+  rectangular box (see `docs/orca-method-provenance.md`'s Tower section) — shows the actual
+  pentagonal cross-section with one band per mm and the current height highlighted, so you can
+  visually sanity-check your measurement against the real shape. The computed value feeds the existing Best-PA
+  field (now read-only for Tower) so saving/exporting reuse all the existing Single-PA plumbing
+  unchanged. The height itself isn't a new stored field — like Single PA's own schema, it's derived
+  back from the saved PA value and the run's start/step on resume, not persisted redundantly.
+  (The schematic's real footprint is ~70mm wide but only 13–51mm tall across PA-Helper's actual
+  `paRanges`, which at true 1:1 scale read as a flat, squat wedge for short towers and crowded
+  overlapping tick labels — fixed with a fixed real-pixel scale plus a height-only visual
+  exaggeration, so every tower reads as tower-shaped and labels never balloon or overlap.)
+- **Basic — Pattern.** The third Basic method, alongside Tower — recommends a PA range from the
+  same per-material `paRanges` table (with the same non-standard-range callout as Tower), then
+  shows the actual chevron picker inline, right in the test panel, rather than a second nested
+  modal: there's no flow/accel/speed grid to navigate for Basic (only one block), so clicking a
+  line commits its PA straight to Best PA, no separate OK step needed. Verified against
+  OrcaSlicer's real source that there's no distinct "Basic Pattern" mode to reproduce in the first
+  place — leaving Orca's own accel/speed fields blank just means no per-object override is applied,
+  so PA-Helper draws the same real chevron/frame geometry (`js/pattern.js`) with no flow/accel
+  label rows, matching what an actual blank-fields print shows. See
+  `docs/orca-method-provenance.md`'s new "Basic (single-block) Pattern" section. The Method
+  dropdown's Pattern option is enabled and correctly labeled everywhere now, including in Advanced
+  mode (previously stuck reading "Pattern — Coming Soon™" even while Advanced mode was actively
+  using it).
+- **Basic — Line.** The fourth and final Basic method — recommends a PA range from the same
+  per-material `paRanges` table, then shows an inline picker matching the real
+  `CalibPressureAdvanceLine` print exactly: the prime and anchor walls, every stacked
+  short/long/short speed-transition test line, and the filled number tab printing every other
+  row's PA value (at Orca's own fixed 4-significant-figure precision — Line never reassigns
+  `m_number_len` the way Pattern does). Click the cleanest row to commit its PA straight to Best
+  PA, same immediacy as Tower/Pattern. Verified against OrcaSlicer's real source
+  (`src/libslic3r/calib.cpp`/`.hpp`) — see `docs/orca-method-provenance.md`'s new "Line method"
+  section, including the two real seven-segment digit-glyph orientations (`Bottom_To_Top` for
+  Pattern, `Left_To_Right` for Line) now sharing one glyph-segment table in `js/pattern.js`. The
+  Method dropdown's Line option is enabled and relabeled everywhere.
+
+### Fixed
+- **Resuming an in-flight Basic run re-enabled the Method dropdown.** `applyMode()`'s Basic branch
+  unconditionally set `#basicMethod.disabled = false` every time it ran — including right after
+  `openRun()` locked it via `setTestFormLocked(true)` when reopening a saved in-flight ("planned")
+  run, since `openRun()` calls `applyMode()` immediately afterward to restore the run's mode. Now
+  respects the lock instead of blindly re-enabling. (Advanced mode was never affected — its branch
+  already disabled the dropdown unconditionally, for a different reason: there's only one Advanced
+  method.)
 
 ## [0.3.1] "Open Sesame" — 2026-07-17
 PA and Ironing tests move out of the nav bar and into modals triggered straight from a

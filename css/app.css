@@ -102,6 +102,18 @@ nav.subtabs{display:flex;gap:.3rem;margin:1rem 0 0}
 .field{display:flex;flex-direction:column;gap:.2rem}
 .field.newrow{grid-column-start:1}
 .field label{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.towercard{border:1px solid var(--line);border-radius:8px;padding:.7rem .9rem;margin:.6rem 0}
+.towerwarn{background:color-mix(in srgb,var(--warn) 15%,transparent);border:1px solid var(--warn);
+  border-radius:6px;padding:.5rem .7rem;color:var(--warn);font-size:.85rem;margin:0 0 .6rem}
+.towerstats{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
+.towerstat{background:var(--panel2);border-radius:6px;padding:.4rem .6rem;display:flex;flex-direction:column;gap:.15rem}
+.towerstat span{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.towerstat strong{font-size:1rem}
+.towerviz{display:flex;align-items:flex-start;gap:1rem;flex-wrap:wrap;margin-top:.4rem}
+.towerviz svg{flex:0 0 auto}
+.towerformula{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85rem;background:var(--panel2);
+  border-radius:6px;padding:.5rem .7rem;margin:0;align-self:center}
+#basicBestPA[readonly]{opacity:.75}
 .row{display:flex;gap:.8rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:.6rem}
 .grid + .row{margin-top:1rem}
 .grid + .checkline{margin-top:.8rem}
@@ -306,6 +318,15 @@ details.rsec>*:not(summary){padding:0 0 .7rem}
 .pmhead{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start}
 #patternSvgWrap{overflow:hidden;background:var(--bg);border:1px solid var(--line);border-radius:8px;margin:.5rem 0}
 #patternSvg{width:100%;height:auto;max-height:58vh;display:block}
+/* Basic — Pattern's inline picker: same .paline/.zig/.bgfill/.labtext/.tabfill classes as the
+   Advanced modal's picker (reused as-is), just a much smaller frame — there's only one block
+   here, not a grid to compare against a physical print, so the modal's large scale isn't needed. */
+#patternResultSvgWrap{overflow:hidden;background:var(--bg);border:1px solid var(--line);border-radius:8px;margin:.5rem 0;max-width:320px}
+#patternResultSvg{width:100%;height:auto;max-height:260px;display:block}
+/* Basic — Line's inline picker: same shared classes, but Line's own geometry is naturally wide
+   (rows side by side) rather than tall like Pattern's chevron block, so the frame is wide-not-tall. */
+#lineResultSvgWrap{overflow:hidden;background:var(--bg);border:1px solid var(--line);border-radius:8px;margin:.5rem 0;max-width:480px}
+#lineResultSvg{width:100%;height:auto;max-height:200px;display:block}
 .paline{cursor:pointer}
 .paline .zig{stroke:#808080;stroke-width:1.5;fill:none;vector-effect:non-scaling-stroke}
 .paline .hit{stroke:transparent;stroke-width:6;vector-effect:non-scaling-stroke}
