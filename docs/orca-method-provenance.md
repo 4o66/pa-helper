@@ -115,6 +115,27 @@ top/bottom shells, seam forced to rear, brim type "ears," `max_volumetric_extrus
 disabled, `slow_down_layer_time` forced to `1.0`. One tower, one object — not a matrix, not
 multiple copies, not multiple plates.
 
+**The tower's real cross-section is not a box.** `tower_with_seam.drc` is Draco-compressed
+geometry — not fetchable/decodable through this project's available tooling (raw GitHub content
+is blocked by the sandbox's network allowlist, and the Draco format needs a real decoder, not a
+text-oriented fetch). So the actual shape was confirmed the reliable way: parsing Sean's own
+sliced g-code (`tower_with_seam_0.2mm_ASA_..._19m48s.gcode`, OrcaSlicer 2.4.0, Start=0/End=0.1/
+Step=0.002, `tower_height_mm=51`, 255 layers) and extracting the outer-wall toolpath directly. Two
+widely separated layers (an early layer and layer 200) produced byte-identical footprint
+coordinates, confirming a constant vertical prism (no taper, no per-layer rotation):
+
+```
+140.200 209.551   140.200 175.083   175.000 140.283
+209.800 175.083   209.800 209.551   175.246 209.798
+```
+
+That's a pentagon, not a rectangle: one flat edge, one straight side, and two diagonals meeting at
+a single sharp point at the opposite side (bounding box ≈ 69.6 × 69.4 mm). The single asymmetric
+point most likely serves as the seam/orientation marker the mesh's filename references — a plain
+box would have four indistinguishable corners, this shape doesn't. `js/app.js`'s `buildTowerBands()`
+uses this exact traced footprint (recentered, rotated 90° for the schematic's fixed viewpoint) run
+through a true isometric projection, not a rectangular-box approximation.
+
 **How PA actually ramps.** There is no per-height config override (no `layer_config_ranges`
 usage — checked directly) and nothing is drawn on the model (no digit/number glyphs, unlike
 Pattern/Line). Every layer change, `GCode::change_layer` emits a **live firmware PA command**,

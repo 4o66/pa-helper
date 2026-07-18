@@ -1091,25 +1091,64 @@
     $("towerRecommendCard").hidden = false;
     $("recommendOut").hidden = true;
   }
-  // Schematic isometric tower: a plain rectangular column divided into whole-mm bands (matching
-  // Orca's real granularity — see docs/orca-method-provenance.md's Tower section), not a pixel
-  // replica of Orca's actual mesh (which has no printed scale to match against anyway). Rebuilt
-  // only when the band count changes; the highlighted band + formula update on every height edit.
+  // Schematic isometric tower: the REAL outer-wall cross-section, traced from an actual
+  // OrcaSlicer Tower export (Sean's own sliced g-code — see docs/orca-method-provenance.md's
+  // Tower section) — a pentagon, not a box. Flat back edge, one straight side, two diagonals
+  // meeting at a single point (the mesh's seam marker). Coordinates below are that traced
+  // footprint, centered and rotated 90° so the schematic's fixed isometric viewpoint shows the
+  // two diagonal faces (Sean's chosen orientation). Because the rotation/viewpoint are both
+  // fixed, which two faces face the camera never changes — the visible-face pattern (edges 2
+  // and 3 below) is baked in rather than computed at runtime.
+  const TOWER_FOOTPRINT = [
+    [-34.551, -34.8], [-0.083, -34.8], [34.717, 0], [-0.083, 34.8], [-34.551, 34.8]
+  ];
+  // True isometric projection (verticals stay vertical) — real 3D→2D math, not a hand-drawn trick.
+  function towerIso(u, v, z) { return [(u - v) * Math.cos(Math.PI / 6), (u + v) * Math.sin(Math.PI / 6) - z]; }
+  // Shared projection + viewBox-fit math for a given tower height (in whole-mm bands), used by
+  // both the one-time schematic build and the per-edit highlight-band update so they always
+  // agree on where everything landed.
+  function towerGeom(count) {
+    const fp = TOWER_FOOTPRINT;
+    const top = fp.map(([u, v]) => towerIso(u, v, count));
+    const bot = fp.map(([u, v]) => towerIso(u, v, 0));
+    const all = top.concat(bot);
+    const minX = Math.min(...all.map(p => p[0])), maxX = Math.max(...all.map(p => p[0]));
+    const minY = Math.min(...all.map(p => p[1])), maxY = Math.max(...all.map(p => p[1]));
+    const pad = 14, tickPad = 22;
+    const w = maxX - minX + pad * 2 + tickPad, h = maxY - minY + pad * 2;
+    const ox = -minX + pad + tickPad, oy = -minY + pad;
+    const tx = (p) => p[0] + ox, ty = (p) => p[1] + oy;
+    const pt = (p) => `${tx(p).toFixed(2)},${ty(p).toFixed(2)}`;
+    return { fp, top, bot, w, h, tx, ty, pt };
+  }
   function buildTowerBands(svg, count) {
-    const svgTop = 40, svgBottom = 300, bandH = (svgBottom - svgTop) / count;
-    let ticks = "", lines = "";
-    for (let i = 0; i <= count; i++) {
-      const y = svgBottom - i * bandH;
-      lines += `<line x1="70" x2="150" y1="${y}" y2="${y}" style="stroke:var(--line);stroke-width:.5"></line>`;
-      if (i % 4 === 0 || count <= 8 || i === count) ticks += `<text x="62" y="${y + 3}" text-anchor="end" style="font-size:11px;fill:var(--muted)">${i}</text>`;
+    const g = towerGeom(count), { fp, top, bot, tx, ty, pt } = g;
+    // Outer silhouette = the top cap's full outline on the hidden-face side, plus the two visible
+    // side faces' bottom edges — the analytically-correct hidden-line-removed outline for this
+    // fixed viewpoint (worked out once by hand; see the isometric-projection discussion this
+    // schematic came from). Vertex 3's own top/bottom edges are an interior ridge, not silhouette.
+    const silhouette = [top[4], top[0], top[1], top[2], bot[2], bot[3], bot[4]].map(pt).join(" ");
+    let bands = "", ticks = "";
+    for (let i = 0; i < count; i++) {
+      const p2 = towerIso(fp[2][0], fp[2][1], i), p3 = towerIso(fp[3][0], fp[3][1], i), p4 = towerIso(fp[4][0], fp[4][1], i);
+      bands += `<polyline points="${pt(p2)} ${pt(p3)} ${pt(p4)}" style="fill:none;stroke:var(--line);stroke-width:${i % 4 === 0 ? 1 : .5}"></polyline>`;
+      if (i % 4 === 0 || count <= 8) ticks += `<text x="${(tx(p4) - 6).toFixed(2)}" y="${(ty(p4) + 3).toFixed(2)}" text-anchor="end" style="font-size:11px;fill:var(--muted)">${i}</text>`;
     }
+    ticks += `<text x="${(tx(top[4]) - 6).toFixed(2)}" y="${(ty(top[4]) + 3).toFixed(2)}" text-anchor="end" style="font-size:11px;fill:var(--muted)">${count}</text>`;
+    // Fixed display height, proportional width — a short/coarse-step tower reads as short and
+    // squat, a tall/fine-step one as tall and narrow, matching how the real print would look.
+    const displayH = 260, scale = displayH / g.h;
+    svg.setAttribute("viewBox", `0 0 ${g.w.toFixed(0)} ${g.h.toFixed(0)}`);
+    svg.setAttribute("width", (g.w * scale).toFixed(0));
+    svg.setAttribute("height", displayH);
     svg.innerHTML =
       `<g>${ticks}</g>
-       <polygon points="70,40 95,25 175,25 150,40" style="fill:var(--panel2);stroke:var(--line);stroke-width:.5"></polygon>
-       <polygon points="150,40 175,25 175,285 150,300" style="fill:var(--panel2);stroke:var(--line);stroke-width:.5"></polygon>
-       <rect x="70" y="40" width="80" height="260" style="fill:var(--panel);stroke:var(--line);stroke-width:.5"></rect>
-       <g>${lines}</g>
-       <rect id="towerHighlight" x="70" width="80" height="${bandH}" style="fill:var(--accent2);fill-opacity:.35;stroke:var(--accent2);stroke-width:1"></rect>`;
+       <polygon points="${silhouette}" style="fill:var(--panel2);stroke:var(--ink);stroke-width:.9"></polygon>
+       <g>${bands}</g>
+       <line x1="${tx(top[2]).toFixed(2)}" y1="${ty(top[2]).toFixed(2)}" x2="${tx(top[3]).toFixed(2)}" y2="${ty(top[3]).toFixed(2)}" style="stroke:var(--ink);stroke-width:.75;opacity:.5"></line>
+       <line x1="${tx(top[3]).toFixed(2)}" y1="${ty(top[3]).toFixed(2)}" x2="${tx(top[4]).toFixed(2)}" y2="${ty(top[4]).toFixed(2)}" style="stroke:var(--ink);stroke-width:.75;opacity:.5"></line>
+       <line x1="${tx(top[3]).toFixed(2)}" y1="${ty(top[3]).toFixed(2)}" x2="${tx(bot[3]).toFixed(2)}" y2="${ty(bot[3]).toFixed(2)}" style="stroke:var(--ink);stroke-width:.75;opacity:.5"></line>
+       <polygon id="towerHighlight" points="" style="fill:var(--accent2);fill-opacity:.35;stroke:var(--accent2);stroke-width:1"></polygon>`;
   }
   function renderTowerResultViz() {
     const s = currentSettings, card = $("towerResultCard");
@@ -1124,9 +1163,13 @@
     let v = parseInt(input.value, 10); if (isNaN(v)) v = 0;
     v = Math.max(0, Math.min(maxH, v));
     input.value = v; input.max = maxH;
-    const svgTop = 40, svgBottom = 300, bandH = (svgBottom - svgTop) / count;
     const hl = svg.querySelector("#towerHighlight");
-    if (hl) hl.setAttribute("y", svgBottom - (v + 1) * bandH);
+    if (hl) {
+      const { fp, pt } = towerGeom(count);
+      const lo = [0, 1, 2].map(i => [2, 3, 4][i]).map(idx => towerIso(fp[idx][0], fp[idx][1], v));
+      const hi = [0, 1, 2].map(i => [2, 3, 4][i]).map(idx => towerIso(fp[idx][0], fp[idx][1], v + 1));
+      hl.setAttribute("points", [lo[0], lo[1], lo[2], hi[2], hi[1], hi[0]].map(pt).join(" "));
+    }
     const dp = s.paStep < 0.01 ? 3 : 2;
     const pa = s.paStart + s.paStep * v;
     $("towerFormulaOut").textContent = `${s.paStart.toFixed(dp)} + ${s.paStep.toFixed(dp)} × ${v} = ${pa.toFixed(4)}`;

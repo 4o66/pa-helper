@@ -26,9 +26,10 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   typing a raw PA value for Tower — enter or scroll-wheel a whole-mm height (scrolling steps by 1
   and clamps to what the tower actually printed, `0` to `tower_height_mm − 1`) and PA-Helper computes
   `PA = start + step × height` for you, with the arithmetic shown, not just the result. A schematic
-  isometric tower (not a replica of Orca's real mesh — it has no printed scale to match against
-  anyway) shows one gridline per mm band with the current height highlighted, so you can visually
-  sanity-check your measurement against the model. The computed value feeds the existing Best-PA
+  isometric tower — traced from a real OrcaSlicer Tower export's outer-wall g-code, not a guessed
+  rectangular box (see `docs/orca-method-provenance.md`'s Tower section) — shows the actual
+  pentagonal cross-section with one band per mm and the current height highlighted, so you can
+  visually sanity-check your measurement against the real shape. The computed value feeds the existing Best-PA
   field (now read-only for Tower) so saving/exporting reuse all the existing Single-PA plumbing
   unchanged. The height itself isn't a new stored field — like Single PA's own schema, it's derived
   back from the saved PA value and the run's start/step on resume, not persisted redundantly.

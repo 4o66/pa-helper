@@ -374,7 +374,7 @@ ok($("gatedBody").hidden === true, "editing max flow hides the form again until 
   ok(parseInt($("towerHeightIn").value, 10) === expectHeight - 1, "height clamps to the tallest band actually printed");
   $("towerHeightIn").value = "-5"; $("towerHeightIn").dispatchEvent(new window.Event("input", { bubbles: true }));
   ok(parseInt($("towerHeightIn").value, 10) === 0, "height clamps down to 0, never negative");
-  ok($("towerSvg").querySelectorAll("line").length === expectHeight + 1, "schematic draws one gridline per band boundary (count+1 lines)");
+  ok($("towerSvg").querySelectorAll("polyline").length === expectHeight, "schematic draws one band polyline per mm (the top boundary coincides with the roofline, drawn separately)");
   // switching the Mode away and back to advanced hides the tower card again (advanced-only areas take over)
   $("testMode").value = "advanced"; $("testMode").dispatchEvent(new window.Event("change", { bubbles: true }));
   ok($("basicMethod").disabled === true, "method control re-locked in advanced");
