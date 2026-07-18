@@ -109,6 +109,11 @@ nav.subtabs{display:flex;gap:.3rem;margin:1rem 0 0}
 .towerstat{background:var(--panel2);border-radius:6px;padding:.4rem .6rem;display:flex;flex-direction:column;gap:.15rem}
 .towerstat span{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .towerstat strong{font-size:1rem}
+.towerviz{display:flex;align-items:flex-start;gap:1rem;flex-wrap:wrap;margin-top:.4rem}
+.towerviz svg{flex:0 0 auto}
+.towerformula{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85rem;background:var(--panel2);
+  border-radius:6px;padding:.5rem .7rem;margin:0;align-self:center}
+#basicBestPA[readonly]{opacity:.75}
 .row{display:flex;gap:.8rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:.6rem}
 .grid + .row{margin-top:1rem}
 .grid + .checkline{margin-top:.8rem}

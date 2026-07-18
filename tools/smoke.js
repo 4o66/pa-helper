@@ -358,6 +358,23 @@ ok($("gatedBody").hidden === true, "editing max flow hides the form again until 
   ok(s === 0.01 && e === 0.07 && st === 0.005, "tower card start/end/step come from PLA's paRanges entry");
   const expectHeight = Math.ceil((e - s) / st) + 1;
   ok(parseInt($("towerHeightOut").textContent, 10) === expectHeight, "tower height mm = ceil((end-start)/step)+1");
+  // measure-the-tower schematic + height input
+  ok($("towerResultCard").hidden === false, "tower result (measure) card shows once a tower recommendation exists");
+  ok($("towerHeightIn").value === "0" && parseInt($("towerHeightIn").max, 10) === expectHeight - 1, "height input defaults to 0, clamped max = tower height - 1");
+  ok($("basicBestPA").readOnly === true, "best-PA field is read-only for tower (computed, not typed)");
+  ok(Math.abs(parseFloat($("basicBestPA").value) - s) < 1e-6, "height 0 computes PA = start");
+  ok($("towerFormulaOut").textContent === `${s.toFixed(3)} + ${st.toFixed(3)} × 0 = ${s.toFixed(4)}`, "formula shows the shown-work for height 0");
+  $("towerHeightIn").value = "6"; $("towerHeightIn").dispatchEvent(new window.Event("input", { bubbles: true }));
+  ok(Math.abs(parseFloat($("basicBestPA").value) - (s + st * 6)) < 1e-6, "typing height 6 computes PA = start + step*6");
+  $("towerHeightIn").dispatchEvent(new window.WheelEvent("wheel", { deltaY: -1, bubbles: true, cancelable: true }));
+  ok($("towerHeightIn").value === "7", "scrolling up on the height field increments by 1");
+  $("towerHeightIn").dispatchEvent(new window.WheelEvent("wheel", { deltaY: 1, bubbles: true, cancelable: true }));
+  ok($("towerHeightIn").value === "6", "scrolling down decrements by 1");
+  $("towerHeightIn").value = "999"; $("towerHeightIn").dispatchEvent(new window.Event("input", { bubbles: true }));
+  ok(parseInt($("towerHeightIn").value, 10) === expectHeight - 1, "height clamps to the tallest band actually printed");
+  $("towerHeightIn").value = "-5"; $("towerHeightIn").dispatchEvent(new window.Event("input", { bubbles: true }));
+  ok(parseInt($("towerHeightIn").value, 10) === 0, "height clamps down to 0, never negative");
+  ok($("towerSvg").querySelectorAll("line").length === expectHeight + 1, "schematic draws one gridline per band boundary (count+1 lines)");
   // switching the Mode away and back to advanced hides the tower card again (advanced-only areas take over)
   $("testMode").value = "advanced"; $("testMode").dispatchEvent(new window.Event("change", { bubbles: true }));
   ok($("basicMethod").disabled === true, "method control re-locked in advanced");

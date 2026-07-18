@@ -294,6 +294,21 @@
         <button id="addRowBtn">+ Add row</button>
       </div>
 
+      <!-- BASIC — Tower: measure the print, see it on a schematic, get the computed PA -->
+      <div class="subsec basic-only" id="towerResultCard" hidden>
+        <h3>Measure the tower</h3>
+        <div class="row">
+          <label>Measured height (mm) <input id="towerHeightIn" type="number" step="1" min="0" value="0"></label>
+          <p class="hint" style="flex:1;min-width:14rem;margin:0">Scroll on the field to adjust — snaps to whole
+            mm, clamped to what actually printed.</p>
+        </div>
+        <div class="towerviz">
+          <svg id="towerSvg" viewBox="0 0 220 340" width="220" height="340" role="img"
+            aria-label="Schematic tower with the measured height band highlighted"></svg>
+          <p class="towerformula" id="towerFormulaOut"></p>
+        </div>
+      </div>
+
       <!-- BASIC result -->
       <div class="subsec basic-only" id="basicResultSec">
         <h3>Result</h3>

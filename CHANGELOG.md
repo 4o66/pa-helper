@@ -21,8 +21,17 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   PA-Helper's own and will likely differ from OrcaSlicer's wiki/dialog default (0 / 0.1 / 0.002
   direct-drive), and the resulting tower's printed height in mm (`ceil((end-start)/step)+1`).
   Verified against OrcaSlicer's real source (`Plater::_calib_pa_tower`, `GCode::change_layer`) —
-  see `docs/orca-method-provenance.md`'s new Tower section. The results-entry side (measured-height
-  input, schematic tower visual, computed PA) is still to come.
+  see `docs/orca-method-provenance.md`'s new Tower section.
+- **Basic — Tower: measure-the-tower results screen.** A "Measured height (mm)" field replaces
+  typing a raw PA value for Tower — enter or scroll-wheel a whole-mm height (scrolling steps by 1
+  and clamps to what the tower actually printed, `0` to `tower_height_mm − 1`) and PA-Helper computes
+  `PA = start + step × height` for you, with the arithmetic shown, not just the result. A schematic
+  isometric tower (not a replica of Orca's real mesh — it has no printed scale to match against
+  anyway) shows one gridline per mm band with the current height highlighted, so you can visually
+  sanity-check your measurement against the model. The computed value feeds the existing Best-PA
+  field (now read-only for Tower) so saving/exporting reuse all the existing Single-PA plumbing
+  unchanged. The height itself isn't a new stored field — like Single PA's own schema, it's derived
+  back from the saved PA value and the run's start/step on resume, not persisted redundantly.
 
 ## [0.3.1] "Open Sesame" — 2026-07-17
 PA and Ironing tests move out of the nav bar and into modals triggered straight from a

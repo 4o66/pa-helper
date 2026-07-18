@@ -1080,6 +1080,61 @@
   }
   const buildGridRows = (pts, accels) => { const rows = []; pts.forEach(f => accels.forEach(a => rows.push({ flow: f, accel: a, bestPA: "", notes: "" }))); return rows; };
 
+  // ---- Basic — Tower: recommend card + schematic result viz ----
+  function showTowerRecommendCard(mat, start, end, step, towerHeightMm) {
+    const dp = step < 0.01 ? 3 : 2;
+    $("towerMat").textContent = mat || "(pick a filament)";
+    $("towerStart").textContent = start.toFixed(dp);
+    $("towerEnd").textContent = end.toFixed(dp);
+    $("towerStep").textContent = step.toFixed(dp);
+    $("towerHeightOut").textContent = towerHeightMm;
+    $("towerRecommendCard").hidden = false;
+    $("recommendOut").hidden = true;
+  }
+  // Schematic isometric tower: a plain rectangular column divided into whole-mm bands (matching
+  // Orca's real granularity — see docs/orca-method-provenance.md's Tower section), not a pixel
+  // replica of Orca's actual mesh (which has no printed scale to match against anyway). Rebuilt
+  // only when the band count changes; the highlighted band + formula update on every height edit.
+  function buildTowerBands(svg, count) {
+    const svgTop = 40, svgBottom = 300, bandH = (svgBottom - svgTop) / count;
+    let ticks = "", lines = "";
+    for (let i = 0; i <= count; i++) {
+      const y = svgBottom - i * bandH;
+      lines += `<line x1="70" x2="150" y1="${y}" y2="${y}" style="stroke:var(--line);stroke-width:.5"></line>`;
+      if (i % 4 === 0 || count <= 8 || i === count) ticks += `<text x="62" y="${y + 3}" text-anchor="end" style="font-size:11px;fill:var(--muted)">${i}</text>`;
+    }
+    svg.innerHTML =
+      `<g>${ticks}</g>
+       <polygon points="70,40 95,25 175,25 150,40" style="fill:var(--panel2);stroke:var(--line);stroke-width:.5"></polygon>
+       <polygon points="150,40 175,25 175,285 150,300" style="fill:var(--panel2);stroke:var(--line);stroke-width:.5"></polygon>
+       <rect x="70" y="40" width="80" height="260" style="fill:var(--panel);stroke:var(--line);stroke-width:.5"></rect>
+       <g>${lines}</g>
+       <rect id="towerHighlight" x="70" width="80" height="${bandH}" style="fill:var(--accent2);fill-opacity:.35;stroke:var(--accent2);stroke-width:1"></rect>`;
+  }
+  function renderTowerResultViz() {
+    const s = currentSettings, card = $("towerResultCard");
+    if (!s || s.basicMethod !== "tower" || !s.towerHeightMm) {
+      card.hidden = true;
+      if ($("basicBestPA")) $("basicBestPA").readOnly = false;
+      return;
+    }
+    card.hidden = false;
+    const count = s.towerHeightMm, maxH = count - 1, svg = $("towerSvg"), input = $("towerHeightIn");
+    if (svg.dataset.count !== String(count)) { buildTowerBands(svg, count); svg.dataset.count = String(count); }
+    let v = parseInt(input.value, 10); if (isNaN(v)) v = 0;
+    v = Math.max(0, Math.min(maxH, v));
+    input.value = v; input.max = maxH;
+    const svgTop = 40, svgBottom = 300, bandH = (svgBottom - svgTop) / count;
+    const hl = svg.querySelector("#towerHighlight");
+    if (hl) hl.setAttribute("y", svgBottom - (v + 1) * bandH);
+    const dp = s.paStep < 0.01 ? 3 : 2;
+    const pa = s.paStart + s.paStep * v;
+    $("towerFormulaOut").textContent = `${s.paStart.toFixed(dp)} + ${s.paStep.toFixed(dp)} × ${v} = ${pa.toFixed(4)}`;
+    $("basicBestPA").readOnly = true;
+    $("basicBestPA").value = pa.toFixed(4);
+    $("basicBestPA").dispatchEvent(new window.Event("input", { bubbles: true }));
+  }
+
   function recommend() {
     currentRunId = null;
     const { mat, drive, start, end, step } = materialRange();
@@ -1089,14 +1144,10 @@
       $("loadPointsBtn").hidden = true;
       if (method === "tower") {
         const towerHeightMm = Math.ceil((end - start) / step) + 1;
-        $("towerMat").textContent = mat || "(pick a filament)";
-        $("towerStart").textContent = start.toFixed(dp);
-        $("towerEnd").textContent = end.toFixed(dp);
-        $("towerStep").textContent = step.toFixed(dp);
-        $("towerHeightOut").textContent = towerHeightMm;
-        $("towerRecommendCard").hidden = false;
-        $("recommendOut").hidden = true;
+        showTowerRecommendCard(mat, start, end, step, towerHeightMm);
         currentSettings = { source: "recommended", mode: "basic", basicMethod: method, paStart: +start.toFixed(3), paEnd: +end.toFixed(3), paStep: +step.toFixed(3), towerHeightMm };
+        $("towerHeightIn").value = 0;
+        renderTowerResultViz();
         return;
       }
       $("towerRecommendCard").hidden = true;
@@ -1107,10 +1158,12 @@
 PA range:  start ${start.toFixed(dp)}   end ${end.toFixed(dp)}   step ${step.toFixed(dp)}
 Run Orca's Pressure Advance ${method} test with that range, then read the single best PA and enter it below.${extra}`;
       currentSettings = { source: "recommended", mode: "basic", basicMethod: method, paStart: +start.toFixed(3), paEnd: +end.toFixed(3), paStep: +step.toFixed(3) };
+      renderTowerResultViz();
       return;
     }
     $("towerRecommendCard").hidden = true;
     $("recommendOut").hidden = false;
+    renderTowerResultViz();
     const maxFlow = num($("maxFlow").value);
     if (!maxFlow) { alert("Enter your max volumetric speed (mm³/s) first — from the results of your Max Flowrate test in Orca."); $("maxFlow").focus(); return; }
     const nFlow = speedPtsN();
@@ -1842,6 +1895,8 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     setTestFormLocked(false);                       // a fresh/reset test is always fully editable
     loadGrid([]);                                   // empty the results grid
     if ($("basicBestPA")) { $("basicBestPA").value = ""; $("basicNotes").value = ""; }
+    $("towerRecommendCard").hidden = true; $("recommendOut").hidden = false;
+    $("towerHeightIn").value = 0; renderTowerResultViz();   // currentSettings is null now, so this just hides the card
     drawPlot([], null, []);
     $("recommendOut").textContent = ""; $("analysisOut").innerHTML = "";
     $("singlePaOut").innerHTML = ""; $("modelOut").value = ""; syncModelBlock();
@@ -2025,6 +2080,7 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
       const ow = tr.querySelector(".outlierwarn"); if (ow) ow.hidden = true;
     });
     if ($("basicBestPA")) { $("basicBestPA").value = ""; $("basicNotes").value = ""; }
+    $("towerHeightIn").value = 0; renderTowerResultViz();   // same settings (tower height unchanged), blank measurement
     drawPlot([], null, []); $("analysisOut").innerHTML = ""; $("modelOut").value = ""; $("singlePaOut").innerHTML = ""; lastFit = null; syncModelBlock();
     $("recommendOut").textContent = "Cloned from a saved run — same settings, blank results. Re-print, enter the best PA per row, then Save.";
     markJobDirty();
@@ -2066,6 +2122,16 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     const s = r.settings || {};
     if (r.mode === "basic") {
       if (r.results && r.results[0]) { $("basicBestPA").value = r.results[0].bestPA != null ? r.results[0].bestPA : ""; $("basicNotes").value = r.results[0].notes || ""; }
+      if (r.basicMethod === "tower" && s.towerHeightMm) {
+        const f = getFilament(r.filamentId);
+        showTowerRecommendCard(f && f.material, s.paStart, s.paEnd, s.paStep, s.towerHeightMm);
+        // height is derivable from the stored PA + range (not persisted separately — see
+        // docs/orca-method-provenance.md's Tower section, same "store the result, not a
+        // rendering of it" principle as Single PA's own schema).
+        const bpa = num($("basicBestPA").value);
+        $("towerHeightIn").value = (bpa != null && s.paStep) ? Math.max(0, Math.round((bpa - s.paStart) / s.paStep)) : 0;
+        renderTowerResultViz();
+      }
       $("recommendOut").textContent = `Resumed planned basic ${r.basicMethod || "tower"} run. PA range ${s.paStart}–${s.paEnd} step ${s.paStep}. Enter the best PA below.`;
     } else {
       if (r.results && r.results.length) loadGrid(r.results.map(x => ({ flow: x.x, accel: x.accel, bestPA: x.bestPA, notes: x.notes, override: x.override, speed: x.speed })));
@@ -2657,6 +2723,13 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
 
     $("testMode").addEventListener("change", applyMode);
     $("basicMethod").addEventListener("change", () => { if (!$("basicMethod").disabled) lastBasicMethod = $("basicMethod").value; updateModeHint(); });
+    $("towerHeightIn").addEventListener("input", renderTowerResultViz);
+    $("towerHeightIn").addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const cur = parseInt($("towerHeightIn").value, 10) || 0;
+      $("towerHeightIn").value = cur + (e.deltaY < 0 ? 1 : -1);
+      renderTowerResultViz();
+    }, { passive: false });
     $("unitMode").addEventListener("change", updateUnitUI);
     // "Display speed as" — switching converts the current numbers between nozzle velocity and flow
     [...document.getElementsByName("recUnit")].forEach(r => r.addEventListener("change", () => {
