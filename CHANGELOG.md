@@ -14,7 +14,7 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 
 ### Added
 - **Basic — Tower recommend screen.** Basic mode is selectable again (Tower method only at first;
-  Line stays disabled, "Coming Soon™", pending its own visual picker). Recommending settings
+  Line and Pattern followed in later entries below). Recommending settings
   for Tower shows a dedicated card instead of the old generic text block: the material's
   Start/End/Step (reusing the existing per-material `paRanges` table, same as Advanced — not
   OrcaSlicer's own flat Tower-dialog defaults), an explicit callout flagging that this range is
@@ -50,6 +50,17 @@ release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
   dropdown's Pattern option is enabled and correctly labeled everywhere now, including in Advanced
   mode (previously stuck reading "Pattern — Coming Soon™" even while Advanced mode was actively
   using it).
+- **Basic — Line.** The fourth and final Basic method — recommends a PA range from the same
+  per-material `paRanges` table, then shows an inline picker matching the real
+  `CalibPressureAdvanceLine` print exactly: the prime and anchor walls, every stacked
+  short/long/short speed-transition test line, and the filled number tab printing every other
+  row's PA value (at Orca's own fixed 4-significant-figure precision — Line never reassigns
+  `m_number_len` the way Pattern does). Click the cleanest row to commit its PA straight to Best
+  PA, same immediacy as Tower/Pattern. Verified against OrcaSlicer's real source
+  (`src/libslic3r/calib.cpp`/`.hpp`) — see `docs/orca-method-provenance.md`'s new "Line method"
+  section, including the two real seven-segment digit-glyph orientations (`Bottom_To_Top` for
+  Pattern, `Left_To_Right` for Line) now sharing one glyph-segment table in `js/pattern.js`. The
+  Method dropdown's Line option is enabled and relabeled everywhere.
 
 ### Fixed
 - **Resuming an in-flight Basic run re-enabled the Method dropdown.** `applyMode()`'s Basic branch

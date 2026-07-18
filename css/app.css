@@ -323,6 +323,10 @@ details.rsec>*:not(summary){padding:0 0 .7rem}
    here, not a grid to compare against a physical print, so the modal's large scale isn't needed. */
 #patternResultSvgWrap{overflow:hidden;background:var(--bg);border:1px solid var(--line);border-radius:8px;margin:.5rem 0;max-width:320px}
 #patternResultSvg{width:100%;height:auto;max-height:260px;display:block}
+/* Basic — Line's inline picker: same shared classes, but Line's own geometry is naturally wide
+   (rows side by side) rather than tall like Pattern's chevron block, so the frame is wide-not-tall. */
+#lineResultSvgWrap{overflow:hidden;background:var(--bg);border:1px solid var(--line);border-radius:8px;margin:.5rem 0;max-width:480px}
+#lineResultSvg{width:100%;height:auto;max-height:200px;display:block}
 .paline{cursor:pointer}
 .paline .zig{stroke:#808080;stroke-width:1.5;fill:none;vector-effect:non-scaling-stroke}
 .paline .hit{stroke:transparent;stroke-width:6;vector-effect:non-scaling-stroke}

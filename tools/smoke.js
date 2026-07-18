@@ -341,7 +341,7 @@ ok($("gatedBody").hidden === true, "editing max flow hides the form again until 
   ok(basicOpt.textContent === "Basic — single PA value", "basic option is labeled 'Basic — single PA value'");
   const lineOpt = [...$("basicMethod").options].find(o => o.value === "line");
   const patternOpt = [...$("basicMethod").options].find(o => o.value === "pattern");
-  ok(!!lineOpt && lineOpt.disabled, "basic Line method is still disabled (Coming Soon)");
+  ok(!!lineOpt && !lineOpt.disabled, "basic Line method is selectable (implemented)");
   ok(!!patternOpt && !patternOpt.disabled, "basic Pattern method is selectable (implemented)");
 }
 {
@@ -417,6 +417,50 @@ ok($("gatedBody").hidden === true, "editing max flow hides the form again until 
   ok($("patternResultCard").hidden === false, "resuming a saved pattern run reopens the inline picker");
   const resumedSel = [...$("patternResultSvg").querySelectorAll(".paline.sel")];
   ok(resumedSel.length === 1 && Math.abs(parseFloat(resumedSel[0].dataset.pa) - parseFloat(target.dataset.pa)) < 1e-4, "resuming re-selects the previously saved chevron");
+  $("abandonRunBtn").dispatchEvent(new window.Event("click", { bubbles: true }));
+  $("testMode").value = "advanced"; $("testMode").dispatchEvent(new window.Event("change", { bubbles: true }));   // restore state for later tests
+}
+{
+  // Basic — Line recommend card + inline picker
+  $("testMode").value = "basic"; $("testMode").dispatchEvent(new window.Event("change", { bubbles: true }));
+  $("basicMethod").value = "line"; $("basicMethod").dispatchEvent(new window.Event("change", { bubbles: true }));   // explicit — lastBasicMethod may now be "pattern" from the block above
+  click("recommendBtn");
+  ok($("lineRecommendCard").hidden === false, "line recommend card shows for basic + line");
+  ok($("recommendOut").hidden === true, "generic recommend text is hidden for line (replaced by the card)");
+  ok($("towerRecommendCard").hidden === true, "tower's own recommend card is hidden while line is active");
+  ok($("patternRecommendCard").hidden === true, "pattern's own recommend card is hidden while line is active");
+  ok(/Non-standard range/.test($("lineRecommendCard").textContent), "line card flags its range as non-standard");
+  ok($("lineMat").textContent === "PLA", "line card shows the selected filament's material");
+  const s = parseFloat($("lineStart").textContent), e = parseFloat($("lineEnd").textContent), st = parseFloat($("lineStep").textContent);
+  ok(s === 0.01 && e === 0.07 && st === 0.005, "line card start/end/step come from PLA's paRanges entry (same table as Tower/Pattern)");
+  // inline picker — no separate modal, click a row commits immediately
+  ok($("lineResultCard").hidden === false, "line result (picker) card shows once a line recommendation exists");
+  ok($("towerResultCard").hidden === true, "tower's own result card is hidden while line is active");
+  ok($("patternResultCard").hidden === true, "pattern's own result card is hidden while line is active");
+  ok($("basicBestPA").readOnly === true, "best-PA field is read-only for line (picked, not typed)");
+  ok(/No line selected yet/.test($("lineResultSel").textContent), "no row selected initially");
+  const rows = [...$("lineResultSvg").querySelectorAll(".paline")];
+  const expectCount = Math.round((e - s) / st) + 1;
+  ok(rows.length === expectCount, "one clickable row per PA value in the range");
+  ok(rows.every(g => g.querySelectorAll("line.zig").length === 3), "each row draws its real 3-segment short/long/short shape");
+  ok($("lineResultSvg").querySelectorAll("line.bgfill").length === 2, "prime + anchor walls drawn as background (not judged)");
+  ok($("lineResultSvg").querySelector("polygon.tabfill") !== null, "filled number tab drawn");
+  ok($("lineResultSvg").querySelectorAll("line.labtext").length > 0, "printed every-other-row PA labels drawn");
+  const target = rows[2];
+  target.dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok(target.classList.contains("sel"), "clicked row gets the selected class");
+  ok(rows.filter(g => g.classList.contains("sel")).length === 1, "only one row selected at a time");
+  ok(Math.abs(parseFloat($("basicBestPA").value) - parseFloat(target.dataset.pa)) < 1e-4, "clicking a row writes its PA straight into Best PA");
+  ok($("lineResultSel").textContent === "Selected PA: " + target.dataset.pa, "selection text shows the picked PA");
+  // resume: closest-match pre-selection, same rationale as Pattern's picker
+  window.PA_test.savePlanned();
+  ok(readData().runs.some(r => r.status === "planned" && r.mode === "basic" && r.basicMethod === "line"), "basic line run saved as an in-flight (planned) run");
+  const card = [...$("filamentList").querySelectorAll(".card,.frow")].find(c => c.textContent.includes("PLA"));
+  const resumeBtn = [...card.querySelectorAll(".actions button")].find(b => /^PA/.test(b.textContent));
+  resumeBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+  ok($("lineResultCard").hidden === false, "resuming a saved line run reopens the inline picker");
+  const resumedSel = [...$("lineResultSvg").querySelectorAll(".paline.sel")];
+  ok(resumedSel.length === 1 && Math.abs(parseFloat(resumedSel[0].dataset.pa) - parseFloat(target.dataset.pa)) < 1e-4, "resuming re-selects the previously saved row");
   $("abandonRunBtn").dispatchEvent(new window.Event("click", { bubbles: true }));
   $("testMode").value = "advanced"; $("testMode").dispatchEvent(new window.Event("change", { bubbles: true }));   // restore state for later tests
 }

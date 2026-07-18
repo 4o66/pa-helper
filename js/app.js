@@ -1091,7 +1091,8 @@
     $("towerEnd").textContent = end.toFixed(dp);
     $("towerStep").textContent = step.toFixed(dp);
     $("towerHeightOut").textContent = towerHeightMm;
-    $("patternRecommendCard").hidden = true;   // mutually exclusive with Pattern's own recommend card
+    $("patternRecommendCard").hidden = true;   // mutually exclusive with Pattern's/Line's own recommend cards
+    $("lineRecommendCard").hidden = true;
     $("towerRecommendCard").hidden = false;
     $("recommendOut").hidden = true;
   }
@@ -1102,8 +1103,21 @@
     $("patternStart").textContent = start.toFixed(dp);
     $("patternEnd").textContent = end.toFixed(dp);
     $("patternStep").textContent = step.toFixed(dp);
-    $("towerRecommendCard").hidden = true;   // mutually exclusive with Tower's own recommend card
+    $("towerRecommendCard").hidden = true;   // mutually exclusive with Tower's/Line's own recommend cards
+    $("lineRecommendCard").hidden = true;
     $("patternRecommendCard").hidden = false;
+    $("recommendOut").hidden = true;
+  }
+  // ---- Basic — Line: recommend card + inline picker ----
+  function showLineRecommendCard(mat, start, end, step) {
+    const dp = step < 0.01 ? 3 : 2;
+    $("lineMat").textContent = mat || "(pick a filament)";
+    $("lineStart").textContent = start.toFixed(dp);
+    $("lineEnd").textContent = end.toFixed(dp);
+    $("lineStep").textContent = step.toFixed(dp);
+    $("towerRecommendCard").hidden = true;   // mutually exclusive with Tower's/Pattern's own recommend cards
+    $("patternRecommendCard").hidden = true;
+    $("lineRecommendCard").hidden = false;
     $("recommendOut").hidden = true;
   }
   // Schematic isometric tower: the REAL outer-wall cross-section, traced from an actual
@@ -1262,16 +1276,73 @@
     $("basicBestPA").readOnly = true;
     selText();
   }
+  // Inline row picker for Basic — Line. Same convention as Pattern's picker (reuse the real-Orca
+  // geometry engine — window.PAPattern.synthLineBlock, see docs/orca-method-provenance.md's Line
+  // section — draw into a small inline <svg>, click-to-commit straight to #basicBestPA, no separate
+  // OK step). Unlike Pattern's naturally-tall chevron block, Line's own geometry is already
+  // wide-not-tall (rows stacked side by side), so it's drawn in the same orientation it actually
+  // prints — no 90°-rotate-for-upright-numbers trick needed.
+  function renderLineResultViz() {
+    const s = currentSettings, card = $("lineResultCard");
+    if (!s || s.basicMethod !== "line" || s.paStart == null || s.paEnd == null || !s.paStep || !window.PAPattern) {
+      card.hidden = true;
+      return;
+    }
+    card.hidden = false;
+    const n = getSelectedNozzle(); const dia = n ? (num(n.diameter) || 0.4) : 0.4;
+    const block = window.PAPattern.synthLineBlock({ paStart: s.paStart, paEnd: s.paEnd, paStep: s.paStep, nozzle: dia, lineWidth: num(s.lineW) });
+    const svg = $("lineResultSvg"); while (svg.firstChild) svg.removeChild(svg.firstChild);
+    const [minx, miny, maxx, maxy] = block.rbox, pad = 2, W = maxx - minx, H = maxy - miny;
+    svg.setAttribute("viewBox", `0 0 ${(W + 2 * pad).toFixed(1)} ${(H + 2 * pad).toFixed(1)}`);
+    // Y-flip: model space is gcode-style Y-up (larger Y = further "up" the bed, which is how the
+    // real draw_digit() point layout assumes its glyphs read), but SVG Y grows downward — mapping
+    // real Y straight through mirrored every digit upside down/backwards (this is what was wrong:
+    // the row lines themselves looked fine since they're flat, but the printed PA labels garbled).
+    const P = (px, py) => [px - minx + pad, (maxy - py) + pad];
+    const line = (x1, y1, x2, y2, cls) => { const a = P(x1, y1), b = P(x2, y2); const l = svgEl("line"); l.setAttribute("x1", a[0].toFixed(2)); l.setAttribute("y1", a[1].toFixed(2)); l.setAttribute("x2", b[0].toFixed(2)); l.setAttribute("y2", b[1].toFixed(2)); if (cls) l.setAttribute("class", cls); return l; };
+    const t = block.tab;
+    if (t) {
+      const pts = [[t.x0, t.y0], [t.x1, t.y0], [t.x1, t.y1], [t.x0, t.y1]].map(pt => { const q = P(pt[0], pt[1]); return q[0].toFixed(2) + "," + q[1].toFixed(2); }).join(" ");
+      const pg = svgEl("polygon"); pg.setAttribute("points", pts); pg.setAttribute("class", "tabfill"); svg.append(pg);
+    }
+    // prime + anchor walls — flow-priming/bracing features, not meant to be judged, drawn as background
+    if (block.primeWall) svg.append(line(block.primeWall.x, block.primeWall.y1, block.primeWall.x, block.primeWall.y2, "bgfill"));
+    if (block.anchorWall) svg.append(line(block.anchorWall.x, block.anchorWall.y1, block.anchorWall.x, block.anchorWall.y2, "bgfill"));
+    (block.labels || []).forEach(seg => svg.append(line(seg.x1, seg.y1, seg.x2, seg.y2, "labtext")));
+    const pas = block.rows.map(r => r.pa);
+    // Resume match uses closest-within-tolerance, same rationale as Pattern's picker (stored value
+    // rounded to 4 decimals at write-time, recomputed to 5 here).
+    const cur = num($("basicBestPA").value);
+    let sel = null;
+    if (cur != null) { let bestD = 1e9; pas.forEach(pa => { const d = Math.abs(pa - cur); if (d < bestD) { bestD = d; sel = pa; } }); if (bestD > 1e-3) sel = null; }
+    const selText = () => { $("lineResultSel").textContent = sel != null ? "Selected PA: " + sel : "No line selected yet — click a row."; };
+    block.rows.forEach(r => {
+      const g = svgEl("g"); g.setAttribute("class", "paline" + (r.pa === sel ? " sel" : "")); g.dataset.pa = r.pa;
+      r.segs.forEach(seg => g.append(line(seg.x1, seg.y1, seg.x2, seg.y2, "zig")));
+      r.segs.forEach(seg => g.append(line(seg.x1, seg.y1, seg.x2, seg.y2, "hit")));
+      g.addEventListener("click", () => {
+        sel = r.pa;
+        [...svg.querySelectorAll(".paline")].forEach(e2 => e2.classList.toggle("sel", e2.dataset.pa === String(r.pa)));
+        selText();
+        $("basicBestPA").value = r.pa.toFixed(4);
+        $("basicBestPA").dispatchEvent(new window.Event("input", { bubbles: true }));
+      });
+      svg.append(g);
+    });
+    $("basicBestPA").readOnly = true;
+    selText();
+  }
   // Dispatches to whichever Basic method's card/renderer is actually active, so switching between
-  // Tower and Pattern (or away to Advanced) can't leave the OTHER method's readOnly/hidden state
-  // stomped on by both renderers running unconditionally — each one's own guard clause only fires
+  // Tower, Line and Pattern (or away to Advanced) can't leave the OTHER methods' readOnly/hidden
+  // state stomped on by renderers running unconditionally — each one's own guard clause only fires
   // correctly if it's the only one asked to render at all.
   function renderBasicMethodViz() {
     const method = currentSettings && currentSettings.basicMethod;
-    if (method === "tower") { $("patternResultCard").hidden = true; renderTowerResultViz(); }
-    else if (method === "pattern") { $("towerResultCard").hidden = true; renderPatternResultViz(); }
+    if (method === "tower") { $("patternResultCard").hidden = true; $("lineResultCard").hidden = true; renderTowerResultViz(); }
+    else if (method === "pattern") { $("towerResultCard").hidden = true; $("lineResultCard").hidden = true; renderPatternResultViz(); }
+    else if (method === "line") { $("towerResultCard").hidden = true; $("patternResultCard").hidden = true; renderLineResultViz(); }
     else {
-      $("towerResultCard").hidden = true; $("patternResultCard").hidden = true;
+      $("towerResultCard").hidden = true; $("patternResultCard").hidden = true; $("lineResultCard").hidden = true;
       if ($("basicBestPA")) $("basicBestPA").readOnly = false;
     }
   }
@@ -1302,7 +1373,16 @@
         renderBasicMethodViz();
         return;
       }
-      $("towerRecommendCard").hidden = true; $("patternRecommendCard").hidden = true;
+      if (method === "line") {
+        showLineRecommendCard(mat, start, end, step);
+        currentSettings = { source: "recommended", mode: "basic", basicMethod: method, paStart: +start.toFixed(3), paEnd: +end.toFixed(3), paStep: +step.toFixed(3) };
+        // Same fresh-recommend-must-not-carry-over-a-stale-Best-PA fix as Pattern needed — see the
+        // comment on that branch above.
+        if ($("basicBestPA")) $("basicBestPA").value = "";
+        renderBasicMethodViz();
+        return;
+      }
+      $("towerRecommendCard").hidden = true; $("patternRecommendCard").hidden = true; $("lineRecommendCard").hidden = true;
       $("recommendOut").hidden = false;
       $("recommendOut").textContent =
 `Material: ${mat || "(pick)"}   Drive: ${drive}   Method: ${method}
@@ -1312,7 +1392,7 @@ Run Orca's Pressure Advance ${method} test with that range, then read the single
       renderBasicMethodViz();
       return;
     }
-    $("towerRecommendCard").hidden = true; $("patternRecommendCard").hidden = true;
+    $("towerRecommendCard").hidden = true; $("patternRecommendCard").hidden = true; $("lineRecommendCard").hidden = true;
     $("recommendOut").hidden = false;
     renderBasicMethodViz();
     const maxFlow = num($("maxFlow").value);
@@ -2046,8 +2126,8 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
     setTestFormLocked(false);                       // a fresh/reset test is always fully editable
     loadGrid([]);                                   // empty the results grid
     if ($("basicBestPA")) { $("basicBestPA").value = ""; $("basicNotes").value = ""; }
-    $("towerRecommendCard").hidden = true; $("patternRecommendCard").hidden = true; $("recommendOut").hidden = false;
-    $("towerHeightIn").value = 0; renderBasicMethodViz();   // currentSettings is null now, so this just hides both cards
+    $("towerRecommendCard").hidden = true; $("patternRecommendCard").hidden = true; $("lineRecommendCard").hidden = true; $("recommendOut").hidden = false;
+    $("towerHeightIn").value = 0; renderBasicMethodViz();   // currentSettings is null now, so this just hides all three cards
     drawPlot([], null, []);
     $("recommendOut").textContent = ""; $("analysisOut").innerHTML = "";
     $("singlePaOut").innerHTML = ""; $("modelOut").value = ""; syncModelBlock();
@@ -2288,6 +2368,11 @@ Test grid = ${speeds.length} speeds × ${accels.length} accels = ${speeds.length
         $("towerRecommendCard").hidden = true;
         showPatternRecommendCard(f && f.material, s.paStart, s.paEnd, s.paStep);
         renderPatternResultViz();   // pre-selects the saved bestPA's chevron, same closest-match logic as a fresh pick
+      } else if (r.basicMethod === "line") {
+        const f = getFilament(r.filamentId);
+        $("towerRecommendCard").hidden = true;
+        showLineRecommendCard(f && f.material, s.paStart, s.paEnd, s.paStep);
+        renderLineResultViz();   // pre-selects the saved bestPA's closest row, same closest-match logic as a fresh pick
       }
       $("recommendOut").textContent = `Resumed planned basic ${r.basicMethod || "tower"} run. PA range ${s.paStart}–${s.paEnd} step ${s.paStep}. Enter the best PA below.`;
     } else {

@@ -1,22 +1,24 @@
 # OrcaSlicer method provenance
 
-PA-Helper reproduces the behavior of OrcaSlicer's **PA Pattern** and **PA Tower** calibrations so
-what we show the user matches what physically prints. We do **not** copy OrcaSlicer code;
-`js/pattern.js` (Pattern) and the Tower recommendation/read-back logic are original
-re-implementations of the *method*. OrcaSlicer and PA-Helper are both **AGPL-3.0**, so this is
-license-compatible; attribution is preserved here and in the relevant source files.
+PA-Helper reproduces the behavior of OrcaSlicer's **PA Pattern**, **PA Line**, and **PA Tower**
+calibrations so what we show the user matches what physically prints. We do **not** copy
+OrcaSlicer code; `js/pattern.js` (Pattern, Line) and the Tower recommendation/read-back logic are
+original re-implementations of the *method*. OrcaSlicer and PA-Helper are both **AGPL-3.0**, so
+this is license-compatible; attribution is preserved here and in the relevant source files.
 
 This file is the **checklist for the monthly upstream tripwire**: each month, diff the OrcaSlicer
 `main` **and** `dev` branches for changes to the items below. Any change here means our replica may
 need updating.
 
 Upstream source: `SoftFever/OrcaSlicer` (mirrored at `OrcaSlicer/OrcaSlicer`) —
-`src/libslic3r/calib.cpp`/`.hpp` (Pattern), `src/slic3r/GUI/Plater.cpp`, `src/libslic3r/GCode.cpp`,
-`src/libslic3r/GCodeWriter.cpp`, and `src/slic3r/GUI/calib_dlg.cpp` (Tower).
+`src/libslic3r/calib.cpp`/`.hpp` (Pattern, Line), `src/slic3r/GUI/Plater.cpp`,
+`src/libslic3r/GCode.cpp`, `src/libslic3r/GCodeWriter.cpp`, and `src/slic3r/GUI/calib_dlg.cpp`
+(Tower).
 Pattern last reviewed against `main`: **2026-07-18** — geometry has been stable since the pattern
 was introduced (2023-07-22, commit `777c7c68f9`); this pass added the Basic (single-block) mode
 section below, covering `calib_dlg.cpp`'s dialog behavior for blank accel/speed fields. Tower last
-reviewed against `main`: **2026-07-17**.
+reviewed against `main`: **2026-07-17**. Line last reviewed against `main`: **2026-07-18** — full
+`calib.cpp`/`.hpp` fetch, see the Line method section below.
 
 ## Derived line width (`src/libslic3r/Flow.cpp`)
 
@@ -199,3 +201,81 @@ the wiki doesn't think something's wrong. Carry this into the mockup.
 ⚠ **Monthly tripwire:** if `_calib_pa_tower()` starts touching `layer_config_ranges` or per-object
 config instead of a fixed mesh + live per-layer firmware command, or if `GCode::change_layer`'s
 `Calib_PA_Tower` case changes its formula or truncation, this section is stale.
+
+## Line method (`CalibPressureAdvanceLine`)
+
+Unlike Tower, Line **does** have a bespoke geometry-generating class — `CalibPressureAdvanceLine`
+in `calib.cpp`/`.hpp`, both fetched in full. It prints a stack of short/long/short speed-transition
+test lines, one per PA value, bracketed by two priming/anchoring walls, with a filled number tab
+printing every other row's PA value.
+
+**Constructor overrides** (the header's own defaults are placeholders, immediately replaced in the
+constructor body):
+
+- `m_line_width = nozzle_diameter < 0.51 ? nozzle_diameter × 1.5 : nozzle_diameter × 1.05` — Line's
+  **own** formula, distinct from Pattern/Tower's `1.125 × nozzle` wall width.
+- `m_number_line_width = m_thin_line_width = nozzle_diameter` — the bare nozzle diameter (not a
+  derived factor) for the prime/anchor walls and the printed number glyphs.
+- `m_height_layer = config.initial_layer_print_height` — not modeled here; PA-Helper's schematic is
+  2D geometry only, no extrusion/layer math needed for a picker.
+
+**Row geometry** — `m_space_y{3.5}` (fixed row pitch, mm), `m_length_short{20.0}`,
+`m_length_long{40.0}`. Each row is three collinear segments at the **same X columns across every
+row** — short(slow) / long(fast) / short(slow) — so the two speed-transition points line up in
+vertical columns across all rows; that alignment is the actual feature being visually judged
+(blob/gap at either transition). `m_length_long` bed-width-adaptively shrinks (`40 + min(w−120, 0)`)
+on beds narrower than 120 mm; PA-Helper's schematic assumes the ≥120 mm-bed case (fixed 40 mm) as a
+documented simplification — `js/pattern.js: CONST.lineLengthLong`.
+
+`set_speed(fast=100.0, slow=20.0)` (mm/s), `speed_adjust(speed) = speed × 60` for the gcode F-value.
+Not modeled in the 2D schematic (only the X columns matter for the picker, not the speeds
+themselves). Not fully verified whether `Plater.cpp` ever overrides these defaults before calling
+`generate_test()` — flagged as an open uncertainty, not chased further given `Plater.cpp`'s fetch-
+size constraints (868 KB / 19,867 lines; the tool truncates well before this function).
+
+**Prime wall**: one full-height vertical stroke at `x = start_x` (the same X every row starts at),
+spanning `y ∈ [start_y, start_y + num·m_space_y]`, printed **once** before any row, at PA=0, heavily
+over-extruded (`e_per_mm × m_space_y × num × 1.2`) — a pure flow-priming feature, not meant to be
+visually judged.
+
+**Anchor wall**: a second full-height vertical stroke at `x = start_x + m_length_short +
+m_length_long + m_length_short` (= 80 mm with defaults), printed **once** immediately after row
+`i==0`'s three segments (same loop iteration), also at PA=0 — a bracing/anchoring feature (same
+spirit as Pattern's anchoring frame), also not meant to be judged.
+
+**Numbers** (`m_draw_numbers{true}` by default — in real Orca's dialog this is user-toggleable for
+Line specifically, unlike Pattern where it's forced-on with a disabled checkbox; PA-Helper's picker
+always draws them, since the picker needs them to identify rows the same way the print does):
+printed on the **second** layer, using the base class's default `Left_To_Right` digit-glyph mode —
+`CalibPressureAdvanceLine` never overrides `DrawDigitMode`, unlike Pattern's explicit
+`Bottom_To_Top`. Digits print for **every other row** (`i % 2 === 0`).
+
+Box/label position formulas: `box_start_x = start_x + short + long + short + line_width`;
+`number_spacing() = digit_segment_len + digit_gap_len = 3`; tab width = `number_spacing() × 8 = 24`
+mm; tab Y spans `[start_y − m_space_y, start_y − m_space_y + (num+1)·m_space_y]` (= `[start_y −
+m_space_y, start_y + num·m_space_y]` — one row-pitch below row 0, up to `num·m_space_y` above).
+Each row `i`'s label draws at `(box_start_x + 3 + line_width, y_pos + m_space_y/2)` — vertically
+centered in the gap after that row.
+
+**Fixed label precision — the one non-obvious quirk here.** `CalibPressureAdvanceLine::generate_test()`
+**never reassigns `m_number_len`** (unlike Pattern's `max_numbering_length()`), so it always uses
+the base class's default (`m_max_number_len = 5`). Per `convert_number_to_string`'s significant-
+figure formula (`precision ? (v ≥ 1000 ? precision : precision − 1) : 6`), and since PA values are
+always < 1000, Line's printed labels are **always** formatted at 4 significant figures, regardless
+of range. `js/pattern.js: synthLineBlock()` hard-codes `numberLen = CONST.maxNumberLen` for exactly
+this reason — do not let it inherit Pattern's dynamic `max_numbering_length()` logic if this file is
+ever refactored to share more code between the two methods.
+
+**Left_To_Right `draw_digit` point layout** (verified from the actual C++ `else` branch — the same
+abstract 6-point + 2-gap-point segment topology as Pattern's `Bottom_To_Top` table, just different
+`(x,y)` formulas): `p0=(sx,sy)`, `p0_5=(sx+L/2,sy)`, `p1=(sx+L,sy)`, `p2=(sx+L,sy−L)`,
+`p3=(sx,sy−L)`, `p4=(sx,sy−2L)`, `p4_5=(sx+L/2,sy−2L)`, `p5=(sx+L,sy−2L)` — a box growing
+**downward** from `(sx,sy)` as characters advance in `+X` (vs. Pattern's box growing **upward** as
+characters stack in `+Y`). Confirmed the same abstract `DIGIT` segment-index table (which point-
+pairs form each digit 0–9/`.`) applies unchanged to both orientations by reusing it against this
+new point layout in a throwaway Node script and visually inspecting the resulting glyph strokes —
+`js/pattern.js: digitPointsBTT()` / `digitPointsLTR()` share one `DIGIT` table.
+
+⚠ **Monthly tripwire:** if `CalibPressureAdvanceLine`'s constructor formulas, `m_space_y` /
+`m_length_short` / `m_length_long`, the prime/anchor wall mechanism, or the never-reassigned
+`m_number_len` change, `js/pattern.js: synthLineBlock()` needs updating to match.
