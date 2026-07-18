@@ -2,13 +2,27 @@
 
 All notable changes to PA-Helper are recorded here.
 
-**Versioning:** `v<major.minor>.<build>` (currently `0.2`). The build number increments on each
+**Versioning:** `v<major.minor>.<build>` (currently `0.3`). The build number increments on each
 stamped build (`node tools/stamp.js`) and resets to `1` when the minor version rolls; a minor bump
 marks a milestone. Commits are made **locally**; when a feature reaches a stable state we **push and
 release** — `git push origin main`, then `bash tools/release.sh` builds a `dist/pa-helper-v<version>.zip`
 (everything needed to run locally, plus a reminder link to the hosted build) to attach to a GitHub
 release. See [`RELEASING.md`](RELEASING.md). Release codenames are tracked in
 [`RELEASES.md`](RELEASES.md). **v1.0** will mark the first "fully usable" release.
+
+## [Unreleased]
+
+### Added
+- **Basic — Tower recommend screen.** Basic mode is selectable again (Tower method only; Line and
+  Pattern stay disabled, "Coming Soon™", pending their own visual pickers). Recommending settings
+  for Tower shows a dedicated card instead of the old generic text block: the material's
+  Start/End/Step (reusing the existing per-material `paRanges` table, same as Advanced — not
+  OrcaSlicer's own flat Tower-dialog defaults), an explicit callout flagging that this range is
+  PA-Helper's own and will likely differ from OrcaSlicer's wiki/dialog default (0 / 0.1 / 0.002
+  direct-drive), and the resulting tower's printed height in mm (`ceil((end-start)/step)+1`).
+  Verified against OrcaSlicer's real source (`Plater::_calib_pa_tower`, `GCode::change_layer`) —
+  see `docs/orca-method-provenance.md`'s new Tower section. The results-entry side (measured-height
+  input, schematic tower visual, computed PA) is still to come.
 
 ## [0.3.1] "Open Sesame" — 2026-07-17
 PA and Ironing tests move out of the nav bar and into modals triggered straight from a

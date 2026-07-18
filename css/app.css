@@ -102,6 +102,13 @@ nav.subtabs{display:flex;gap:.3rem;margin:1rem 0 0}
 .field{display:flex;flex-direction:column;gap:.2rem}
 .field.newrow{grid-column-start:1}
 .field label{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.towercard{border:1px solid var(--line);border-radius:8px;padding:.7rem .9rem;margin:.6rem 0}
+.towerwarn{background:color-mix(in srgb,var(--warn) 15%,transparent);border:1px solid var(--warn);
+  border-radius:6px;padding:.5rem .7rem;color:var(--warn);font-size:.85rem;margin:0 0 .6rem}
+.towerstats{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
+.towerstat{background:var(--panel2);border-radius:6px;padding:.4rem .6rem;display:flex;flex-direction:column;gap:.15rem}
+.towerstat span{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.towerstat strong{font-size:1rem}
 .row{display:flex;gap:.8rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:.6rem}
 .grid + .row{margin-top:1rem}
 .grid + .checkline{margin-top:.8rem}

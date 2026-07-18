@@ -195,11 +195,10 @@
       <div class="subsec">
         <h3>Test type</h3>
         <div class="row">
-          <!-- Basic mode is mid-rework on a separate branch — shown but unselectable here so it's
-               visible on the roadmap without being reachable. To re-enable: drop the `disabled`
-               attribute and restore its real label ("Basic — single PA value"). -->
-          <label>Mode <select id="testMode"><option value="advanced">Advanced — adaptive PA (flow × accel)</option><option value="basic" disabled>Basic — Coming Soon™</option></select></label>
-          <label>Method <select id="basicMethod"><option value="tower">Tower (recommended)</option><option value="line">Line</option><option value="pattern">Pattern</option></select></label>
+          <!-- Basic mode: Tower is implemented; Line and Pattern (basic) are still on the roadmap —
+               shown but unselectable so they're visible without being reachable. -->
+          <label>Mode <select id="testMode"><option value="advanced">Advanced — adaptive PA (flow × accel)</option><option value="basic">Basic — single PA value</option></select></label>
+          <label>Method <select id="basicMethod"><option value="tower">Tower (recommended)</option><option value="line" disabled>Line — Coming Soon™</option><option value="pattern" disabled>Pattern — Coming Soon™</option></select></label>
         </div>
         <p class="hint" id="modeHint"></p>
       </div>
@@ -239,6 +238,18 @@
           <p class="hint">Adaptive PA depends on both flow and acceleration. The point counts start from a smart default that scales with your printer's envelope — a narrow accel or flow range needs fewer points, so a low-accel/low-flow machine won't be forced into a big matrix. Both counts are yours to override, and the value lists auto-fill from them (or type your own). The test grid is every speed × every accel.</p>
         </div>
         <div class="row"><button id="recommendBtn">Recommend settings</button></div>
+        <div id="towerRecommendCard" class="towercard basic-only" hidden>
+          <p class="towerwarn"><strong>Non-standard range:</strong> this is PA-Helper's own recommended
+            range for <span id="towerMat"></span>, not OrcaSlicer's stock Tower dialog default
+            (0 / 0.1 / 0.002 direct-drive). Expect it to differ from the wiki.</p>
+          <div class="towerstats">
+            <div class="towerstat"><span>Start</span><strong id="towerStart"></strong></div>
+            <div class="towerstat"><span>End</span><strong id="towerEnd"></strong></div>
+            <div class="towerstat"><span>Step</span><strong id="towerStep"></strong></div>
+          </div>
+          <p class="hint">Run Orca's Pressure Advance Tower test with that range. Prints as a
+            <strong id="towerHeightOut"></strong> mm tower.</p>
+        </div>
         <pre id="recommendOut" class="out"></pre>
         <div class="row"><button id="loadPointsBtn" hidden>Load test points into the table ↓</button></div>
       </div>

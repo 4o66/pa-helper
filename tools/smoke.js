@@ -337,8 +337,30 @@ $("maxFlow").value = "22"; $("maxFlow").dispatchEvent(new window.Event("input", 
 ok($("gatedBody").hidden === true, "editing max flow hides the form again until re-confirmed");
 {
   const basicOpt = [...$("testMode").options].find(o => o.value === "basic");
-  ok(!!basicOpt && basicOpt.disabled, "basic mode is visible but disabled in the Mode dropdown (advanced-only for now)");
-  ok(basicOpt.textContent === "Basic — Coming Soon™", "disabled basic option is labeled 'Basic — Coming Soon™'");
+  ok(!!basicOpt && !basicOpt.disabled, "basic mode is selectable in the Mode dropdown");
+  ok(basicOpt.textContent === "Basic — single PA value", "basic option is labeled 'Basic — single PA value'");
+  const lineOpt = [...$("basicMethod").options].find(o => o.value === "line");
+  const patternOpt = [...$("basicMethod").options].find(o => o.value === "pattern");
+  ok(!!lineOpt && lineOpt.disabled, "basic Line method is still disabled (Coming Soon)");
+  ok(!!patternOpt && patternOpt.disabled, "basic Pattern method is still disabled (Coming Soon)");
+}
+{
+  // Basic — Tower recommend card
+  $("testMode").value = "basic"; $("testMode").dispatchEvent(new window.Event("change", { bubbles: true }));
+  ok($("basicMethod").value === "tower", "switching to basic mode defaults its method to tower");
+  click("recommendBtn");
+  ok($("towerRecommendCard").hidden === false, "tower recommend card shows for basic + tower");
+  ok($("recommendOut").hidden === true, "generic recommend text is hidden for tower (replaced by the card)");
+  ok(/Non-standard range/.test($("towerRecommendCard").textContent), "tower card flags its range as non-standard");
+  ok(/OrcaSlicer's stock Tower dialog default/.test($("towerRecommendCard").textContent), "tower card explains it differs from Orca's own dialog default");
+  ok($("towerMat").textContent === "PLA", "tower card shows the selected filament's material");
+  const s = parseFloat($("towerStart").textContent), e = parseFloat($("towerEnd").textContent), st = parseFloat($("towerStep").textContent);
+  ok(s === 0.01 && e === 0.07 && st === 0.005, "tower card start/end/step come from PLA's paRanges entry");
+  const expectHeight = Math.ceil((e - s) / st) + 1;
+  ok(parseInt($("towerHeightOut").textContent, 10) === expectHeight, "tower height mm = ceil((end-start)/step)+1");
+  // switching the Mode away and back to advanced hides the tower card again (advanced-only areas take over)
+  $("testMode").value = "advanced"; $("testMode").dispatchEvent(new window.Event("change", { bubbles: true }));
+  ok($("basicMethod").disabled === true, "method control re-locked in advanced");
 }
 $("maxFlow").value = "20"; $("maxFlow").dispatchEvent(new window.Event("input", { bubbles: true }));
 $("maxFlowConfirm").dispatchEvent(new window.Event("click", { bubbles: true }));   // re-confirm for the recommend flow below

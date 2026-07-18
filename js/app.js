@@ -1045,7 +1045,12 @@
     $("tab-test").dataset.mode = basic ? "basic" : "advanced";
     gateMaxFlow();   // basic ↔ advanced changes whether the gate applies
     const m = $("basicMethod");
-    if (basic) { m.disabled = false; m.value = lastBasicMethod || P.basicDefault; }
+    if (basic) {
+      let v = lastBasicMethod || P.basicDefault;
+      const opt = m.querySelector(`option[value="${v}"]`);
+      if (!opt || opt.disabled) v = P.basicDefault;   // fall back if the remembered method is disabled (still on the roadmap)
+      m.disabled = false; m.value = v;
+    }
     else { if (!m.disabled) lastBasicMethod = m.value; m.value = "pattern"; m.disabled = true; }
     updateModeHint();
   }
@@ -1081,15 +1086,31 @@
     const dp = step < 0.01 ? 3 : 2;
     if (isBasic()) {
       const method = $("basicMethod").value;
+      $("loadPointsBtn").hidden = true;
+      if (method === "tower") {
+        const towerHeightMm = Math.ceil((end - start) / step) + 1;
+        $("towerMat").textContent = mat || "(pick a filament)";
+        $("towerStart").textContent = start.toFixed(dp);
+        $("towerEnd").textContent = end.toFixed(dp);
+        $("towerStep").textContent = step.toFixed(dp);
+        $("towerHeightOut").textContent = towerHeightMm;
+        $("towerRecommendCard").hidden = false;
+        $("recommendOut").hidden = true;
+        currentSettings = { source: "recommended", mode: "basic", basicMethod: method, paStart: +start.toFixed(3), paEnd: +end.toFixed(3), paStep: +step.toFixed(3), towerHeightMm };
+        return;
+      }
+      $("towerRecommendCard").hidden = true;
+      $("recommendOut").hidden = false;
       const extra = method === "pattern" ? "\nIn Orca's pattern test, leave the acceleration and speed inputs blank." : "";
       $("recommendOut").textContent =
 `Material: ${mat || "(pick)"}   Drive: ${drive}   Method: ${method}
 PA range:  start ${start.toFixed(dp)}   end ${end.toFixed(dp)}   step ${step.toFixed(dp)}
 Run Orca's Pressure Advance ${method} test with that range, then read the single best PA and enter it below.${extra}`;
       currentSettings = { source: "recommended", mode: "basic", basicMethod: method, paStart: +start.toFixed(3), paEnd: +end.toFixed(3), paStep: +step.toFixed(3) };
-      $("loadPointsBtn").hidden = true;
       return;
     }
+    $("towerRecommendCard").hidden = true;
+    $("recommendOut").hidden = false;
     const maxFlow = num($("maxFlow").value);
     if (!maxFlow) { alert("Enter your max volumetric speed (mm³/s) first — from the results of your Max Flowrate test in Orca."); $("maxFlow").focus(); return; }
     const nFlow = speedPtsN();
