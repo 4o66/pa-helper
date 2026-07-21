@@ -13,12 +13,16 @@ need updating.
 Upstream source: `SoftFever/OrcaSlicer` (mirrored at `OrcaSlicer/OrcaSlicer`) —
 `src/libslic3r/calib.cpp`/`.hpp` (Pattern, Line), `src/slic3r/GUI/Plater.cpp`,
 `src/libslic3r/GCode.cpp`, `src/libslic3r/GCodeWriter.cpp`, and `src/slic3r/GUI/calib_dlg.cpp`
-(Tower).
+(Tower). `Plater.cpp` and `GCode.cpp` are too large for a direct raw fetch (truncates at ~94KB,
+well short of the calibration functions near line 5467/13823) — when a direct fetch won't reach
+far enough, cross-check via `grep.app` (code search across GitHub mirrors, no size limit) and
+GitHub's own file/PR view (via browser, not `web_fetch`) instead of assuming the truncated content
+is the whole file.
 Pattern last reviewed against `main`: **2026-07-18** — geometry has been stable since the pattern
 was introduced (2023-07-22, commit `777c7c68f9`); this pass added the Basic (single-block) mode
 section below, covering `calib_dlg.cpp`'s dialog behavior for blank accel/speed fields. Tower last
-reviewed against `main`: **2026-07-17**. Line last reviewed against `main`: **2026-07-18** — full
-`calib.cpp`/`.hpp` fetch, see the Line method section below.
+reviewed against `main`: **2026-07-17**. Line last reviewed against `main`: **2026-07-21** — see
+the "2026-07-21 upstream review" note at the end of the Line method section below.
 
 ## Derived line width (`src/libslic3r/Flow.cpp`)
 
@@ -279,3 +283,36 @@ new point layout in a throwaway Node script and visually inspecting the resultin
 ⚠ **Monthly tripwire:** if `CalibPressureAdvanceLine`'s constructor formulas, `m_space_y` /
 `m_length_short` / `m_length_long`, the prime/anchor wall mechanism, or the never-reassigned
 `m_number_len` change, `js/pattern.js: synthLineBlock()` needs updating to match.
+
+### 2026-07-21 upstream review — no impact
+
+Triggered by an OrcaSlicer app update. Found the relevant recent change: PR
+[#14440](https://github.com/OrcaSlicer/OrcaSlicer/pull/14440) "PA_Line Calibration QOL
+improvements and tweaks" (merged into `OrcaSlicer/OrcaSlicer:main`). It does three things, none of
+which touch the geometry PA-Helper replicates:
+
+- Constrains Line's bed-placement bounding box to the actual calibration geometry instead of the
+  full bed (fewer mesh-bed-leveling probe points) — a new `CalibPressureAdvanceLine::print_extents()`
+  mirrors `generate_test()`'s own math purely for *where Orca places the object on the bed*, not
+  the object's own shape.
+- Adds `;TYPE:`/`;HEIGHT:`/`;LAYER_CHANGE` GCodeProcessor reserved-tag comments to Line and Pattern
+  segments, fixing a gcode-viewer bug (wrong Z-height reported when a purge line precedes the
+  calibration, and Line's numbers appearing on the wrong layer in the viewer). Cosmetic/metadata
+  only — doesn't change any coordinate, constant, or formula.
+- Skips `EXCLUDE_OBJECT_DEFINE` for Line mode (a Prusa-firmware compatibility fix, unrelated to
+  geometry).
+
+Re-verified against the current source that everything PA-Helper mirrors is unchanged:
+`m_space_y=3.5`, `m_length_short=20`/`m_length_long=40`, the line-width formula, `m_number_line_width`/
+`m_thin_line_width = nozzle`, both digit point layouts (`Bottom_To_Top`/`Left_To_Right`),
+`auto_extrusion_width = 1.125×nozzle`, and the per-firmware `set_pressure_advance()` command
+strings all match this doc exactly. No PA-Helper code change needed.
+
+Two small things noticed in passing, not acted on (neither affects PA-Helper today):
+
+- `GCodeWriter::set_pressure_advance()` now has `if (pa < 0) return "";` — silently no-ops for
+  negative PA. Doesn't affect us; our ranges never go negative.
+- `CalibMode` gained `Calib_Auto_PA_Line`, `Calib_Cornering`, `Calib_Input_shaping_freq/damp` — new
+  calibration types. `Calib_Auto_PA_Line` sounds like it could be a sensor-driven automatic Line
+  variant; not investigated, since it's a different calibration mode from the manual
+  `Calib_PA_Line` this doc covers.
